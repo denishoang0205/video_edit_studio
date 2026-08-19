@@ -1,0 +1,32 @@
+﻿{
+  "source_path": "",
+  "dest_path": "",
+  "youtube_channels": [
+    {
+      "name": "Sample Channel",
+      "url": "https://www.youtube.com/@SampleChannel/videos",
+      "folder_name": "Sample Channel",
+      "note": "Kênh YouTube mẫu",
+      "total_downloaded": 0
+    }
+  ],
+  "tiktok_accounts": [
+    {
+      "account_name": "sample_account",
+      "password": "PasswordExample123",
+      "mail": "sample@example.com",
+      "mail_confirm": "",
+      "original_ip": "US",
+      "build_up_ip": "US",
+      "created_date": "2026-01-01",
+      "target_channel": "Sample Channel",
+      "content": "Shorts / Gaming",
+      "hashtag": "#viral #trending #fyp",
+      "note": "Ghi chú mẫu",
+      "target_history": [
+        "Sample Channel"
+      ],
+      "posted_clips": {}
+    }
+  ]
+}

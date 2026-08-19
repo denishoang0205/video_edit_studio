@@ -1,0 +1,23 @@
+﻿========================================================================
+       🎬 HƯỚNG DẪN SỬ DỤNG TIKTOK VIDEO STUDIO PRO
+========================================================================
+
+1. YÊU CẦU HỆ THỐNG:
+- Hệ điều hành: Windows 10 / 11.
+- Máy tính đã cài Python 3.8+ (Lưu ý: Khi cài Python, nhớ tích chọn ô "Add python.exe to PATH").
+
+2. CÁC BƯỚC KHỞI ĐỘNG TOOL:
+- Bước 1: Nhấp đúp vào file `Install_Dependencies.bat` (chỉ cần chạy 1 lần đầu tiên để cài thư viện đồ họa Pillow).
+- Bước 2: Nhấp đúp vào file `Run_Studio.bat` để chạy tool. Trình duyệt web sẽ tự động mở trang quản trị tại địa chỉ: http://localhost:8000
+
+3. TÙY BIẾN ĐƯỜNG DẪN SOURCE (INPUT) VÀ OUTPUT:
+- Vào tab "Workspaces" trên giao diện web:
+  + Ô "Local SOURCE Directory": Chọn hoặc dán đường dẫn thư mục chứa video gốc.
+  + Ô "Local DESTINATION Directory": Chọn hoặc dán đường dẫn thư mục lưu video xuất ra.
+  + Bấm "Save Paths" để lưu lại cấu hình.
+
+4. QUẢN LÝ KÊNH YOUTUBE & TỰ ĐỘNG TẠO THƯ MỤC:
+- Vào tab "YouTube Channels", bấm "Add New Channel" để thêm kênh.
+- Ngay khi bạn bấm Lưu kênh, hệ thống sẽ TỰ ĐỘNG TẠO THƯ MỤC TÊN KÊNH ở cả thư mục Nguồn (Input) và thư mục Đích (Output).
+- Bạn chỉ việc thả video gốc vào thư mục tên kênh tương ứng rồi quay lại tab "Editor Studio" để render.
+========================================================================

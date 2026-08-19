@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit studio - designed by Huy</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Montserrat:wght@600;700;800&family=Be+Vietnam+Pro:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css?v=4">
+</head>
+<body class="theme-system">
+    <div class="app-layout">
+        <!-- Top Navbar -->
+        <header class="top-navbar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <div>
+                    <h1 class="brand-title">Edit studio <span style="font-size: 10px; background: var(--primary); color: white; padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 6px;">v2.6</span></h1>
+                    <p class="brand-subtitle">designed by Huy</p>
+                </div>
+            </div>
+
+            <!-- Header Right Group: Navigation & Actions on the Right -->
+            <div class="header-right-group">
+                <!-- Tab Navigation Links -->
+                <nav class="tab-navigation">
+                    <button class="tab-link active" data-tab="tab-config">
+                        <i class="fa-solid fa-gear"></i> Workspaces
+                    </button>
+                    <button class="tab-link" data-tab="tab-channels">
+                        <i class="fa-solid fa-square-rss"></i> YouTube Channels
+                    </button>
+                    <button class="tab-link" data-tab="tab-tiktok">
+                        <i class="fa-brands fa-tiktok"></i> TikTok Accounts
+                    </button>
+                    <button class="tab-link" data-tab="tab-publishing">
+                        <i class="fa-solid fa-paper-plane"></i> Posting Tracker
+                    </button>
+                    <button class="tab-link" data-tab="tab-dashboard">
+                        <i class="fa-solid fa-chart-pie"></i> Analytics Dashboard
+                    </button>
+                    <button class="tab-link" data-tab="tab-studio">
+                        <i class="fa-solid fa-clapperboard"></i> Editor Studio
+                    </button>
+                    <button class="tab-link" data-tab="tab-outputs">
+                        <i class="fa-solid fa-circle-check"></i> Finished Library
+                    </button>
+                </nav>
+
+                <div class="header-actions">
+                    <!-- Dark/Light Theme Toggle -->
+                    <button class="btn-theme-toggle" id="theme-toggle" title="Toggle Light/Dark Mode">
+                        <i class="fa-solid fa-circle-half-stroke"></i>
+                    </button>
+                    
+                    <div class="status-badge" id="system-status">
+                        <span class="status-dot online"></span>
+                        <span id="status-text">Ready</span>
+                    </div>
+                    
+                    <button class="btn btn-outline btn-sm" id="btn-refresh-data" title="Refresh data">
+                        <i class="fa-solid fa-arrows-rotate"></i> Reload
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tab 0: Configuration (Source and Dest path setup) -->
+        <div id="tab-config" class="tab-content active">
+            <section class="panel config-panel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-gears text-primary"></i>
+                        <h3>Workspace Path Settings</h3>
+                    </div>
+                    <div class="panel-actions-group" style="display: flex; gap: 8px; align-items: center;">
+                        <button class="btn btn-primary btn-sm" id="btn-save-paths">
+                            <i class="fa-solid fa-floppy-disk"></i> Save Paths
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="btn-scan-source">
+                            <i class="fa-solid fa-magnifying-glass"></i> Scan Source Data
+                        </button>
+                        <button class="btn btn-outline btn-sm" id="btn-open-dest-folder" title="Open destination folder">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Destination Folder
+                        </button>
+                    </div>
+                </div>
+                <div class="panel-body-config" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Input Source Drive Link -->
+                    <div class="drive-input-group" style="width: 100%;">
+                        <div class="input-header">
+                            <label for="source-drive-link">
+                                <i class="fa-solid fa-folder-open text-primary"></i> 
+                                <strong>Local SOURCE Directory (Contains raw videos folder for editing)</strong>
+                            </label>
+                        </div>
+                        <div class="input-icon-wrapper" style="width: 100%; position: relative;">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <input type="text" id="source-drive-link" placeholder="e.g. c:\Users\bao huy\Documents\Tiktok builder" value="" style="width: 100%; padding-right: 40px;">
+                            <button type="button" class="btn-picker" id="btn-pick-source" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 15px; display: flex; align-items: center;" title="Select local directory">
+                                <i class="fa-solid fa-folder-tree"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Input Destination Drive Link -->
+                    <div class="drive-input-group" style="width: 100%;">
+                        <div class="input-header">
+                            <label for="dest-drive-link">
+                                <i class="fa-solid fa-folder-plus text-success"></i> 
+                                <strong>Local DESTINATION Directory (Output folder for finished videos)</strong>
+                            </label>
+                        </div>
+                        <div class="input-icon-wrapper" style="width: 100%; position: relative;">
+                            <i class="fa-solid fa-folder-plus"></i>
+                            <input type="text" id="dest-drive-link" placeholder="e.g. d:\Antigravity\tiktok_running\Tiktok_Builder_Output" value="" style="width: 100%; padding-right: 40px;">
+                            <button type="button" class="btn-picker" id="btn-pick-dest" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--success); cursor: pointer; font-size: 15px; display: flex; align-items: center;" title="Select local directory">
+                                <i class="fa-solid fa-folder-tree"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Tab 0.1: YouTube Target Channels Manager -->
+        <div id="tab-channels" class="tab-content">
+            <!-- Section 2: YouTube Channels Manager -->
+            <section class="panel config-panel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-square-rss text-primary"></i>
+                        <h3>📺 YouTube Target Channels Manager</h3>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="btn-toggle-channel-form">
+                        <i class="fa-solid fa-plus"></i> Add New Channel
+                    </button>
+                </div>
+
+                <!-- Add Channel Form (Collapsible) -->
+                <div class="config-form-body hidden" id="channel-form-area" style="padding: 20px; border-bottom: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.05);">
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label class="sub-label">YouTube Channel Name</label>
+                            <input type="text" id="input-channel-name" class="form-input" placeholder="e.g. SoyPato">
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label">Channel URL</label>
+                            <input type="text" id="input-channel-url" class="form-input" placeholder="e.g. https://youtube.com/@SoyPato">
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label">Corresponding Source Folder</label>
+                            <input type="text" id="input-channel-folder" class="form-input" placeholder="e.g. SoyPato (must match local source directory folder name)">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top: 12px; justify-content: flex-end;">
+                        <button class="btn btn-secondary btn-sm" id="btn-cancel-channel">Cancel</button>
+                        <button class="btn btn-primary btn-sm" id="btn-save-channel">Save Channel</button>
+                    </div>
+                </div>
+
+                <!-- Channels Table -->
+                <div class="table-scroll-area">
+                    <table class="dashboard-table">
+                        <thead>
+                            <tr>
+                                <th width="60">No.</th>
+                                <th>YouTube Channel Name</th>
+                                <th>Channel URL</th>
+                                <th>Source Folder Name</th>
+                                <th style="text-align: center;">Clips Downloaded</th>
+                                <th width="120" style="text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="channels-table-body">
+                            <!-- Loaded dynamically via JS -->
+                            <tr>
+                                <td colspan="6" class="table-empty">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Loading channel data...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- Tab 0.2: TikTok Accounts Manager -->
+        <div id="tab-tiktok" class="tab-content">
+            <!-- Section 3: TikTok Accounts Manager -->
+            <section class="panel config-panel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-brands fa-tiktok text-accent"></i>
+                        <h3>📱 TikTok Accounts Manager</h3>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="btn-toggle-account-form">
+                        <i class="fa-solid fa-plus"></i> Add New Account
+                    </button>
+                </div>
+
+                <!-- Add Account Form (Collapsible) -->
+                <div class="config-form-body hidden" id="account-form-area" style="padding: 20px; border-bottom: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.05);">
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label class="sub-label">TikTok Username (account_name)</label>
+                            <input type="text" id="input-acc-username" class="form-input" placeholder="e.g. soypato.t4">
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label">Password (password)</label>
+                            <div class="input-icon-wrapper" style="width: 100%;">
+                                <input type="password" id="input-acc-password" class="form-input" placeholder="Account password" style="width: 100%; padding-right: 35px;">
+                                <i class="fa-solid fa-eye-slash btn-toggle-pw" id="btn-toggle-input-pw" style="cursor: pointer; position: absolute; right: 12px; left: auto;"></i>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label">Registered Email (mail)</label>
+                            <input type="email" id="input-acc-email" class="form-input" placeholder="e.g. name@gmail.com">
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label">Recovery Email (mail_confirm)</label>
+                            <input type="email" id="input-acc-email-confirm" class="form-input" placeholder="e.g. backup@gmail.com">
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="margin-top: 12px;">
+                        <div class="form-col">
+                            <label class="sub-label">Original IP (original_ip)</label>
+                            <input type="text" id="input-acc-ip-orig" class="form-input" placeholder="e.g. 192.168.1.1">
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label">Nurtured IP (build_up_ip)</label>
+                            <input type="text" id="input-acc-ip-build" class="form-input" placeholder="e.g. 45.132.22.18">
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label">Creation Date (created_date)</label>
+                            <input type="date" id="input-acc-date" class="form-input">
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label">Target YouTube Channel (channel_name)</label>
+                            <select id="input-acc-target" class="form-select">
+                                <option value="">Select YouTube channel...</option>
+                                <!-- Loaded dynamically via JS -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="margin-top: 12px;">
+                        <div class="form-col" style="flex: 2;">
+                            <label class="sub-label">Default Hashtags</label>
+                            <input type="text" id="input-acc-hashtags" class="form-input" placeholder="e.g. #roblox #story #gaming">
+                        </div>
+                        <div class="form-col" style="flex: 1;">
+                            <label class="sub-label">Content Niche</label>
+                            <input type="text" id="input-acc-content" class="form-input" placeholder="e.g. roblox story">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 12px;">
+                        <label class="sub-label">Notes (note)</label>
+                        <input type="text" id="input-acc-note" class="form-input" placeholder="Add notes...">
+                    </div>
+
+                    <div class="form-row" style="margin-top: 16px; justify-content: flex-end;">
+                        <button class="btn btn-secondary btn-sm" id="btn-cancel-account">Cancel</button>
+                        <button class="btn btn-primary btn-sm" id="btn-save-account">Save Account</button>
+                    </div>
+                </div>
+
+                <!-- TikTok Accounts Table -->
+                <div class="table-scroll-area">
+                    <table class="dashboard-table">
+                        <thead>
+                            <tr>
+                                <th width="50">No.</th>
+                                <th>Account Name</th>
+                                <th>Password</th>
+                                <th>Mail / Confirm</th>
+                                <th>Original / Nurtured IP</th>
+                                <th>Target YouTube Channel</th>
+                                <th>Created Date</th>
+                                <th>Hashtags & Notes</th>
+                                <th width="120" style="text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accounts-table-body">
+                            <!-- Loaded dynamically via JS -->
+                            <tr>
+                                <td colspan="9" class="table-empty">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Loading accounts list...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- Tab 0.3: TikTok Publishing & Distribution Matrix -->
+        <div id="tab-publishing" class="tab-content">
+            <div class="publishing-layout-grid">
+                <!-- Left Sidebar: TikTok Accounts List with Progress -->
+                <aside class="panel pub-sidebar-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-group">
+                            <i class="fa-brands fa-tiktok text-accent"></i>
+                            <h3>TikTok Accounts</h3>
+                        </div>
+                        <span class="badge badge-info" id="pub-accounts-count">0 accounts</span>
+                    </div>
+
+                    <div class="pub-sidebar-search">
+                        <div class="input-icon-wrapper" style="width: 100%;">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="search-pub-account" class="form-input" placeholder="Search accounts..." style="width: 100%;">
+                        </div>
+                    </div>
+
+                    <div class="pub-accounts-list" id="pub-accounts-list">
+                        <!-- Loaded dynamically via JS -->
+                        <div class="empty-state">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i>
+                            <p>Loading accounts...</p>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Right Main Content: Active Account Details & Clips Feed -->
+                <main class="panel pub-main-panel">
+                    <!-- Top Bar: Account info & Target Channel Switcher -->
+                    <div class="pub-header-card" id="pub-active-account-header">
+                        <div class="pub-account-info-banner">
+                            <div class="pub-acc-title-row">
+                                <div class="pub-acc-avatar">
+                                    <i class="fa-brands fa-tiktok"></i>
+                                </div>
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                        <h3 id="pub-acc-name" style="font-size: 17px; font-weight: 800; color: var(--text-primary);">Select an account</h3>
+                                        <span class="badge badge-primary" id="pub-acc-ip-badge">IP: -</span>
+                                    </div>
+                                    <div class="pub-acc-meta" id="pub-acc-meta-text">
+                                        <span id="pub-acc-mail"><i class="fa-solid fa-envelope"></i> -</span>
+                                        <span id="pub-acc-hashtag" style="color: var(--accent);"><i class="fa-solid fa-hashtag"></i> -</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Target Channel Selector Box -->
+                            <div class="pub-target-switch-box">
+                                <div class="pub-target-label">
+                                    <i class="fa-solid fa-crosshairs text-danger"></i>
+                                    <strong>Target YouTube Channel:</strong>
+                                </div>
+                                <div class="pub-target-controls">
+                                    <select id="pub-select-target" class="form-select" style="min-width: 180px; font-weight: 700;">
+                                        <!-- Loaded dynamically -->
+                                    </select>
+                                    <button class="btn btn-sm btn-primary" id="btn-pub-change-target">
+                                        <i class="fa-solid fa-arrow-right-arrow-left"></i> Switch Target
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Action & Filter Bar -->
+                        <div class="pub-toolbar">
+                            <div class="pub-filter-group">
+                                <button class="btn btn-sm btn-secondary pub-filter-btn active" data-filter="all">All Clips (<span id="pub-count-all">0</span>)</button>
+                                <button class="btn btn-sm btn-secondary pub-filter-btn" data-filter="pending">Pending (<span id="pub-count-pending">0</span>)</button>
+                                <button class="btn btn-sm btn-secondary pub-filter-btn" data-filter="posted">Posted (<span id="pub-count-posted">0</span>)</button>
+                                
+                                <select id="pub-filter-channel" class="form-select" style="height: 32px; font-size: 11px; margin-left: 6px;">
+                                    <option value="all">All Source Channels</option>
+                                </select>
+                            </div>
+
+                            <div class="pub-action-group">
+                                <button class="btn btn-sm btn-outline" id="btn-pub-copy-hashtags" title="Copy Caption and Hashtags to Clipboard">
+                                    <i class="fa-regular fa-copy"></i> Copy Hashtags
+                                </button>
+                                <button class="btn btn-sm btn-outline-success" id="btn-pub-mark-all" title="Mark all filtered clips as posted">
+                                    <i class="fa-solid fa-check-double"></i> Mark All Posted
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Clips Table / Feed List -->
+                    <div class="pub-clips-container" id="pub-clips-container">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-clapperboard"></i>
+                            <p>Select a TikTok account from the left list to view available finished clips.</p>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- Tab 1: Dashboard & Statistics -->
+        <div id="tab-dashboard" class="tab-content">
+            <!-- Overall Stats Summary -->
+            <section class="stats-summary-grid">
+                <div class="stats-card glow-primary">
+                    <div class="stats-card-left">
+                        <span class="stats-label">Total Channels (Folders)</span>
+                        <h2 id="summary-total-folders">0</h2>
+                    </div>
+                    <div class="stats-card-icon bg-primary-soft">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+
+                <div class="stats-card glow-accent">
+                    <div class="stats-card-left">
+                        <span class="stats-label">Total Scanned Videos</span>
+                        <h2 id="summary-total-videos">0</h2>
+                    </div>
+                    <div class="stats-card-icon bg-accent-soft">
+                        <i class="fa-solid fa-film"></i>
+                    </div>
+                </div>
+
+                <div class="stats-card glow-success">
+                    <div class="stats-card-left">
+                        <span class="stats-label">Edited Videos</span>
+                        <h2 id="summary-edited-videos">0</h2>
+                    </div>
+                    <div class="stats-card-icon bg-success-soft">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                </div>
+
+                <div class="stats-card glow-warning">
+                    <div class="stats-card-left">
+                        <span class="stats-label">Unedited Videos</span>
+                        <h2 id="summary-unedited-videos">0</h2>
+                    </div>
+                    <div class="stats-card-icon bg-warning-soft">
+                        <i class="fa-solid fa-circle-play"></i>
+                    </div>
+                </div>
+
+                <div class="stats-card progress-circle-card">
+                    <div class="progress-info-group">
+                        <span class="stats-label">Completion Rate</span>
+                        <h2 id="summary-completion-rate">0%</h2>
+                    </div>
+                    <div class="completion-bar-track">
+                        <div class="completion-bar-fill" id="summary-completion-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Channels Detail Table / Grid -->
+            <section class="panel dashboard-detail-panel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-chart-line text-primary"></i>
+                        <h3>Progress Statistics by YouTube Channel (Folder)</h3>
+                    </div>
+                    <!-- Table Filtering Toolbar -->
+                    <div class="table-filter-toolbar">
+                        <div class="search-box-wrapper">
+                            <i class="fa-solid fa-filter"></i>
+                            <select id="select-folder-filter" class="form-select select-filter">
+                                <option value="all">All Folders</option>
+                                <!-- Rendered dynamically via JS -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-scroll-area">
+                    <table class="dashboard-table">
+                        <thead>
+                            <tr>
+                                <th width="60">No.</th>
+                                <th>Channel Name (Folder)</th>
+                                <th width="150" style="text-align: center;">Total Videos</th>
+                                <th width="150" style="text-align: center;">Edited</th>
+                                <th width="150" style="text-align: center;">Unedited</th>
+                                <th width="280">Progress</th>
+                                <th width="150" style="text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboard-table-body">
+                            <tr>
+                                <td colspan="7" class="table-empty">
+                                    <i class="fa-solid fa-folder-tree"></i> Please scan the source folder to display statistics.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- Tab 2: Studio Video Explorer & Editor -->
+        <div id="tab-studio" class="tab-content">
+            <div class="studio-layout-grid">
+                <!-- Column Left: Video Tree -->
+                <section class="panel video-explorer-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-group">
+                            <i class="fa-solid fa-folder-tree text-primary"></i>
+                            <h3>1. Video Explorer</h3>
+                        </div>
+                    </div>
+
+                    <div class="explorer-toolbar">
+                        <div class="batch-select-all">
+                            <label class="custom-checkbox">
+                                <input type="checkbox" id="chk-select-all">
+                                <span class="checkmark"></span>
+                                <span class="label-text">Select all unedited videos</span>
+                            </label>
+                        </div>
+                        <div class="filter-group">
+                            <button class="filter-btn active" data-filter="all">All</button>
+                            <button class="filter-btn" data-filter="unedited">Unedited</button>
+                            <button class="filter-btn" data-filter="edited">Edited</button>
+                        </div>
+                    </div>
+
+                    <div class="video-tree-container" id="video-tree-container">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <p>Set your source workspace directory and click <strong>"Scan Source Data"</strong>.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Column Center: Editing Configurations -->
+                <section class="panel studio-controls-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-group">
+                            <i class="fa-solid fa-sliders text-accent"></i>
+                            <h3>2. Control Panel</h3>
+                        </div>
+                        <span class="badge badge-accent">Auto-GPU Enabled</span>
+                    </div>
+
+                    <div class="controls-scroll-area">
+                        <!-- 1. Aspect ratio -->
+                        <div class="control-box">
+                            <label class="control-label">
+                                <i class="fa-solid fa-crop-simple"></i> Aspect Ratio
+                            </label>
+                            <div class="ratio-selector-grid">
+                                <label class="ratio-card active">
+                                    <input type="radio" name="aspect_ratio" value="3:4" checked>
+                                    <div class="ratio-preview ratio-3-4"></div>
+                                    <span class="ratio-name">3:4 (Viral)</span>
+                                    <span class="ratio-dim">1080 x 1440</span>
+                                </label>
+                                <label class="ratio-card">
+                                    <input type="radio" name="aspect_ratio" value="9:16">
+                                    <div class="ratio-preview ratio-9-16"></div>
+                                    <span class="ratio-name">9:16 (Shorts)</span>
+                                    <span class="ratio-dim">1080 x 1920</span>
+                                </label>
+                                <label class="ratio-card">
+                                    <input type="radio" name="aspect_ratio" value="16:9">
+                                    <div class="ratio-preview ratio-16-9"></div>
+                                    <span class="ratio-name">16:9 (YouTube)</span>
+                                    <span class="ratio-dim">1920 x 1080</span>
+                                </label>
+                                <label class="ratio-card">
+                                    <input type="radio" name="aspect_ratio" value="4:3">
+                                    <div class="ratio-preview ratio-4-3"></div>
+                                    <span class="ratio-name">4:3 (Classic)</span>
+                                    <span class="ratio-dim">1440 x 1080</span>
+                                </label>
+                                <label class="ratio-card">
+                                    <input type="radio" name="aspect_ratio" value="1:1">
+                                    <div class="ratio-preview ratio-1-1"></div>
+                                    <span class="ratio-name">1:1 (Square)</span>
+                                    <span class="ratio-dim">1080 x 1080</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 2. Effects -->
+                        <div class="control-box">
+                            <label class="control-label">
+                                <i class="fa-solid fa-wand-magic"></i> Video Effects & BG Settings
+                            </label>
+                            <div class="options-grid">
+                                <label class="toggle-card">
+                                    <input type="checkbox" id="effect-blur-bg" checked>
+                                    <span class="toggle-slider"></span>
+                                    <div class="toggle-info">
+                                        <strong>Double-layer Blur Background</strong>
+                                        <span>Blurs background and retains crisp foreground center</span>
+                                    </div>
+                                </label>
+                                <label class="toggle-card">
+                                    <input type="checkbox" id="effect-hflip">
+                                    <span class="toggle-slider"></span>
+                                    <div class="toggle-info">
+                                        <strong>Horizontal Flip</strong>
+                                        <span>Flips video horizontally to bypass AI copyright algorithms</span>
+                                    </div>
+                                </label>
+                                <label class="toggle-card">
+                                    <input type="checkbox" id="effect-color-boost" checked>
+                                    <span class="toggle-slider"></span>
+                                    <div class="toggle-info">
+                                        <strong>Color & Contrast Boost</strong>
+                                        <span>Enhances colors and increases video sharpness</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 3. Text & Banner Box style -->
+                        <div class="control-box">
+                            <label class="control-label">
+                                <i class="fa-solid fa-font"></i> Banner Template & Typography
+                            </label>
+                            
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <label class="sub-label">Banner Box Style</label>
+                                    <select id="banner-box-style" class="form-select">
+                                        <option value="white-rounded">Rounded White Box (Black Text)</option>
+                                        <option value="dark-glass">Dark Glassmorphism Box (White Text)</option>
+                                        <option value="pill-badge">Pill Badge Style (Black Text)</option>
+                                        <option value="none">No Box (Shadowed Text)</option>
+                                    </select>
+                                </div>
+                                <div class="form-col">
+                                    <label class="sub-label">Font Family</label>
+                                    <select id="banner-font" class="form-select">
+                                        <option value="Poppins-Bold">Poppins Bold (Modern)</option>
+                                        <option value="Montserrat-Bold">Montserrat Bold</option>
+                                        <option value="Arial-Bold">Arial Bold (Classic)</option>
+                                        <option value="BeVietnamPro-Bold">Be Vietnam Pro Bold</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <label class="sub-label">Banner Position</label>
+                                    <select id="banner-position" class="form-select">
+                                        <option value="top">Top</option>
+                                        <option value="center">Center</option>
+                                        <option value="bottom">Bottom</option>
+                                    </select>
+                                </div>
+                                <div class="form-col">
+                                    <label class="sub-label">Font Size</label>
+                                    <div class="range-with-val">
+                                        <input type="range" id="banner-font-size" min="30" max="64" value="46" step="2">
+                                        <span id="font-size-val">46px</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-top: 10px;">
+                                <label class="sub-label">Sample Title (Live Preview):</label>
+                                <input type="text" id="preview-text-input" class="form-input" value="AYUDÉ A EXTRAÑOS A LLEGAR A LAS 500 NOCHES">
+                            </div>
+                        </div>
+
+                        <!-- 4. Split video -->
+                        <div class="control-box">
+                            <label class="control-label">
+                                <i class="fa-solid fa-scissors"></i> Video Split Rules
+                            </label>
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <label class="sub-label">Split Mode</label>
+                                    <select id="split-mode" class="form-select">
+                                        <option value="auto">Auto Split by Duration (3 / 6 parts)</option>
+                                        <option value="fixed-3">Fixed 3 Parts (Part 1-3)</option>
+                                        <option value="fixed-6">Fixed 6 Parts (Part 1-6)</option>
+                                        <option value="no-split">No Split (Export Full Video Only)</option>
+                                    </select>
+                                </div>
+                                <div class="form-col">
+                                    <label class="sub-label">Export Full Video Output</label>
+                                    <select id="export-full-toggle" class="form-select">
+                                        <option value="yes">Export Full Video + Splitted Parts</option>
+                                        <option value="no">Export Splitted Parts Only</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Button Action Bar -->
+                    <div class="studio-execute-bar">
+                        <div class="selected-summary">
+                            <span>Selected: <strong id="selected-count-badge" class="text-primary">0</strong> videos</span>
+                        </div>
+                        <button class="btn btn-hero" id="btn-start-processing">
+                            <i class="fa-solid fa-play"></i> START BATCH PROCESS
+                        </button>
+                        <button class="btn btn-danger hidden" id="btn-stop-processing">
+                            <i class="fa-solid fa-stop"></i> Abort Processing
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Column Right: Live Preview Mockup -->
+                <section class="panel preview-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-group">
+                            <i class="fa-solid fa-eye text-primary"></i>
+                            <h3>Live Canvas Preview</h3>
+                        </div>
+                        <span class="preview-ratio-tag" id="preview-ratio-label">3:4 Canvas</span>
+                    </div>
+
+                    <div class="preview-canvas-wrapper">
+                        <div class="mockup-canvas ratio-3-4-canvas" id="mockup-canvas">
+                            <div class="canvas-bg-blur" id="canvas-bg-blur"></div>
+                            <div class="canvas-fg-video" id="canvas-fg-video">
+                                <div class="video-placeholder-content">
+                                    <i class="fa-solid fa-film"></i>
+                                    <span>Raw Video Centered</span>
+                                </div>
+                            </div>
+                            <div class="canvas-banner banner-white-rounded" id="canvas-banner">
+                                <span id="canvas-banner-text">AYUDÉ A EXTRAÑOS A LLEGAR A LAS 500 NOCHES</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="preview-footer-tips">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span>Simulates real canvas layout and title banner rendering.</span>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Queue Progress Section (Placed under editor in Tab 2) -->
+            <section class="panel queue-progress-panel" style="margin-top: 16px; min-height: 200px;">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-bolt text-accent"></i>
+                        <h3>Real-time Processing Console (Render Logs & Status)</h3>
+                    </div>
+                    <div class="queue-status" id="render-status-indicator">
+                        <span class="dot idle"></span>
+                        <span id="render-status-text">Waiting...</span>
+                    </div>
+                </div>
+
+                <div class="progress-bar-container">
+                    <div class="progress-info">
+                        <span id="progress-current-task">Idle (No active tasks)</span>
+                        <span id="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <div class="terminal-logs-window" id="terminal-logs-window">
+                    <div class="log-line text-muted">[Ready] Select videos on the left pane, configure settings, and click "START BATCH PROCESS".</div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Tab 3: Finished Products & Output Section -->
+        <div id="tab-outputs" class="tab-content">
+            <section class="panel finished-products-full-panel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-circle-check text-success"></i>
+                        <h3>Finished Library (Outputs)</h3>
+                        <span class="badge badge-primary" id="finished-total-badge" style="font-size: 11px;">0 videos</span>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button class="btn btn-sm btn-outline" id="btn-refresh-finished" title="Reload Finished Library">
+                            <i class="fa-solid fa-arrows-rotate"></i> Reload
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" id="btn-delete-all-finished" title="Clear all finished outputs">
+                            <i class="fa-solid fa-trash-can"></i> Delete All
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" id="link-open-gdrive-dest-tab">
+                            <i class="fa-solid fa-folder-open"></i> Open Destination Folder ↗
+                        </button>
+                    </div>
+                </div>
+
+                <div class="finished-list-container" id="finished-list-container" style="min-height: 380px;">
+                    <div class="empty-finished-state">
+                        <i class="fa-solid fa-clapperboard"></i>
+                        <p>No finished videos processed in this session yet.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Modal Video Player Preview -->
+    <div class="modal-overlay hidden" id="video-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h4 id="modal-video-title">Video Preview</h4>
+                <button class="btn-close-modal" id="btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <video id="modal-video-player" controls autoplay playsinline style="max-height: 70vh; width: 100%; border-radius: 8px;"></video>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=14"></script>
+</body>
+</html>

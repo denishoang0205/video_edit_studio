@@ -1,0 +1,39 @@
+﻿# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Output and Raw Media Files
+/video/*
+!/video/.gitkeep
+/Tiktok_Builder_Output/*
+!/Tiktok_Builder_Output/.gitkeep
+/input_sources/
+/output_product/
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.webm
+
+# Binaries (FFmpeg is auto-downloaded by Install_Dependencies.bat)
+/bin/*
+!/bin/.gitkeep
+
+# Sensitive User Data & Passwords
+accounts.json
+history.json
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
