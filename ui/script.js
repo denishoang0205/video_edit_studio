@@ -457,6 +457,12 @@ function renderVideoTree(folders) {
             cb.addEventListener('change', async (e) => {
                 if (e.target.checked) {
                     if (video.edited) {
+                        if (video.is_finished_only) {
+                            alert(`Video "${video.title}" đã được xuất thành phẩm hoàn tất trong thư mục Output!\n\n(Tệp video gốc đã được tự động dọn dẹp để tiết kiệm dung lượng đĩa. Nếu bạn muốn biên tập lại, hãy copy tệp video gốc mới vào thư mục Kênh).`);
+                            e.target.checked = false;
+                            return;
+                        }
+
                         const shouldReEdit = confirm(
                             `Video này đã có bản thành phẩm được tạo trước đó!\n\nBạn có muốn XÓA bản thành phẩm cũ để biên tập lại video:\n"${video.title}" không?`
                         );

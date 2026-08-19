@@ -68,158 +68,6 @@ def resolve_google_drive_path(url_or_path):
             return g_base
     return url_or_path
 
-def scan_source_directory(source_path, dest_path=None):
-    """
-    Quét thư mục nguồn (Local Path hoặc Google Drive Synced Folder)
-    Phân tích cấu trúc thư mục phân cấp:
-    Thư mục gốc -> Thư mục Kênh (vd: SoyPato) -> Các video con
-    """
-    resolved_source = resolve_google_drive_path(source_path)
-    resolved_dest = resolve_google_drive_path(dest_path)
-
-    # 1. Fallback nếu thư mục nguồn không tồn tại
-    if not resolved_source or not os.path.exists(resolved_source):
-        default_candidates = [
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "video"),
-            r"c:\Users\bao huy\Documents\Tiktok builder"
-        ]
-        for cand in default_candidates:
-            if os.path.exists(cand):
-                resolved_source = cand
-                break
-        if not resolved_source or not os.path.exists(resolved_source):
-            resolved_source = os.path.join(os.path.dirname(os.path.abspath(__file__)), "video")
-            os.makedirs(resolved_source, exist_ok=True)
-
-    # 2. Fallback nếu thư mục đích không tồn tại
-    if not resolved_dest or not os.path.exists(resolved_dest):
-        resolved_dest = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Tiktok_Builder_Output")
-        os.makedirs(resolved_dest, exist_ok=True)
-
-    history = load_history()
-    result_folders = []
-
-    # Duyệt các folder con trong resolved_source
-    try:
-        entries = sorted(os.listdir(resolved_source))
-    except Exception as e:
-        return {"error": f"Không thể đọc thư mục nguồn: {str(e)}"}
-
-    for entry in entries:
-        full_entry_path = os.path.join(resolved_source, entry)
-        if not os.path.isdir(full_entry_path) or entry.startswith('.'):
-            continue
-
-        folder_data = {
-            "name": entry,
-            "path": full_entry_path,
-            "videos": []
-        }
-
-        # Duyệt các video trong folder này
-        try:
-            sub_items = sorted(os.listdir(full_entry_path))
-            for sub in sub_items:
-                sub_path = os.path.join(full_entry_path, sub)
-                
-                # Trường hợp 1: Sub folder chứa video (như cấu trúc TikTok Builder: SoyPato / Tên Video / edited_full.mp4 hoặc raw.mp4)
-                if os.path.isdir(sub_path):
-                    video_title = sub
-                    sub_files = os.listdir(sub_path)
-                    
-                    # 1. Kiểm tra xem folder đã được xuất ở thư mục đích chưa (Quét 2 chiều cả raw và sanitized)
-                    dest_has_edited = False
-                    if resolved_dest:
-                        dirs_to_check = [
-                            os.path.join(resolved_dest, entry, video_title),
-                            os.path.join(resolved_dest, sanitize_filename(entry), sanitize_filename(video_title)),
-                            os.path.join(resolved_dest, sanitize_filename(entry), video_title),
-                            os.path.join(resolved_dest, entry, sanitize_filename(video_title))
-                        ]
-                        for dest_video_dir in dirs_to_check:
-                            if os.path.exists(dest_video_dir):
-                                dest_files = os.listdir(dest_video_dir)
-                                if any(f.endswith('.mp4') and (' - part ' in f or f.startswith('edited_')) for f in dest_files):
-                                    dest_has_edited = True
-                                    break
-                    
-                    # 2. Kiểm tra cục bộ trong folder nguồn
-                    local_has_edited = any(f.startswith("part_") or f.startswith("edited_") or ' - part ' in f for f in sub_files)
-                    
-                    # Tìm file raw
-                    video_file_path = None
-                    for f in sub_files:
-                        if f.endswith(('.mp4', '.mkv', '.mov', '.avi')) and not f.startswith(('part_', 'edited_', 'title_banner')):
-                            if ' - part ' not in f:
-                                video_file_path = os.path.join(sub_path, f)
-                                break
-                    
-                    # Nếu không có file raw, tìm bất kỳ file video nào
-                    if not video_file_path:
-                        for f in sub_files:
-                            if f.endswith(('.mp4', '.mkv', '.mov', '.avi')):
-                                video_file_path = os.path.join(sub_path, f)
-                                break
-                    
-                    # Nếu thư mục rỗng hoàn toàn không chứa file video nào, bỏ qua
-                    if not video_file_path:
-                        continue
-                    
-                    # Logic xác định trạng thái Đã Edit:
-                    # Nếu có resolved_dest -> dựa vào sự tồn tại của file thành phẩm ở thư mục đích
-                    # Nếu không có resolved_dest -> dùng lịch sử & local check
-                    if resolved_dest:
-                        is_edited = dest_has_edited
-                    else:
-                        is_edited = local_has_edited or (sub in history) or (sub_path in history)
-                        
-                    folder_data["videos"].append({
-                        "title": video_title,
-                        "path": video_file_path,
-                        "dir_path": sub_path,
-                        "edited": is_edited
-                    })
-                    
-                # Trường hợp 2: File video trực tiếp
-                elif sub.lower().endswith(('.mp4', '.mkv', '.mov', '.avi', '.webm')):
-                    video_title = os.path.splitext(sub)[0]
-                    
-                    # Kiểm tra xem folder đã được xuất ở thư mục đích chưa (Quét 2 chiều cả raw và sanitized)
-                    dest_has_edited = False
-                    if resolved_dest:
-                        dirs_to_check = [
-                            os.path.join(resolved_dest, entry, video_title),
-                            os.path.join(resolved_dest, sanitize_filename(entry), sanitize_filename(video_title)),
-                            os.path.join(resolved_dest, sanitize_filename(entry), video_title),
-                            os.path.join(resolved_dest, entry, sanitize_filename(video_title))
-                        ]
-                        for dest_video_dir in dirs_to_check:
-                            if os.path.exists(dest_video_dir):
-                                dest_files = os.listdir(dest_video_dir)
-                                if any(f.endswith('.mp4') and (' - part ' in f or f.startswith('edited_')) for f in dest_files):
-                                    dest_has_edited = True
-                                    break
-
-                    if resolved_dest:
-                        is_edited = dest_has_edited
-                    else:
-                        is_edited = (video_title in history) or (sub_path in history)
-                        
-                    folder_data["videos"].append({
-                        "title": video_title,
-                        "path": sub_path,
-                        "dir_path": full_entry_path,
-                        "edited": is_edited
-                    })
-
-        except Exception as err:
-            print(f"Lỗi đọc subfolder {entry}: {err}")
-
-        if folder_data["videos"]:
-            result_folders.append(folder_data)
-
-    return {"folders": result_folders, "source_path": source_path}
-
 def scan_finished_results(dest_path):
     """Quét các video thành phẩm đã xuất trong thư mục đích"""
     resolved_dest = resolve_google_drive_path(dest_path)
@@ -262,6 +110,216 @@ def scan_finished_results(dest_path):
         print(f"Lỗi quét output: {e}")
 
     return {"results": results}
+
+def scan_source_directory(source_path, dest_path=None):
+    """
+    Quét toàn diện thư mục nguồn và thư mục đích:
+    - Quét các video thô (raw) đang có ở Source.
+    - Quét các video đã biên tập (finished) ở Destination (Output) và trong history.json.
+    - Đảm bảo các chỉ số trên Dashboard, Editor Studio và Kênh YouTube luôn chính xác 100%
+      ngay cả sau khi video gốc đã được biên tập và xóa để tiết kiệm dung lượng đĩa.
+    """
+    resolved_source = resolve_google_drive_path(source_path)
+    resolved_dest = resolve_google_drive_path(dest_path)
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    if not resolved_source or not os.path.exists(resolved_source):
+        default_candidates = [
+            os.path.join(base_dir, "video"),
+            r"c:\Users\bao huy\Documents\Tiktok builder"
+        ]
+        for cand in default_candidates:
+            if os.path.exists(cand):
+                resolved_source = cand
+                break
+        if not resolved_source or not os.path.exists(resolved_source):
+            resolved_source = os.path.join(base_dir, "video")
+            os.makedirs(resolved_source, exist_ok=True)
+
+    if not resolved_dest or not os.path.exists(resolved_dest):
+        resolved_dest = os.path.join(base_dir, "Tiktok_Builder_Output")
+        os.makedirs(resolved_dest, exist_ok=True)
+
+    history = load_history()
+    accounts_data = load_accounts_data()
+
+    # Dùng map để gom nhóm video theo kênh
+    channel_map = {}
+
+    # 1. Khởi tạo từ danh sách YouTube Channels đã cấu hình
+    for chan in accounts_data.get("youtube_channels", []):
+        cname = chan.get("folder_name") or chan.get("name")
+        if not cname:
+            continue
+        c_path = os.path.join(resolved_source, sanitize_filename(cname)) if resolved_source else ""
+        channel_map[cname] = {
+            "name": cname,
+            "path": c_path if (c_path and os.path.exists(c_path)) else (os.path.join(resolved_source, cname) if resolved_source else ""),
+            "videos_dict": {}
+        }
+
+    # 2. Quét các folder và video trong resolved_source
+    if resolved_source and os.path.exists(resolved_source):
+        try:
+            entries = sorted(os.listdir(resolved_source))
+            for entry in entries:
+                full_entry_path = os.path.join(resolved_source, entry)
+                if not os.path.isdir(full_entry_path) or entry.startswith('.'):
+                    continue
+
+                matched_cname = None
+                for k in channel_map:
+                    if k == entry or sanitize_filename(k) == sanitize_filename(entry):
+                        matched_cname = k
+                        break
+                if not matched_cname:
+                    matched_cname = entry
+                    channel_map[matched_cname] = {
+                        "name": entry,
+                        "path": full_entry_path,
+                        "videos_dict": {}
+                    }
+
+                # Quét video bên trong folder kênh này
+                try:
+                    sub_items = sorted(os.listdir(full_entry_path))
+                    for sub in sub_items:
+                        sub_path = os.path.join(full_entry_path, sub)
+                        
+                        # Subfolder chứa video (vd: SoyPato / Video 1 / raw.mp4)
+                        if os.path.isdir(sub_path):
+                            v_title = sub
+                            sub_files = os.listdir(sub_path)
+                            video_file_path = None
+                            for f in sub_files:
+                                if f.endswith(('.mp4', '.mkv', '.mov', '.avi')) and not f.startswith(('part_', 'edited_', 'title_banner')):
+                                    if ' - part ' not in f:
+                                        video_file_path = os.path.join(sub_path, f)
+                                        break
+                            if not video_file_path:
+                                for f in sub_files:
+                                    if f.endswith(('.mp4', '.mkv', '.mov', '.avi')):
+                                        video_file_path = os.path.join(sub_path, f)
+                                        break
+                            
+                            if video_file_path:
+                                channel_map[matched_cname]["videos_dict"][v_title] = {
+                                    "title": v_title,
+                                    "path": video_file_path,
+                                    "dir_path": sub_path,
+                                    "edited": False,
+                                    "is_finished_only": False
+                                }
+                        # File video trực tiếp (vd: SoyPato / Video1.mp4)
+                        elif sub.lower().endswith(('.mp4', '.mkv', '.mov', '.avi', '.webm')):
+                            v_title = os.path.splitext(sub)[0]
+                            channel_map[matched_cname]["videos_dict"][v_title] = {
+                                "title": v_title,
+                                "path": sub_path,
+                                "dir_path": full_entry_path,
+                                "edited": False,
+                                "is_finished_only": False
+                            }
+                except Exception as err:
+                    print(f"Lỗi đọc thư mục {entry}: {err}")
+        except Exception as e:
+            print(f"Lỗi đọc thư mục nguồn: {e}")
+
+    # 3. Quét kết quả thành phẩm trong resolved_dest (Output)
+    finished_data = scan_finished_results(resolved_dest)
+    for finished_item in finished_data.get("results", []):
+        f_channel = finished_item.get("folder_name", "")
+        f_title = finished_item.get("title", "")
+        if not f_title:
+            continue
+
+        matched_cname = None
+        for k in channel_map:
+            if k == f_channel or sanitize_filename(k) == sanitize_filename(f_channel):
+                matched_cname = k
+                break
+        if not matched_cname:
+            matched_cname = f_channel if f_channel else "Output"
+            channel_map[matched_cname] = {
+                "name": matched_cname,
+                "path": os.path.join(resolved_dest, f_channel) if f_channel else resolved_dest,
+                "videos_dict": {}
+            }
+
+        # Tìm video trong channel_map
+        matched_vtitle = None
+        for v_k in channel_map[matched_cname]["videos_dict"]:
+            if v_k == f_title or sanitize_filename(v_k) == sanitize_filename(f_title):
+                matched_vtitle = v_k
+                break
+
+        if matched_vtitle:
+            channel_map[matched_cname]["videos_dict"][matched_vtitle]["edited"] = True
+        else:
+            channel_map[matched_cname]["videos_dict"][f_title] = {
+                "title": f_title,
+                "path": finished_item.get("path", ""),
+                "dir_path": finished_item.get("path", ""),
+                "edited": True,
+                "is_finished_only": True
+            }
+
+    # 4. Kiểm tra thêm trong history.json (đề phòng trường hợp file output bị sync trễ)
+    for h_key, h_val in history.items():
+        if not isinstance(h_val, dict):
+            continue
+        h_title = h_val.get("title") or h_key
+        h_channel = h_val.get("channel", "")
+        h_out = h_val.get("output_dir", "")
+        if not h_channel and h_out:
+            h_channel = os.path.basename(os.path.dirname(h_out))
+            
+        if not h_channel:
+            continue
+
+        matched_cname = None
+        for k in channel_map:
+            if k == h_channel or sanitize_filename(k) == sanitize_filename(h_channel):
+                matched_cname = k
+                break
+        if not matched_cname:
+            matched_cname = h_channel
+            channel_map[matched_cname] = {
+                "name": matched_cname,
+                "path": os.path.join(resolved_dest, h_channel) if h_channel else resolved_dest,
+                "videos_dict": {}
+            }
+
+        matched_vtitle = None
+        for v_k in channel_map[matched_cname]["videos_dict"]:
+            if v_k == h_title or sanitize_filename(v_k) == sanitize_filename(h_title):
+                matched_vtitle = v_k
+                break
+
+        if matched_vtitle:
+            channel_map[matched_cname]["videos_dict"][matched_vtitle]["edited"] = True
+        else:
+            channel_map[matched_cname]["videos_dict"][h_title] = {
+                "title": h_title,
+                "path": h_out,
+                "dir_path": h_out,
+                "edited": True,
+                "is_finished_only": True
+            }
+
+    # 5. Đóng gói kết quả trả về
+    result_folders = []
+    for cname, cdata in channel_map.items():
+        v_list = list(cdata["videos_dict"].values())
+        # Sắp xếp: Unedited lên trước để tiện biên tập, Edited xuống dưới
+        v_list.sort(key=lambda x: (x.get("edited", False), x.get("title", "")))
+        result_folders.append({
+            "name": cdata["name"],
+            "path": cdata["path"],
+            "videos": v_list
+        })
+
+    return {"folders": result_folders, "source_path": source_path}
 
 def remove_readonly(func, path, excinfo):
     """Callback xử lý file Read-Only trên Windows khi rmtree"""

@@ -162,6 +162,7 @@ def batch_worker(payload):
         # Ghi nhận trạng thái vào history
         history[title] = {
             "title": title,
+            "channel": channel,
             "status": "edited",
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "output_dir": video_out_dir,
@@ -233,34 +234,20 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/accounts":
             source_path = query.get("source", [""])[0]
             data = load_accounts_data()
+            dest_path = data.get("dest_path", os.path.join(BASE_DIR, "Tiktok_Builder_Output"))
             
-            # Giải mã/ánh xạ đường dẫn Google Drive nếu có
-            from drive_manager import resolve_google_drive_path
-            resolved_source = resolve_google_drive_path(source_path)
-            
-            # Tính toán số lượng video đã tải cho mỗi kênh
-            if resolved_source and os.path.exists(resolved_source):
-                for chan in data.get("youtube_channels", []):
-                    folder_name = chan.get("folder_name", chan.get("name"))
-                    chan_dir = os.path.join(resolved_source, folder_name)
-                    video_count = 0
-                    if os.path.exists(chan_dir) and os.path.isdir(chan_dir):
-                        try:
-                            sub_items = os.listdir(chan_dir)
-                            for sub in sub_items:
-                                sub_path = os.path.join(chan_dir, sub)
-                                if os.path.isdir(sub_path):
-                                    sub_files = os.listdir(sub_path)
-                                    if any(f.endswith(('.mp4', '.mkv', '.mov', '.avi')) and not f.startswith(('part_', 'edited_')) for f in sub_files):
-                                        video_count += 1
-                                elif sub.lower().endswith(('.mp4', '.mkv', '.mov', '.avi')):
-                                    video_count += 1
-                        except Exception:
-                            pass
-                    chan["total_downloaded"] = video_count
-            else:
-                for chan in data.get("youtube_channels", []):
-                    chan["total_downloaded"] = 0
+            # Quét tổng số video thực tế (cả thô và thành phẩm) của mỗi kênh
+            scan_res = scan_source_directory(source_path, dest_path)
+            folder_counts = {}
+            for f in scan_res.get("folders", []):
+                fname = f.get("name", "")
+                folder_counts[fname] = len(f.get("videos", []))
+                folder_counts[sanitize_filename(fname)] = len(f.get("videos", []))
+
+            for chan in data.get("youtube_channels", []):
+                folder_name = chan.get("folder_name", chan.get("name"))
+                c_count = folder_counts.get(folder_name, folder_counts.get(sanitize_filename(folder_name), 0))
+                chan["total_downloaded"] = c_count
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
