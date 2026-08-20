@@ -1,4 +1,4 @@
-﻿# Byte-compiled / optimized / DLL files
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -31,6 +31,7 @@ dist/
 # Sensitive User Data & Passwords
 accounts.json
 history.json
+settings.json
 
 # Operating System Files
 .DS_Store

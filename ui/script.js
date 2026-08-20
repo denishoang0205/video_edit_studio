@@ -14,9 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     initLivePreview();
     setupEventListeners();
+    initSettingsManager();
     initAccountsManager();
     initPublishingTracker();
 });
+
 
 /* ==========================================================================
    1. Tab Navigation & Theme Engine
@@ -263,7 +265,10 @@ function setupEventListeners() {
     btnStop.addEventListener('click', stopProcessing);
 
     const openDestFolderAction = () => {
-        const dest = document.getElementById('dest-drive-link').value.trim();
+        let dest = document.getElementById('dest-drive-link')?.value?.trim();
+        if (!dest) {
+            dest = accountsData.dest_path || 'D:/Antigravity/tiktok_running/output_product';
+        }
         if (dest.startsWith('http')) {
             window.open(dest, '_blank');
         } else {
@@ -275,11 +280,13 @@ function setupEventListeners() {
         }
     };
 
-    btnOpenDest.addEventListener('click', openDestFolderAction);
-    linkOpenGDriveTab.addEventListener('click', (e) => {
-        e.preventDefault();
-        openDestFolderAction();
-    });
+    if (btnOpenDest) btnOpenDest.addEventListener('click', openDestFolderAction);
+    if (linkOpenGDriveTab) {
+        linkOpenGDriveTab.addEventListener('click', (e) => {
+            e.preventDefault();
+            openDestFolderAction();
+        });
+    }
 
     const btnRefreshFinished = document.getElementById('btn-refresh-finished');
     if (btnRefreshFinished) {
@@ -341,7 +348,10 @@ function setupEventListeners() {
         e.preventDefault();
         pickFolderAction('dest-drive-link');
     });
+
+    initExplorerControls();
 }
+
 
 /* ==========================================================================
    4. Scan Drive & Folder Parser
@@ -399,34 +409,46 @@ async function scanSourcePath(sourcePath) {
     }
 }
 
+let currentVideoTreeFilter = 'all';
+let currentVideoTreeSearch = '';
+
 function renderVideoTree(folders) {
     const container = document.getElementById('video-tree-container');
+    const totalBadge = document.getElementById('explorer-total-badge');
+    
     if (!folders || folders.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
                 <i class="fa-solid fa-folder-open"></i>
-                <p>No videos found.</p>
+                <p>Không tìm thấy video nào. Hãy kiểm tra đường dẫn thư mục nguồn.</p>
             </div>
         `;
+        if (totalBadge) totalBadge.textContent = '0 Video';
         return;
     }
 
     container.innerHTML = '';
+    let totalVideosAcrossFolders = 0;
 
     folders.forEach(folder => {
-        const folderEl = document.createElement('div');
-        folderEl.className = 'folder-group';
-
         const totalVids = folder.videos.length;
+        totalVideosAcrossFolders += totalVids;
         const editedVids = folder.videos.filter(v => v.edited).length;
 
+        const folderEl = document.createElement('div');
+        folderEl.className = 'folder-group';
+        folderEl.dataset.folderName = folder.name;
+
         folderEl.innerHTML = `
-            <div class="folder-header">
+            <div class="folder-header" title="Bấm để mở/thu gọn thư mục ${escapeHtml(folder.name)}">
                 <div class="folder-left">
-                    <i class="fa-solid fa-folder-open text-primary"></i>
-                    <span>${folder.name}</span>
+                    <i class="fa-solid fa-folder-open text-primary folder-icon"></i>
+                    <span class="folder-name-text">${escapeHtml(folder.name)}</span>
                 </div>
-                <span class="badge badge-info">${editedVids}/${totalVids} Edited</span>
+                <div class="folder-right">
+                    <span class="badge ${editedVids === totalVids ? 'badge-success' : 'badge-info'}" style="font-size: 10px;">${editedVids}/${totalVids} Đã edit</span>
+                    <i class="fa-solid fa-chevron-down folder-chevron"></i>
+                </div>
             </div>
             <div class="folder-items-list"></div>
         `;
@@ -436,18 +458,20 @@ function renderVideoTree(folders) {
         folder.videos.forEach(video => {
             const itemEl = document.createElement('div');
             itemEl.className = `video-tree-item ${video.edited ? 'is-edited' : 'is-unedited'}`;
+            itemEl.dataset.videoTitle = video.title.toLowerCase();
+            itemEl.dataset.channelName = folder.name.toLowerCase();
 
             const badgeHtml = video.edited 
-                ? '<span class="badge-status edited"><i class="fa-solid fa-check"></i> Edited</span>'
-                : '<span class="badge-status unedited">⚪ Unedited</span>';
+                ? '<span class="badge-status edited"><i class="fa-solid fa-check"></i> Đã edit</span>'
+                : '<span class="badge-status unedited"><i class="fa-regular fa-circle"></i> Chưa edit</span>';
 
             itemEl.innerHTML = `
                 <div class="video-item-left">
                     <label class="custom-checkbox">
-                        <input type="checkbox" class="video-checkbox" data-path="${video.path}" data-title="${video.title}" data-edited="${video.edited}" data-channel="${folder.name}">
+                        <input type="checkbox" class="video-checkbox" data-path="${escapeAttr(video.path)}" data-title="${escapeAttr(video.title)}" data-edited="${video.edited}" data-channel="${escapeAttr(folder.name)}">
                         <span class="checkmark"></span>
                     </label>
-                    <span class="video-title-truncate" title="${video.title}">${video.title}</span>
+                    <span class="video-title-truncate" title="${escapeAttr(video.title)}">${escapeHtml(video.title)}</span>
                 </div>
                 <div>${badgeHtml}</div>
             `;
@@ -483,7 +507,7 @@ function renderVideoTree(folders) {
                                     video.edited = false;
                                     cb.dataset.edited = 'false';
                                     itemEl.className = 'video-tree-item is-unedited';
-                                    itemEl.querySelector('div:last-child').innerHTML = '<span class="badge-status unedited">⚪ Unedited</span>';
+                                    itemEl.querySelector('div:last-child').innerHTML = '<span class="badge-status unedited"><i class="fa-regular fa-circle"></i> Chưa edit</span>';
                                     fetchResults();
                                     selectedVideos.add(video.path);
                                     document.getElementById('preview-text-input').value = video.title;
@@ -510,36 +534,191 @@ function renderVideoTree(folders) {
             listEl.appendChild(itemEl);
         });
 
-        // Folder collapse toggle
+        // Folder accordion collapse toggle
         folderEl.querySelector('.folder-header').addEventListener('click', (e) => {
-            if (e.target.tagName === 'INPUT') return;
-            listEl.classList.toggle('hidden');
-            const icon = folderEl.querySelector('.folder-left i');
-            icon.className = listEl.classList.contains('hidden') ? 'fa-solid fa-folder text-muted' : 'fa-solid fa-folder-open text-primary';
+            if (e.target.tagName === 'INPUT' || e.target.closest('.custom-checkbox')) return;
+            folderEl.classList.toggle('is-collapsed');
+            const icon = folderEl.querySelector('.folder-icon');
+            if (icon) {
+                icon.className = folderEl.classList.contains('is-collapsed') 
+                    ? 'fa-solid fa-folder text-muted folder-icon' 
+                    : 'fa-solid fa-folder-open text-primary folder-icon';
+            }
         });
 
         container.appendChild(folderEl);
     });
+
+    if (totalBadge) totalBadge.textContent = `${totalVideosAcrossFolders} Video`;
+    
+    // Apply current filter & search
+    applyVideoTreeFilters();
+    initExplorerControls();
 }
 
 function updateExplorerStats(folders) {
     let totalVideos = 0;
     folders.forEach(f => totalVideos += f.videos.length);
+    const badge = document.getElementById('explorer-total-badge');
+    if (badge) badge.textContent = `${totalVideos} Video`;
     document.getElementById('selected-count-badge').textContent = selectedVideos.size;
 }
 
 function filterVideoTree(filter) {
-    const items = document.querySelectorAll('.video-tree-item');
-    items.forEach(item => {
-        if (filter === 'all') item.style.display = 'flex';
-        else if (filter === 'unedited') item.style.display = item.classList.contains('is-unedited') ? 'flex' : 'none';
-        else if (filter === 'edited') item.style.display = item.classList.contains('is-edited') ? 'flex' : 'none';
+    currentVideoTreeFilter = filter;
+    applyVideoTreeFilters();
+}
+
+function applyVideoTreeFilters() {
+    const filter = currentVideoTreeFilter;
+    const search = currentVideoTreeSearch.trim().toLowerCase();
+    const folderGroups = document.querySelectorAll('.folder-group');
+
+    folderGroups.forEach(folderEl => {
+        const items = folderEl.querySelectorAll('.video-tree-item');
+        let visibleCountInFolder = 0;
+
+        items.forEach(item => {
+            let matchesStatus = true;
+            if (filter === 'unedited') {
+                matchesStatus = item.classList.contains('is-unedited');
+            } else if (filter === 'edited') {
+                matchesStatus = item.classList.contains('is-edited');
+            }
+
+            let matchesSearch = true;
+            if (search) {
+                const title = item.dataset.videoTitle || '';
+                const channel = item.dataset.channelName || '';
+                matchesSearch = title.includes(search) || channel.includes(search);
+            }
+
+            if (matchesStatus && matchesSearch) {
+                item.style.display = 'flex';
+                visibleCountInFolder++;
+            } else {
+                item.style.display = 'none';
+            }
+        });
+
+        // Hide empty folder group if no matching videos inside
+        if (visibleCountInFolder > 0) {
+            folderEl.style.display = 'block';
+        } else {
+            folderEl.style.display = 'none';
+        }
     });
+}
+
+let explorerControlsInitialized = false;
+function initExplorerControls() {
+    if (explorerControlsInitialized) return;
+    explorerControlsInitialized = true;
+
+    // 1. Search Box input & clear
+    const searchInput = document.getElementById('input-explorer-search');
+    const clearBtn = document.getElementById('btn-clear-explorer-search');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            currentVideoTreeSearch = e.target.value;
+            if (clearBtn) {
+                if (currentVideoTreeSearch) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+            }
+            applyVideoTreeFilters();
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (searchInput) {
+                searchInput.value = '';
+                currentVideoTreeSearch = '';
+                clearBtn.classList.add('hidden');
+                applyVideoTreeFilters();
+            }
+        });
+    }
+
+    // 2. Toggle Collapse All Folders
+    const btnToggleAll = document.getElementById('btn-toggle-all-folders');
+    if (btnToggleAll) {
+        let allCollapsed = false;
+        btnToggleAll.addEventListener('click', () => {
+            allCollapsed = !allCollapsed;
+            const folders = document.querySelectorAll('.folder-group');
+            folders.forEach(f => {
+                const icon = f.querySelector('.folder-icon');
+                if (allCollapsed) {
+                    f.classList.add('is-collapsed');
+                    if (icon) icon.className = 'fa-solid fa-folder text-muted folder-icon';
+                } else {
+                    f.classList.remove('is-collapsed');
+                    if (icon) icon.className = 'fa-solid fa-folder-open text-primary folder-icon';
+                }
+            });
+            btnToggleAll.title = allCollapsed ? 'Mở rộng tất cả thư mục' : 'Thu gọn tất cả thư mục';
+        });
+    }
+
+    // 3. Collapse/Expand Explorer Panel
+    const btnCollapsePanel = document.getElementById('btn-collapse-explorer-panel');
+    const explorerPanel = document.getElementById('video-explorer-panel');
+    const iconCollapse = document.getElementById('icon-collapse-explorer');
+
+    if (btnCollapsePanel && explorerPanel) {
+        btnCollapsePanel.addEventListener('click', () => {
+            explorerPanel.classList.toggle('is-collapsed');
+            if (iconCollapse) {
+                iconCollapse.className = explorerPanel.classList.contains('is-collapsed')
+                    ? 'fa-solid fa-chevron-down'
+                    : 'fa-solid fa-chevron-up';
+            }
+        });
+    }
+
+    // 4. Resize Handle for Video Tree Container (Thanh kéo chiều cao)
+    const resizeHandle = document.getElementById('explorer-resize-handle');
+    const treeContainer = document.getElementById('video-tree-container');
+
+    if (resizeHandle && treeContainer) {
+        let isDragging = false;
+        let startY = 0;
+        let startHeight = 0;
+
+        resizeHandle.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startY = e.clientY;
+            startHeight = treeContainer.offsetHeight;
+            resizeHandle.classList.add('is-dragging');
+            document.body.style.cursor = 'ns-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const deltaY = e.clientY - startY;
+            const newHeight = Math.max(220, Math.min(850, startHeight + deltaY));
+            treeContainer.style.height = `${newHeight}px`;
+            treeContainer.style.maxHeight = `${newHeight}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                resizeHandle.classList.remove('is-dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
+    }
 }
 
 function updateSelectedCount() {
     document.getElementById('selected-count-badge').textContent = selectedVideos.size;
 }
+
 
 /* ==========================================================================
    5. Tab 1: Dashboard Analytics Calculations & Rendering
@@ -980,10 +1159,14 @@ function openLocalFile(filePath) {
 }
 
 function openOutputDirectory(folderPath) {
+    let target = folderPath;
+    if (!target) {
+        target = document.getElementById('dest-drive-link')?.value?.trim() || accountsData.dest_path || 'D:/Antigravity/tiktok_running/output_product';
+    }
     fetch('/api/open_folder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: folderPath })
+        body: JSON.stringify({ path: target })
     });
 }
 
@@ -1156,6 +1339,7 @@ function initAccountsManager() {
         const emailConfirm = document.getElementById('input-acc-email-confirm').value.trim();
         const ipOrig = document.getElementById('input-acc-ip-orig').value.trim();
         const ipBuild = document.getElementById('input-acc-ip-build').value.trim();
+        const adspowerId = document.getElementById('input-acc-adspower')?.value.trim() || '';
         const date = document.getElementById('input-acc-date').value;
         const target = document.getElementById('input-acc-target').value;
         const hashtags = document.getElementById('input-acc-hashtags').value.trim();
@@ -1174,6 +1358,7 @@ function initAccountsManager() {
             mail_confirm: emailConfirm,
             original_ip: ipOrig,
             build_up_ip: ipBuild,
+            adspower_id: adspowerId,
             created_date: date,
             target_channel: target,
             content: content,
@@ -1195,6 +1380,26 @@ function initAccountsManager() {
             await fetchAccountsData();
         }
     });
+
+    // Quick select AdsPower profile
+    const selectAdsQuick = document.getElementById('select-acc-adspower-quick');
+    if (selectAdsQuick) {
+        selectAdsQuick.addEventListener('change', (e) => {
+            if (e.target.value) {
+                const inputAds = document.getElementById('input-acc-adspower');
+                if (inputAds) inputAds.value = e.target.value;
+            }
+        });
+    }
+
+    const btnRefreshAdsProfiles = document.getElementById('btn-refresh-adspower-profiles');
+    if (btnRefreshAdsProfiles) {
+        btnRefreshAdsProfiles.addEventListener('click', () => {
+            if (typeof fetchAdsPowerProfiles === 'function') {
+                fetchAdsPowerProfiles(true);
+            }
+        });
+    }
     
     fetchAccountsData();
 }
@@ -1212,6 +1417,8 @@ function clearAccountForm() {
     document.getElementById('input-acc-email-confirm').value = '';
     document.getElementById('input-acc-ip-orig').value = '';
     document.getElementById('input-acc-ip-build').value = '';
+    if (document.getElementById('input-acc-adspower')) document.getElementById('input-acc-adspower').value = '';
+    if (document.getElementById('select-acc-adspower-quick')) document.getElementById('select-acc-adspower-quick').value = '';
     document.getElementById('input-acc-date').value = '';
     document.getElementById('input-acc-target').value = '';
     document.getElementById('input-acc-hashtags').value = '';
@@ -1333,9 +1540,14 @@ function renderAccountsTable() {
             ? `<div>${acc.mail}</div>${acc.mail_confirm ? `<div style="font-size: 11px; opacity:0.6;"><i class="fa-solid fa-reply"></i> ${acc.mail_confirm}</div>` : ''}` 
             : '<span class="text-muted">-</span>';
             
+        const adspowerDisplay = (acc.adspower_id || acc.adspower_serial)
+            ? `<div style="margin-top:3px;"><span class="badge-adspower" title="AdsPower Profile ID"><i class="fa-solid fa-bolt"></i> ${escapeHtml(acc.adspower_id || acc.adspower_serial)}</span></div>`
+            : `<div style="margin-top:3px;"><span style="font-size:10px; opacity:0.6;"><i class="fa-solid fa-bolt"></i> Auto</span></div>`;
+
         const ipDisplay = `
             <div><span class="badge-ip" title="Original IP"><i class="fa-solid fa-house"></i> ${acc.original_ip || 'No IP'}</span></div>
             <div><span class="badge-ip" title="Nurtured IP"><i class="fa-solid fa-network-wired"></i> ${acc.build_up_ip || 'No IP'}</span></div>
+            ${adspowerDisplay}
         `;
         
         const matchingChan = (accountsData.youtube_channels || []).find(c => c.name === acc.target_channel);
@@ -1443,6 +1655,9 @@ function editAccount(idx) {
     document.getElementById('input-acc-email-confirm').value = acc.mail_confirm || '';
     document.getElementById('input-acc-ip-orig').value = acc.original_ip || '';
     document.getElementById('input-acc-ip-build').value = acc.build_up_ip || '';
+    if (document.getElementById('input-acc-adspower')) {
+        document.getElementById('input-acc-adspower').value = acc.adspower_id || acc.adspower_serial || '';
+    }
     document.getElementById('input-acc-date').value = acc.created_date || '';
     document.getElementById('input-acc-target').value = acc.target_channel || '';
     document.getElementById('input-acc-hashtags').value = acc.hashtag || '';
@@ -1456,6 +1671,7 @@ function editAccount(idx) {
 }
 
 async function deleteAccount(idx) {
+
     accountsData.tiktok_accounts.splice(idx, 1);
     const success = await saveAccountsToBackend();
     if (success) {
@@ -1517,6 +1733,46 @@ function initPublishingTracker() {
 
     if (btnMarkAll) {
         btnMarkAll.addEventListener('click', handleBatchMarkAllPosted);
+    }
+
+    const btnSelectAllPending = document.getElementById('btn-pub-select-all-pending');
+    if (btnSelectAllPending) {
+        btnSelectAllPending.addEventListener('click', () => {
+            const allChks = document.querySelectorAll('.part-pill-chk');
+            let hasAny = false;
+            allChks.forEach(chk => {
+                const pill = chk.closest('.part-pill');
+                const isPosted = pill && pill.classList.contains('part-chip-posted');
+                if (!isPosted) {
+                    chk.checked = true;
+                    if (pill) pill.classList.add('is-selected');
+                    hasAny = true;
+                }
+            });
+            updateGlobalSelectedPartsCount();
+            if (!hasAny) {
+                alert('Tất cả các part đã được đăng!');
+            }
+        });
+    }
+
+    const btnBatchPostSelected = document.getElementById('btn-pub-batch-post-selected');
+    if (btnBatchPostSelected) {
+        btnBatchPostSelected.addEventListener('click', () => {
+            const checkedChks = Array.from(document.querySelectorAll('.part-pill-chk:checked'));
+            if (checkedChks.length === 0) {
+                alert('Vui lòng tích chọn ít nhất 1 Part trên danh sách để đăng!');
+                return;
+            }
+            const partsList = checkedChks.map(chk => ({
+                clip_key: chk.dataset.clipKey,
+                channel: chk.dataset.channel,
+                title: chk.dataset.title,
+                file_path: chk.dataset.filePath,
+                label: chk.dataset.partLabel
+            }));
+            handleBatchPostGlobalParts(partsList);
+        });
     }
 
     if (btnRefreshPub) {
@@ -1751,27 +2007,41 @@ function renderPublishingClipsFeed() {
             sourceBadgeHtml = `<span class="pub-source-badge pub-source-history" title="Kênh trước đây đã lưu lịch sử"><i class="fa-solid fa-clock-rotate-left"></i> ${escapeHtml(clip.channel)} (Kênh cũ)</span>`;
         }
 
-        // Parts buttons
+        // Parts buttons: Tinh gọn UX/UI (Checkbox phía trước + Tên Part + Icon trạng thái phía sau)
         let partsHtml = '';
         if (clip.parts && clip.parts.length > 0) {
             partsHtml = `
-                <div class="finished-parts-chips" style="margin-top: 4px;">
-                    ${clip.parts.map((p, idx) => `
-                        <button type="button" class="finished-part-chip" onclick="playFinishedVideo('${encodeURIComponent(p.url)}', '${escapeAttr(clip.title)} - Part ${idx + 1}')" title="Xem trước ${escapeAttr(p.name)}">
-                            <i class="fa-solid fa-play" style="font-size: 8px;"></i> Part ${idx + 1}
-                        </button>
-                    `).join('')}
+                <div class="finished-parts-chips" style="margin-top: 6px;">
+                    ${clip.parts.map((p, idx) => {
+                        const partLabel = p.label || `Part ${idx + 1}`;
+                        const isPartPosted = p.posted;
+                        const partBadgeClass = isPartPosted ? 'part-chip-posted' : '';
+                        const partFilePath = p.file_path || '';
+                        return `
+                            <div class="part-pill ${partBadgeClass}" data-part="${partLabel}">
+                                <label class="part-pill-chk-label" title="Tích chọn để đăng ${partLabel}">
+                                    <input type="checkbox" class="part-pill-chk" data-clip-key="${escapeAttr(clip.key)}" data-part-label="${partLabel}" data-file-path="${escapeAttr(partFilePath)}" data-channel="${escapeAttr(clip.channel)}" data-title="${escapeAttr(clip.title)}">
+                                </label>
+                                <button type="button" class="part-pill-preview" onclick="playFinishedVideo('${encodeURIComponent(p.url)}', '${escapeAttr(clip.title)} - ${partLabel}')" title="Xem trước ${escapeAttr(p.name || partLabel)}">
+                                    <i class="fa-solid fa-play" style="font-size: 9px;"></i> ${escapeHtml(partLabel)}
+                                </button>
+                                <button type="button" class="part-pill-toggle" onclick="handleTogglePartPost('${escapeAttr(clip.key)}', '${escapeAttr(clip.channel)}', '${escapeAttr(clip.title)}', '${partLabel}', ${!isPartPosted})" title="${isPartPosted ? 'Đã đăng ' + (p.posted_at || '') + ' (Bấm để hủy)' : 'Chưa đăng (Bấm để đánh dấu Đã Đăng)'}">
+                                    <i class="fa-solid ${isPartPosted ? 'fa-circle-check text-success' : 'fa-circle-dot text-muted'}"></i>
+                                </button>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             `;
         }
 
         const postedTagHtml = clip.posted 
-            ? `<span class="pub-posted-tag"><i class="fa-solid fa-circle-check"></i> Đã đăng ${clip.posted_at ? `(${clip.posted_at})` : ''}</span>`
+            ? `<span class="pub-posted-tag"><i class="fa-solid fa-circle-check"></i> Đã đăng đủ part ${clip.posted_at ? `(${clip.posted_at})` : ''}</span>`
             : '';
 
         row.innerHTML = `
             <div class="pub-clip-left">
-                <button type="button" class="pub-clip-checkbox-btn" title="${clip.posted ? 'Bấm để đánh dấu Chưa Đăng' : 'Bấm để đánh dấu ĐÃ ĐĂNG'}" onclick="handleToggleClipPost('${escapeAttr(clip.key)}', '${escapeAttr(clip.channel)}', '${escapeAttr(clip.title)}', ${!clip.posted})">
+                <button type="button" class="pub-clip-checkbox-btn" title="${clip.posted ? 'Bấm để đánh dấu Chưa Đăng tất cả part' : 'Bấm để đánh dấu ĐÃ ĐĂNG tất cả part'}" onclick="handleToggleClipPost('${escapeAttr(clip.key)}', '${escapeAttr(clip.channel)}', '${escapeAttr(clip.title)}', ${!clip.posted})">
                     <i class="fa-solid fa-check"></i>
                 </button>
                 <div class="pub-clip-info">
@@ -1785,6 +2055,9 @@ function renderPublishingClipsFeed() {
             </div>
 
             <div class="pub-clip-actions">
+                <button class="btn btn-sm btn-post-auto" onclick="handleSelectPartToPost('${escapeAttr(clip.key)}', '${escapeAttr(clip.channel)}', '${escapeAttr(clip.title)}', '${escapeAttr(clip.path || '')}')" title="Đăng các Part đã chọn hoặc chọn Part">
+                    <i class="fa-brands fa-tiktok"></i> Đăng TikTok
+                </button>
                 <button class="btn btn-sm btn-secondary" onclick="handleCopyCaptionForClip('${escapeAttr(clip.title)}')" title="Sao chép Tiêu đề clip + Hashtag tài khoản">
                     <i class="fa-regular fa-copy"></i> Copy Caption
                 </button>
@@ -1798,6 +2071,945 @@ function renderPublishingClipsFeed() {
 
         container.appendChild(row);
     });
+
+    // Lắng nghe sự kiện click checkbox trên từng Part Pill
+    container.querySelectorAll('.part-pill-chk').forEach(chk => {
+        chk.addEventListener('change', () => {
+            const pill = chk.closest('.part-pill');
+            if (chk.checked) {
+                pill.classList.add('is-selected');
+            } else {
+                pill.classList.remove('is-selected');
+            }
+            updateGlobalSelectedPartsCount();
+        });
+    });
+
+    updateGlobalSelectedPartsCount();
+}
+
+function updateGlobalSelectedPartsCount() {
+    const totalSelected = document.querySelectorAll('.part-pill-chk:checked').length;
+    const badgeEl = document.getElementById('pub-selected-parts-total');
+    if (badgeEl) badgeEl.textContent = totalSelected;
+}
+
+// Xử lý khi bấm nút Đăng TikTok tổng: Mở Part Selection Modal hỗ trợ Đăng Tất Cả & Multi-select Part
+function handleSelectPartToPost(clipKey, channel, title, videoPath) {
+    if (!activePublishingAccountName) {
+        alert('Vui lòng chọn tài khoản TikTok cần đăng!');
+        return;
+    }
+    const accounts = publishingMatrixData.accounts || [];
+    const acc = accounts.find(a => a.account_name === activePublishingAccountName);
+    if (!acc) return;
+    const clip = acc.clips?.find(c => c.key === clipKey);
+    if (!clip) return;
+
+    if (!clip.parts || clip.parts.length <= 1) {
+        // Chỉ có 1 part hoặc không phân part -> đăng trực tiếp
+        const singlePart = clip.parts && clip.parts.length === 1 ? clip.parts[0] : null;
+        handleAutoPostToTikTok(clipKey, channel, title, videoPath, singlePart?.file_path || '', singlePart?.label || '');
+        return;
+    }
+
+    // Mở Part Selection Modal
+    const modal = document.getElementById('part-selection-modal');
+    const titleEl = document.getElementById('part-select-clip-title');
+    const accEl = document.getElementById('part-select-target-account');
+    const countEl = document.getElementById('part-select-count');
+    const listEl = document.getElementById('part-selection-list');
+    const selectedCountEl = document.getElementById('selected-parts-count');
+    const btnSelectAll = document.getElementById('btn-select-all-parts');
+    const btnSelectPending = document.getElementById('btn-select-pending-parts');
+    const btnDeselectAll = document.getElementById('btn-deselect-all-parts');
+    const btnPostAll = document.getElementById('btn-post-all-parts-direct');
+    const btnPostSelected = document.getElementById('btn-post-selected-parts');
+    const btnCancel = document.getElementById('btn-cancel-part-select');
+    const btnClose = document.getElementById('btn-close-part-select-modal');
+
+    titleEl.textContent = title;
+    accEl.textContent = `Đăng lên: @${acc.account_name} (AdsPower: ${acc.adspower_id || acc.adspower_serial || 'Default'} | IP: ${acc.build_up_ip || acc.original_ip || 'US'})`;
+    countEl.textContent = clip.parts.length;
+
+    const updateSelectedCount = () => {
+        const checkedBoxes = listEl.querySelectorAll('.part-select-checkbox:checked');
+        selectedCountEl.textContent = checkedBoxes.length;
+        btnPostSelected.disabled = checkedBoxes.length === 0;
+        if (checkedBoxes.length === 0) {
+            btnPostSelected.style.opacity = '0.5';
+        } else {
+            btnPostSelected.style.opacity = '1';
+        }
+    };
+
+    // Render danh sách part (Mặc định không tích chọn part nào)
+    listEl.innerHTML = clip.parts.map((p, idx) => {
+        const isPosted = !!p.posted;
+        const pLabel = p.label || `Part ${idx + 1}`;
+        return `
+            <div class="part-select-item ${isPosted ? 'is-posted' : ''}" data-idx="${idx}">
+                <label class="part-select-label" for="part-chk-${idx}">
+                    <input type="checkbox" id="part-chk-${idx}" class="part-select-checkbox" data-idx="${idx}">
+                    <span class="part-select-num-badge">${escapeHtml(pLabel)}</span>
+                    <span class="part-select-filename" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || 'part_' + (idx + 1) + '.mp4')}</span>
+                </label>
+                <span class="part-select-status-badge ${isPosted ? 'posted' : 'pending'}">
+                    ${isPosted ? '<i class="fa-solid fa-check"></i> Đã đăng' : '<i class="fa-regular fa-clock"></i> Chưa đăng'}
+                </span>
+            </div>
+        `;
+    }).join('');
+
+    updateSelectedCount();
+
+    // Lắng nghe thay đổi checkbox
+    listEl.querySelectorAll('.part-select-checkbox').forEach(chk => {
+        chk.addEventListener('change', () => {
+            const item = chk.closest('.part-select-item');
+            if (chk.checked) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+            updateSelectedCount();
+        });
+    });
+
+    btnSelectAll.onclick = () => {
+        listEl.querySelectorAll('.part-select-checkbox').forEach(chk => {
+            chk.checked = true;
+            chk.closest('.part-select-item').classList.add('selected');
+        });
+        updateSelectedCount();
+    };
+
+    btnSelectPending.onclick = () => {
+        listEl.querySelectorAll('.part-select-item').forEach(item => {
+            const chk = item.querySelector('.part-select-checkbox');
+            const isPosted = item.classList.contains('is-posted');
+            chk.checked = !isPosted;
+            if (chk.checked) item.classList.add('selected');
+            else item.classList.remove('selected');
+        });
+        updateSelectedCount();
+    };
+
+    btnDeselectAll.onclick = () => {
+        listEl.querySelectorAll('.part-select-checkbox').forEach(chk => {
+            chk.checked = false;
+            chk.closest('.part-select-item').classList.remove('selected');
+        });
+        updateSelectedCount();
+    };
+
+    const closePartModal = () => {
+        modal.classList.add('hidden');
+    };
+
+    btnCancel.onclick = closePartModal;
+    btnClose.onclick = closePartModal;
+
+    // Option 1: Đăng TẤT CẢ Part theo thứ tự
+    btnPostAll.onclick = () => {
+        closePartModal();
+        handleBatchPostParts(clipKey, channel, title, videoPath, clip.parts);
+    };
+
+    // Option 2: Đăng các Part ĐÃ CHỌN theo thứ tự
+    btnPostSelected.onclick = () => {
+        const checkedIndices = Array.from(listEl.querySelectorAll('.part-select-checkbox:checked')).map(chk => parseInt(chk.dataset.idx));
+        if (checkedIndices.length === 0) {
+            alert('Vui lòng chọn ít nhất 1 Part để đăng!');
+            return;
+        }
+        const selectedParts = checkedIndices.map(i => clip.parts[i]).filter(Boolean);
+        closePartModal();
+        handleBatchPostParts(clipKey, channel, title, videoPath, selectedParts);
+    };
+
+    modal.classList.remove('hidden');
+}
+
+// Hàm thực thi đăng hàng loạt (Batch sequential post) nhiều Part
+async function handleBatchPostParts(clipKey, channel, title, videoPath, partsToPost) {
+    if (!partsToPost || partsToPost.length === 0) return;
+
+    if (partsToPost.length === 1) {
+        const p = partsToPost[0];
+        handleAutoPostToTikTok(clipKey, channel, title, videoPath, p.file_path || '', p.label || 'Part 1');
+        return;
+    }
+
+    if (!activePublishingAccountName) {
+        alert('Vui lòng chọn tài khoản TikTok cần đăng!');
+        return;
+    }
+
+    const accounts = publishingMatrixData.accounts || [];
+    const acc = accounts.find(a => a.account_name === activePublishingAccountName);
+    if (!acc) return;
+
+    const modal = document.getElementById('posting-progress-modal');
+    const modalTitle = document.getElementById('posting-modal-title');
+    const metaAcc = document.getElementById('posting-meta-acc');
+    const metaIp = document.getElementById('posting-meta-ip');
+    const metaProfile = document.getElementById('posting-meta-profile');
+    const metaClipTitle = document.getElementById('posting-meta-clip-title');
+    const logsWindow = document.getElementById('posting-terminal-logs');
+    const btnFinish = document.getElementById('btn-finish-posting-modal');
+    const btnClose = document.getElementById('btn-close-posting-modal');
+
+    const stepHma = document.getElementById('step-hma');
+    const stepAds = document.getElementById('step-ads');
+    const stepUpload = document.getElementById('step-upload');
+    const stepDone = document.getElementById('step-done');
+
+    const setStepState = (el, statusText, state = 'active') => {
+        el.className = `posting-step ${state}`;
+        const statusSpan = el.querySelector('.step-status');
+        if (statusSpan) statusSpan.textContent = statusText;
+    };
+
+    logsWindow.innerHTML = '';
+    const appendLog = (msg, isError = false) => {
+        const line = document.createElement('div');
+        line.className = `log-line ${isError ? 'text-danger' : ''}`;
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        logsWindow.appendChild(line);
+        logsWindow.scrollTop = logsWindow.scrollHeight;
+    };
+
+    metaAcc.textContent = `@${acc.account_name}`;
+    metaIp.textContent = acc.build_up_ip || acc.original_ip || 'Mặc định';
+    metaProfile.textContent = acc.adspower_id || acc.adspower_serial || 'Tự động';
+
+    modal.classList.remove('hidden');
+    btnFinish.disabled = true;
+    btnClose.onclick = () => modal.classList.add('hidden');
+    btnFinish.onclick = () => modal.classList.add('hidden');
+
+    appendLog(`🚀 BẮT ĐẦU ĐĂNG TUẦN TỰ ${partsToPost.length} PART CHO CLIP: "${title}"`);
+    appendLog(`📋 Danh sách part: ${partsToPost.map(p => p.label || p.name).join(', ')}`);
+
+    let successCount = 0;
+
+    for (let i = 0; i < partsToPost.length; i++) {
+        const currentPart = partsToPost[i];
+        const partLabel = currentPart.label || `Part ${i + 1}`;
+        const displayUploadTitle = `${title} (${partLabel})`;
+
+        modalTitle.textContent = `[${i + 1}/${partsToPost.length}] Đang Đăng: "${displayUploadTitle}"`;
+        metaClipTitle.textContent = displayUploadTitle;
+
+        setStepState(stepHma, 'Đang chuẩn bị...', 'active');
+        setStepState(stepAds, 'Chờ...', '');
+        setStepState(stepUpload, 'Chờ...', '');
+        setStepState(stepDone, 'Chờ...', '');
+
+        appendLog(`\n--------------------------------------------------`);
+        appendLog(`▶️ [TIẾN TRÌNH ${i + 1}/${partsToPost.length}] Bắt đầu tải lên ${partLabel}...`);
+
+        try {
+            setTimeout(() => {
+                if (stepHma.classList.contains('active')) {
+                    setStepState(stepHma, 'Đã chuyển IP', 'done');
+                    setStepState(stepAds, 'Đang mở profile...', 'active');
+                }
+            }, 1500);
+
+            setTimeout(() => {
+                if (stepAds.classList.contains('active')) {
+                    setStepState(stepAds, 'Đã mở Chrome', 'done');
+                    setStepState(stepUpload, 'Đang tải lên...', 'active');
+                }
+            }, 3500);
+
+            const res = await fetch('/api/publishing/post_to_tiktok', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    account_name: activePublishingAccountName,
+                    clip_key: clipKey,
+                    channel: channel,
+                    title: title,
+                    video_file: currentPart.file_path || '',
+                    part_label: partLabel
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.step_logs && Array.isArray(data.step_logs)) {
+                data.step_logs.forEach(logText => appendLog(logText));
+            }
+
+            if (data.success) {
+                successCount++;
+                setStepState(stepHma, 'Hoàn thành', 'done');
+                setStepState(stepAds, 'Hoàn thành', 'done');
+                setStepState(stepUpload, 'Đã tải lên', 'done');
+                setStepState(stepDone, 'Thành công', 'done');
+                appendLog(`✅ [${i + 1}/${partsToPost.length}] ${partLabel} ĐÃ ĐĂNG THÀNH CÔNG!`);
+
+                // Cập nhật trạng thái hiển thị
+                fetchPublishingMatrix();
+
+                // Nếu còn part tiếp theo -> Chờ 5 giây trước khi tiếp tục
+                if (i < partsToPost.length - 1) {
+                    appendLog(`⏳ Đang nghỉ 5 giây trước khi đăng Part tiếp theo...`);
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+            } else {
+                setStepState(stepDone, 'Lỗi', 'error');
+                appendLog(`❌ [${i + 1}/${partsToPost.length}] Lỗi khi đăng ${partLabel}: ${data.error || 'Thất bại'}`, true);
+            }
+        } catch (err) {
+            setStepState(stepDone, 'Lỗi mạng', 'error');
+            appendLog(`❌ [${i + 1}/${partsToPost.length}] Ngoại lệ: ${err.message}`, true);
+        }
+    }
+
+    // Kết thúc toàn bộ tiến trình
+    appendLog(`\n==================================================`);
+    appendLog(`🎉 KẾT THÚC TIẾN TRÌNH: Đã đăng thành công ${successCount}/${partsToPost.length} Part!`);
+    modalTitle.textContent = `Hoàn tất đăng ${successCount}/${partsToPost.length} Part`;
+    btnFinish.disabled = false;
+    btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Đã hoàn tất - Đóng';
+    fetchPublishingMatrix();
+}
+
+// Đăng hàng loạt danh sách các Part được tích chọn trên nhiều clip
+async function handleBatchPostGlobalParts(partsList) {
+    if (!partsList || partsList.length === 0) return;
+
+    if (!activePublishingAccountName) {
+        alert('Vui lòng chọn tài khoản TikTok cần đăng!');
+        return;
+    }
+
+    const accounts = publishingMatrixData.accounts || [];
+    const acc = accounts.find(a => a.account_name === activePublishingAccountName);
+    if (!acc) return;
+
+    const modal = document.getElementById('posting-progress-modal');
+    const modalTitle = document.getElementById('posting-modal-title');
+    const metaAcc = document.getElementById('posting-meta-acc');
+    const metaIp = document.getElementById('posting-meta-ip');
+    const metaProfile = document.getElementById('posting-meta-profile');
+    const metaClipTitle = document.getElementById('posting-meta-clip-title');
+    const logsWindow = document.getElementById('posting-terminal-logs');
+    const btnFinish = document.getElementById('btn-finish-posting-modal');
+    const btnClose = document.getElementById('btn-close-posting-modal');
+
+    const stepHma = document.getElementById('step-hma');
+    const stepAds = document.getElementById('step-ads');
+    const stepUpload = document.getElementById('step-upload');
+    const stepDone = document.getElementById('step-done');
+
+    const setStepState = (el, statusText, state = 'active') => {
+        el.className = `posting-step ${state}`;
+        const statusSpan = el.querySelector('.step-status');
+        if (statusSpan) statusSpan.textContent = statusText;
+    };
+
+    logsWindow.innerHTML = '';
+    const appendLog = (msg, isError = false) => {
+        const line = document.createElement('div');
+        line.className = `log-line ${isError ? 'text-danger' : ''}`;
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        logsWindow.appendChild(line);
+        logsWindow.scrollTop = logsWindow.scrollHeight;
+    };
+
+    metaAcc.textContent = `@${acc.account_name}`;
+    metaIp.textContent = acc.build_up_ip || acc.original_ip || 'Mặc định';
+    metaProfile.textContent = acc.adspower_id || acc.adspower_serial || 'Tự động';
+
+    modal.classList.remove('hidden');
+    btnFinish.disabled = true;
+    btnClose.onclick = () => modal.classList.add('hidden');
+    btnFinish.onclick = () => modal.classList.add('hidden');
+
+    appendLog(`🚀 BẮT ĐẦU ĐĂNG TUẦN TỰ ${partsList.length} PART ĐÃ CHỌN LÊN @${acc.account_name}...`);
+
+    let successCount = 0;
+
+    for (let i = 0; i < partsList.length; i++) {
+        const item = partsList[i];
+        const displayUploadTitle = `${item.title} (${item.label})`;
+
+        modalTitle.textContent = `[${i + 1}/${partsList.length}] Đang Đăng: "${displayUploadTitle}"`;
+        metaClipTitle.textContent = displayUploadTitle;
+
+        setStepState(stepHma, 'Đang chuẩn bị...', 'active');
+        setStepState(stepAds, 'Chờ...', '');
+        setStepState(stepUpload, 'Chờ...', '');
+        setStepState(stepDone, 'Chờ...', '');
+
+        appendLog(`\n--------------------------------------------------`);
+        appendLog(`▶️ [TIẾN TRÌNH ${i + 1}/${partsList.length}] Bắt đầu đăng: "${displayUploadTitle}"`);
+
+        try {
+            setTimeout(() => {
+                if (stepHma.classList.contains('active')) {
+                    setStepState(stepHma, 'Đã chuyển IP', 'done');
+                    setStepState(stepAds, 'Đang mở profile...', 'active');
+                }
+            }, 1500);
+
+            setTimeout(() => {
+                if (stepAds.classList.contains('active')) {
+                    setStepState(stepAds, 'Đã mở Chrome', 'done');
+                    setStepState(stepUpload, 'Đang tải lên...', 'active');
+                }
+            }, 3500);
+
+            const res = await fetch('/api/publishing/post_to_tiktok', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    account_name: activePublishingAccountName,
+                    clip_key: item.clip_key,
+                    channel: item.channel,
+                    title: item.title,
+                    video_file: item.file_path || '',
+                    part_label: item.label
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.step_logs && Array.isArray(data.step_logs)) {
+                data.step_logs.forEach(logText => appendLog(logText));
+            }
+
+            if (data.success) {
+                successCount++;
+                setStepState(stepHma, 'Hoàn thành', 'done');
+                setStepState(stepAds, 'Hoàn thành', 'done');
+                setStepState(stepUpload, 'Đã tải lên', 'done');
+                setStepState(stepDone, 'Thành công', 'done');
+                appendLog(`✅ [${i + 1}/${partsList.length}] ${displayUploadTitle} ĐÃ ĐĂNG THÀNH CÔNG!`);
+
+                fetchPublishingMatrix();
+
+                if (i < partsList.length - 1) {
+                    appendLog(`⏳ Nghỉ 5 giây trước khi đăng Part tiếp theo...`);
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+            } else {
+                setStepState(stepDone, 'Lỗi', 'error');
+                appendLog(`❌ [${i + 1}/${partsList.length}] Lỗi: ${data.error || 'Thất bại'}`, true);
+            }
+        } catch (err) {
+            setStepState(stepDone, 'Lỗi kết nối', 'error');
+            appendLog(`❌ [${i + 1}/${partsList.length}] Ngoại lệ: ${err.message}`, true);
+        }
+    }
+
+    appendLog(`\n==================================================`);
+    appendLog(`🎉 KẾT THÚC: Đã hoàn tất đăng ${successCount}/${partsList.length} Part đã chọn!`);
+    modalTitle.textContent = `Hoàn tất đăng ${successCount}/${partsList.length} Part`;
+    btnFinish.disabled = false;
+    btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Đã hoàn tất - Đóng';
+    fetchPublishingMatrix();
+}
+
+async function handleTogglePartPost(clipKey, channel, title, partLabel, posted) {
+    if (!activePublishingAccountName) return;
+    try {
+        const res = await fetch('/api/publishing/toggle_post', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                account_name: activePublishingAccountName,
+                clip_key: clipKey,
+                channel: channel,
+                title: title,
+                part_label: partLabel,
+                posted: posted
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            fetchPublishingMatrix();
+        }
+    } catch (err) {
+        console.error('Error toggling part status:', err);
+    }
+}
+
+/* ==========================================================================
+   11. TikTok Auto-Posting Interactive Stepper Pipeline
+   ========================================================================== */
+async function handleAutoPostToTikTok(clipKey, channel, title, videoPath, specificFile = null, partLabel = null) {
+    if (!activePublishingAccountName) {
+        alert('Vui lòng chọn tài khoản TikTok cần đăng!');
+        return;
+    }
+
+    const accounts = publishingMatrixData.accounts || [];
+    const acc = accounts.find(a => a.account_name === activePublishingAccountName);
+    if (!acc) return;
+
+    const displayUploadTitle = (partLabel && !title.includes(partLabel)) ? `${title} (${partLabel})` : title;
+
+    const modal = document.getElementById('posting-progress-modal');
+    const modalTitle = document.getElementById('posting-modal-title');
+    const metaAcc = document.getElementById('posting-meta-acc');
+    const metaIp = document.getElementById('posting-meta-ip');
+    const metaProfile = document.getElementById('posting-meta-profile');
+    const metaClipTitle = document.getElementById('posting-meta-clip-title');
+    const logsWindow = document.getElementById('posting-terminal-logs');
+    const btnFinish = document.getElementById('btn-finish-posting-modal');
+    const btnClose = document.getElementById('btn-close-posting-modal');
+
+    // Cập nhật thông tin trên Modal
+    modalTitle.textContent = `Đang Đăng: "${displayUploadTitle}"`;
+    metaAcc.textContent = `@${acc.account_name}`;
+    metaIp.textContent = acc.build_up_ip || acc.original_ip || 'Mặc định';
+    metaProfile.textContent = acc.adspower_id || acc.adspower_serial || 'Tự động';
+    metaClipTitle.textContent = displayUploadTitle;
+
+    // Reset Stepper
+    const stepHma = document.getElementById('step-hma');
+    const stepAds = document.getElementById('step-ads');
+    const stepUpload = document.getElementById('step-upload');
+    const stepDone = document.getElementById('step-done');
+
+    const setStepState = (el, statusText, state = 'active') => {
+        el.className = `posting-step ${state}`;
+        const statusSpan = el.querySelector('.step-status');
+        if (statusSpan) statusSpan.textContent = statusText;
+    };
+
+    setStepState(stepHma, 'Đang đổi IP...', 'active');
+    setStepState(stepAds, 'Chờ...', '');
+    setStepState(stepUpload, 'Chờ...', '');
+    setStepState(stepDone, 'Chờ...', '');
+
+    logsWindow.innerHTML = '';
+    const appendLog = (msg, isError = false) => {
+        const line = document.createElement('div');
+        line.className = `log-line ${isError ? 'text-danger' : ''}`;
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        logsWindow.appendChild(line);
+        logsWindow.scrollTop = logsWindow.scrollHeight;
+    };
+
+    appendLog(`🚀 Bắt đầu quy trình đăng "${displayUploadTitle}" cho tài khoản @${acc.account_name}`);
+    if (acc.build_up_ip || acc.original_ip) {
+        appendLog(`🛡️ Đang kích hoạt HMA chuyển IP sang: ${acc.build_up_ip || acc.original_ip}...`);
+    }
+
+    modal.classList.remove('hidden');
+    btnFinish.disabled = true;
+
+    btnClose.onclick = () => {
+        modal.classList.add('hidden');
+    };
+    btnFinish.onclick = () => {
+        modal.classList.add('hidden');
+    };
+
+    try {
+        // Step 1 -> 2 animation cue
+        setTimeout(() => {
+            if (stepHma.classList.contains('active')) {
+                setStepState(stepHma, 'Đã chuyển IP', 'done');
+                setStepState(stepAds, 'Đang mở profile...', 'active');
+                appendLog(`⚡ Đang kết nối AdsPower Profile: ${acc.adspower_id || acc.adspower_serial || 'Default'}...`);
+            }
+        }, 1500);
+
+        setTimeout(() => {
+            if (stepAds.classList.contains('active')) {
+                setStepState(stepAds, 'Đã mở Chrome', 'done');
+                setStepState(stepUpload, 'Đang tải lên...', 'active');
+                appendLog('🌐 Đang tải lên video thành phẩm và điền tiêu đề + hashtags...');
+            }
+        }, 3500);
+
+        const res = await fetch('/api/publishing/post_to_tiktok', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                account_name: activePublishingAccountName,
+                clip_key: clipKey,
+                channel: channel,
+                title: title,
+                video_file: specificFile || '',
+                part_label: partLabel || ''
+            })
+        });
+
+        const data = await res.json();
+
+        if (data.step_logs && Array.isArray(data.step_logs)) {
+            data.step_logs.forEach(logText => appendLog(logText));
+        }
+
+        if (data.success) {
+            setStepState(stepHma, 'Hoàn thành', 'done');
+            setStepState(stepAds, 'Hoàn thành', 'done');
+            setStepState(stepUpload, 'Đã tải lên', 'done');
+            setStepState(stepDone, 'Thành công!', 'done');
+            appendLog(`🎉 HOÀN TẤT ĐĂNG "${displayUploadTitle}" LÊN TIKTOK THÀNH CÔNG!`);
+
+            btnFinish.disabled = false;
+            btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Đăng thành công - Đóng';
+
+            // Cập nhật lại Publishing Matrix để hiển thị trạng thái mới nhất
+            fetchPublishingMatrix();
+        } else {
+            setStepState(stepDone, 'Thất bại', 'error');
+            appendLog(`❌ Lỗi: ${data.error || 'Quá trình đăng video thất bại'}`, true);
+            btnFinish.disabled = false;
+            btnFinish.innerHTML = '<i class="fa-solid fa-xmark"></i> Đóng';
+        }
+    } catch (err) {
+        setStepState(stepDone, 'Lỗi kết nối', 'error');
+        appendLog(`❌ Lỗi kết nối máy chủ: ${err.message}`, true);
+        btnFinish.disabled = false;
+        btnFinish.innerHTML = '<i class="fa-solid fa-xmark"></i> Đóng';
+    }
+}
+
+
+/* ==========================================================================
+   12. Section: Settings Manager (AdsPower, HMA VPN & Workspace Paths)
+   ========================================================================== */
+let systemSettings = {
+    adspower: { api_url: "http://local.adspower.net:50325", api_key: "" },
+    hma: { cli_path: "", enabled: true, switch_mode: "country", wait_seconds_after_switch: 5 },
+    tiktok_upload: { auto_submit: true, close_browser_after_finish: false, wait_timeout: 60 }
+};
+let availableAdsPowerProfiles = [];
+
+function initSettingsManager() {
+    const btnSaveAll = document.getElementById('btn-save-all-settings');
+    const btnSavePaths = document.getElementById('btn-save-paths');
+    const btnTestAdsPower = document.getElementById('btn-test-adspower');
+    const btnTestHmaIp = document.getElementById('btn-test-hma-ip');
+    const btnTestHmaChange = document.getElementById('btn-test-hma-change');
+    const btnHmaDisconnect = document.getElementById('btn-hma-disconnect');
+    const btnAutoDetectHma = document.getElementById('btn-auto-detect-hma');
+    const btnPickSource = document.getElementById('btn-pick-source');
+    const btnPickDest = document.getElementById('btn-pick-dest');
+    const btnPickHma = document.getElementById('btn-pick-hma');
+
+    if (btnSaveAll) btnSaveAll.addEventListener('click', saveAllSettings);
+    if (btnSavePaths) btnSavePaths.addEventListener('click', saveAllSettings);
+    if (btnTestAdsPower) btnTestAdsPower.addEventListener('click', () => testAdsPowerConnection(false));
+    if (btnTestHmaIp) btnTestHmaIp.addEventListener('click', () => checkHmaIp(false));
+    if (btnTestHmaChange) btnTestHmaChange.addEventListener('click', testHmaChangeIp);
+    if (btnHmaDisconnect) btnHmaDisconnect.addEventListener('click', disconnectHma);
+    if (btnAutoDetectHma) btnAutoDetectHma.addEventListener('click', autoDetectHma);
+
+    if (btnPickSource) {
+        btnPickSource.addEventListener('click', async () => {
+            const folder = await pickLocalFolder();
+            if (folder) document.getElementById('source-drive-link').value = folder;
+        });
+    }
+
+    if (btnPickDest) {
+        btnPickDest.addEventListener('click', async () => {
+            const folder = await pickLocalFolder();
+            if (folder) document.getElementById('dest-drive-link').value = folder;
+        });
+    }
+
+    if (btnPickHma) {
+        btnPickHma.addEventListener('click', async () => {
+            const folder = await pickLocalFolder();
+            if (folder) document.getElementById('input-hma-path').value = folder;
+        });
+    }
+
+    fetchSettings();
+}
+
+async function fetchSettings() {
+    try {
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        systemSettings = data;
+
+        // AdsPower fields
+        const adspowerUrl = document.getElementById('input-adspower-url');
+        const adspowerKey = document.getElementById('input-adspower-key');
+        if (adspowerUrl) adspowerUrl.value = data.adspower?.api_url || 'http://local.adspower.net:50325';
+        if (adspowerKey) adspowerKey.value = data.adspower?.api_key || '';
+
+        // HMA fields
+        const hmaPath = document.getElementById('input-hma-path');
+        const hmaMode = document.getElementById('select-hma-mode');
+        const hmaWait = document.getElementById('input-hma-wait');
+        if (hmaPath) {
+            hmaPath.value = data.hma?.cli_path || data.hma_detected_path || '';
+        }
+        if (hmaMode) hmaMode.value = data.hma?.switch_mode || 'country';
+        if (hmaWait) hmaWait.value = data.hma?.wait_seconds_after_switch || 5;
+
+        // TikTok preferences
+        const postMode = document.getElementById('select-tiktok-post-mode');
+        const closeBrowser = document.getElementById('select-tiktok-close-browser');
+        const timeout = document.getElementById('input-tiktok-timeout');
+        if (postMode) postMode.value = data.tiktok_upload?.auto_submit ? 'auto_post' : 'draft';
+        if (closeBrowser) closeBrowser.value = data.tiktok_upload?.close_browser_after_finish ? 'yes' : 'no';
+        if (timeout) timeout.value = data.tiktok_upload?.wait_timeout || 60;
+
+        // Tự động kiểm tra AdsPower và IP ngầm
+        testAdsPowerConnection(true);
+        checkHmaIp(true);
+    } catch (err) {
+        console.error('Error fetching settings:', err);
+    }
+}
+
+async function saveAllSettings() {
+    const sourcePath = document.getElementById('source-drive-link')?.value.trim() || '';
+    const destPath = document.getElementById('dest-drive-link')?.value.trim() || '';
+    const adspowerUrl = document.getElementById('input-adspower-url')?.value.trim() || 'http://local.adspower.net:50325';
+    const adspowerKey = document.getElementById('input-adspower-key')?.value.trim() || '';
+    const hmaPath = document.getElementById('input-hma-path')?.value.trim() || '';
+    const hmaMode = document.getElementById('select-hma-mode')?.value || 'country';
+    const hmaWait = parseInt(document.getElementById('input-hma-wait')?.value || 5);
+    const postMode = document.getElementById('select-tiktok-post-mode')?.value || 'auto_post';
+    const closeBrowser = document.getElementById('select-tiktok-close-browser')?.value === 'yes';
+    const timeout = parseInt(document.getElementById('input-tiktok-timeout')?.value || 60);
+
+    const payload = {
+        adspower: {
+            api_url: adspowerUrl,
+            api_key: adspowerKey
+        },
+        hma: {
+            cli_path: hmaPath,
+            enabled: true,
+            switch_mode: hmaMode,
+            wait_seconds_after_switch: hmaWait
+        },
+        tiktok_upload: {
+            auto_submit: (postMode === 'auto_post'),
+            close_browser_after_finish: closeBrowser,
+            wait_timeout: timeout
+        }
+    };
+
+    try {
+        // 1. Lưu cài đặt hệ thống
+        const res = await fetch('/api/settings/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        // 2. Lưu Workspace paths vào accounts.json
+        if (typeof accountsData !== 'undefined') {
+            accountsData.source_path = sourcePath;
+            accountsData.dest_path = destPath;
+            await saveAccountsToBackend();
+        }
+
+        const data = await res.json();
+        if (data.success) {
+            alert('🎉 Đã lưu toàn bộ cấu hình Settings & Workspaces thành công!');
+        } else {
+            alert('Lỗi khi lưu cài đặt!');
+        }
+    } catch (err) {
+        alert('Lỗi kết nối khi lưu cài đặt: ' + err.message);
+    }
+}
+
+async function testAdsPowerConnection(silent = false) {
+    const url = document.getElementById('input-adspower-url')?.value.trim() || 'http://local.adspower.net:50325';
+    const key = document.getElementById('input-adspower-key')?.value.trim() || '';
+    const badge = document.getElementById('adspower-status-badge');
+    const countSpan = document.getElementById('adspower-profiles-count');
+    const previewDiv = document.getElementById('adspower-profiles-preview');
+
+    if (badge) {
+        badge.innerHTML = '<span class="status-dot warning" style="width: 6px; height: 6px;"></span> Đang kiểm tra...';
+    }
+
+    try {
+        const res = await fetch('/api/adspower/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_url: url, api_key: key })
+        });
+        const data = await res.json();
+
+        if (data.connected) {
+            if (badge) {
+                badge.className = 'badge badge-success';
+                badge.innerHTML = '<span class="status-dot online" style="width: 6px; height: 6px;"></span> AdsPower Online';
+            }
+
+            availableAdsPowerProfiles = data.profiles || [];
+            if (countSpan) countSpan.textContent = `${availableAdsPowerProfiles.length} Profiles`;
+
+            // Populate preview
+            if (previewDiv && availableAdsPowerProfiles.length > 0) {
+                previewDiv.style.display = 'block';
+                previewDiv.innerHTML = availableAdsPowerProfiles.slice(0, 8).map(p => `
+                    <div style="padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); display: flex; justify-content: space-between;">
+                        <span><strong>#${escapeHtml(p.serial_number)}</strong> ${escapeHtml(p.name)} (${escapeHtml(p.user_id)})</span>
+                        <span style="opacity: 0.6;">${escapeHtml(p.country || p.ip || 'No IP')}</span>
+                    </div>
+                `).join('');
+            }
+
+            // Populate account dropdown
+            populateAdsPowerSelectDropdown(availableAdsPowerProfiles);
+
+            if (!silent) {
+                alert(`✅ Kết nối AdsPower thành công!\nTìm thấy ${availableAdsPowerProfiles.length} profiles.`);
+            }
+        } else {
+            if (badge) {
+                badge.className = 'badge badge-danger';
+                badge.innerHTML = '<span class="status-dot offline" style="width: 6px; height: 6px;"></span> AdsPower Offline';
+            }
+            if (!silent) {
+                alert(`❌ ${data.message || 'Không thể kết nối đến AdsPower. Hãy mở ứng dụng AdsPower và bật Local API.'}`);
+            }
+        }
+    } catch (err) {
+        if (badge) {
+            badge.className = 'badge badge-danger';
+            badge.innerHTML = '<span class="status-dot offline" style="width: 6px; height: 6px;"></span> Lỗi kết nối';
+        }
+        if (!silent) alert('Lỗi kết nối: ' + err.message);
+    }
+}
+
+async function fetchAdsPowerProfiles(populateSelect = true) {
+    try {
+        const url = document.getElementById('input-adspower-url')?.value.trim() || '';
+        const key = document.getElementById('input-adspower-key')?.value.trim() || '';
+        const res = await fetch(`/api/adspower/profiles?api_url=${encodeURIComponent(url)}&api_key=${encodeURIComponent(key)}`);
+        const data = await res.json();
+        if (data.success && data.profiles) {
+            availableAdsPowerProfiles = data.profiles;
+            if (populateSelect) {
+                populateAdsPowerSelectDropdown(availableAdsPowerProfiles);
+            }
+        }
+    } catch (err) {
+        console.error('Fetch AdsPower profiles error:', err);
+    }
+}
+
+function populateAdsPowerSelectDropdown(profiles) {
+    const selectQuick = document.getElementById('select-acc-adspower-quick');
+    if (!selectQuick) return;
+
+    selectQuick.innerHTML = '<option value="">-- Chọn profile AdsPower có sẵn --</option>';
+    profiles.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.user_id || p.serial_number;
+        opt.textContent = `[#${p.serial_number}] ${p.name || 'Unnamed'} (${p.user_id})`;
+        selectQuick.appendChild(opt);
+    });
+}
+
+async function checkHmaIp(silent = false) {
+    const badge = document.getElementById('hma-current-ip-badge');
+    if (badge) badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> IP: Checking...';
+
+    try {
+        const res = await fetch('/api/hma/test_ip', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success && data.ip) {
+            if (badge) {
+                const countryTag = data.country ? ` (${data.country})` : '';
+                badge.innerHTML = `<i class="fa-solid fa-globe text-success"></i> IP: ${data.ip}${countryTag}`;
+            }
+            if (!silent) {
+                alert(`🌐 Thông tin IP hiện tại:\n- IP: ${data.ip}\n- Quốc gia: ${data.country || 'N/A'}\n- Thành phố: ${data.city || 'N/A'}\n- ISP: ${data.isp || 'N/A'}`);
+            }
+        } else {
+            if (badge) badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> IP: Unknown';
+        }
+    } catch (err) {
+        if (badge) badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> IP Error';
+    }
+}
+
+async function testHmaChangeIp() {
+    const cliPath = document.getElementById('input-hma-path')?.value.trim() || '';
+    if (!confirm('Bạn có muốn thực hiện đổi IP ngẫu nhiên qua HMA VPN ngay bây giờ không?')) return;
+
+    try {
+        const res = await fetch('/api/hma/change_ip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cli_path: cliPath })
+        });
+        const data = await res.json();
+        if (data.success) {
+            await checkHmaIp(true);
+            alert(`✅ ${data.message || 'Đã gửi lệnh đổi IP HMA VPN thành công!'}`);
+        } else {
+            alert(`❌ Lỗi: ${data.error || 'Không thể đổi IP'}`);
+        }
+    } catch (err) {
+        alert('Lỗi kết nối: ' + err.message);
+    }
+}
+
+async function disconnectHma() {
+    const cliPath = document.getElementById('input-hma-path')?.value.trim() || '';
+    if (!confirm('Ngắt kết nối HMA VPN?')) return;
+
+    try {
+        const res = await fetch('/api/hma/disconnect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cli_path: cliPath })
+        });
+        const data = await res.json();
+        if (data.success) {
+            await checkHmaIp(true);
+            alert('✅ Đã ngắt kết nối HMA VPN.');
+        } else {
+            alert(`❌ Lỗi: ${data.error || 'Không thể ngắt kết nối'}`);
+        }
+    } catch (err) {
+        alert('Lỗi kết nối: ' + err.message);
+    }
+}
+
+async function autoDetectHma() {
+    try {
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        const detected = data.hma_detected_path || '';
+        if (detected) {
+            document.getElementById('input-hma-path').value = detected;
+            alert(`🔍 Đã tự động phát hiện HMA CLI tại:\n${detected}`);
+        } else {
+            alert('⚠️ Không tự động tìm thấy HMA CLI tại các vị trí mặc định. Vui lòng chọn thủ công tệp HMA.exe trên máy bạn.');
+        }
+    } catch (err) {
+        alert('Lỗi khi phát hiện HMA: ' + err.message);
+    }
+}
+
+async function pickLocalFolder() {
+    try {
+        const res = await fetch('/api/select_folder', { method: 'POST' });
+        const data = await res.json();
+        return data.folder_path || '';
+    } catch (err) {
+        return '';
+    }
 }
 
 async function handleToggleClipPost(clipKey, channel, title, newPosted) {
@@ -1967,4 +3179,13 @@ window.initPublishingTracker = initPublishingTracker;
 window.fetchPublishingMatrix = fetchPublishingMatrix;
 window.selectPublishingAccount = selectPublishingAccount;
 window.handleToggleClipPost = handleToggleClipPost;
+window.handleTogglePartPost = handleTogglePartPost;
+window.handleSelectPartToPost = handleSelectPartToPost;
 window.handleCopyCaptionForClip = handleCopyCaptionForClip;
+window.handleAutoPostToTikTok = handleAutoPostToTikTok;
+window.initSettingsManager = initSettingsManager;
+window.fetchSettings = fetchSettings;
+window.saveAllSettings = saveAllSettings;
+window.testAdsPowerConnection = testAdsPowerConnection;
+window.checkHmaIp = checkHmaIp;
+

@@ -12,6 +12,8 @@ VIDEO_DIR = os.path.join(BASE_DIR, "video")
 # Đổi OUTPUT về cùng thư mục app thay vì ổ C cứng để người khác dùng không bị lỗi
 OUTPUT_BASE_DIR = os.path.join(BASE_DIR, "Tiktok_Builder_Output")
 HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
+ACCOUNTS_FILE = os.path.join(BASE_DIR, "accounts.json")
+SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
 BIN_DIR = os.path.join(BASE_DIR, "bin")
 
 # Đường dẫn thực thi FFmpeg
@@ -23,3 +25,4 @@ if BIN_DIR not in os.environ.get("PATH", ""):
 
 # Đảm bảo thư mục video tồn tại
 os.makedirs(VIDEO_DIR, exist_ok=True)
+

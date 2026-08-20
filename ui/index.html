@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Montserrat:wght@600;700;800&family=Be+Vietnam+Pro:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=30">
 </head>
 <body class="theme-system">
     <div class="app-layout">
@@ -30,7 +30,7 @@
                 <!-- Tab Navigation Links -->
                 <nav class="tab-navigation">
                     <button class="tab-link active" data-tab="tab-config">
-                        <i class="fa-solid fa-gear"></i> Workspaces
+                        <i class="fa-solid fa-sliders"></i> Settings (AdsPower & HMA)
                     </button>
                     <button class="tab-link" data-tab="tab-channels">
                         <i class="fa-solid fa-square-rss"></i> YouTube Channels
@@ -38,6 +38,7 @@
                     <button class="tab-link" data-tab="tab-tiktok">
                         <i class="fa-brands fa-tiktok"></i> TikTok Accounts
                     </button>
+
                     <button class="tab-link" data-tab="tab-publishing">
                         <i class="fa-solid fa-paper-plane"></i> Posting Tracker
                     </button>
@@ -70,13 +71,14 @@
             </div>
         </header>
 
-        <!-- Tab 0: Configuration (Source and Dest path setup) -->
+        <!-- Tab 0: Configuration (Source, Destination, AdsPower & HMA VPN Settings) -->
         <div id="tab-config" class="tab-content active">
+            <!-- 1. Workspace Folders Panel -->
             <section class="panel config-panel">
                 <div class="panel-header">
                     <div class="panel-title-group">
-                        <i class="fa-solid fa-gears text-primary"></i>
-                        <h3>Workspace Path Settings</h3>
+                        <i class="fa-solid fa-folder-tree text-primary"></i>
+                        <h3>1. Workspace Directory Settings</h3>
                     </div>
                     <div class="panel-actions-group" style="display: flex; gap: 8px; align-items: center;">
                         <button class="btn btn-primary btn-sm" id="btn-save-paths">
@@ -90,7 +92,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="panel-body-config" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+                <div class="panel-body-config" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
                     <!-- Input Source Drive Link -->
                     <div class="drive-input-group" style="width: 100%;">
                         <div class="input-header">
@@ -126,7 +128,147 @@
                     </div>
                 </div>
             </section>
+
+            <!-- 2-Column Grid: AdsPower Local API Settings & HMA VPN Settings -->
+            <div class="settings-grid-layout" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+                <!-- 2. AdsPower Local API Panel -->
+                <section class="panel config-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-group">
+                            <i class="fa-solid fa-bolt text-accent"></i>
+                            <h3>2. AdsPower Local API Settings</h3>
+                        </div>
+                        <span class="badge badge-secondary" id="adspower-status-badge">
+                            <span class="status-dot offline" style="width: 6px; height: 6px;"></span> Checking...
+                        </span>
+                    </div>
+                    <div class="panel-body-config" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                        <div>
+                            <label class="sub-label">
+                                <i class="fa-solid fa-link"></i> AdsPower API Base URL
+                            </label>
+                            <input type="text" id="input-adspower-url" class="form-input" placeholder="http://local.adspower.net:50325" value="http://local.adspower.net:50325">
+                            <span style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: block;">Mặc định AdsPower chạy API tại port <code>50325</code>.</span>
+                        </div>
+
+                        <div>
+                            <label class="sub-label">
+                                <i class="fa-solid fa-key"></i> AdsPower API Key (Tùy chọn)
+                            </label>
+                            <input type="password" id="input-adspower-key" class="form-input" placeholder="Nhập API Key nếu có cấu hình...">
+                        </div>
+
+                        <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                            <button class="btn btn-secondary btn-sm" id="btn-test-adspower">
+                                <i class="fa-solid fa-satellite-dish"></i> Test Kết Nối AdsPower
+                            </button>
+                            <span id="adspower-profiles-count" style="font-size: 12px; font-weight: 700; color: var(--accent);">0 Profiles</span>
+                        </div>
+
+                        <div id="adspower-profiles-preview" style="font-size: 11px; color: var(--text-secondary); max-height: 90px; overflow-y: auto; background: rgba(0,0,0,0.1); padding: 8px; border-radius: 6px; display: none;">
+                            <!-- Danh sách profile nạp tự động -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. HMA VPN Settings Panel -->
+                <section class="panel config-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-group">
+                            <i class="fa-solid fa-shield-halved text-success"></i>
+                            <h3>3. HMA VPN Connection Settings</h3>
+                        </div>
+                        <span class="badge badge-primary" id="hma-current-ip-badge">
+                            <i class="fa-solid fa-globe"></i> IP: Checking...
+                        </span>
+                    </div>
+                    <div class="panel-body-config" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label class="sub-label">
+                                    <i class="fa-solid fa-terminal"></i> HMA CLI Executable Path
+                                </label>
+                                <button type="button" class="btn-link-xs" id="btn-auto-detect-hma" style="background: none; border: none; color: var(--primary); font-size: 11px; cursor: pointer; text-decoration: underline;">
+                                    <i class="fa-solid fa-magnifying-glass"></i> Tự động tìm kiếm
+                                </button>
+                            </div>
+                            <div class="input-icon-wrapper" style="width: 100%; position: relative;">
+                                <i class="fa-solid fa-shield-virus"></i>
+                                <input type="text" id="input-hma-path" class="form-input" placeholder="e.g. C:\Program Files\Privax\HMA VPN\bin\HMA.exe" style="width: 100%; padding-right: 35px;">
+                                <button type="button" class="btn-picker" id="btn-pick-hma" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 14px;" title="Chọn file HMA.exe">
+                                    <i class="fa-solid fa-folder"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label class="sub-label">Chế độ chuyển IP</label>
+                                <select id="select-hma-mode" class="form-select">
+                                    <option value="country">Chuyển theo Quốc gia tài khoản (build_up_ip / original_ip)</option>
+                                    <option value="changeip">Đổi IP ngẫu nhiên (-changeip)</option>
+                                </select>
+                            </div>
+                            <div class="form-col" style="max-width: 130px;">
+                                <label class="sub-label">Chờ sau đổi IP</label>
+                                <div class="range-with-val">
+                                    <input type="number" id="input-hma-wait" class="form-input" min="1" max="30" value="5" style="text-align: center;">
+                                    <span style="font-size: 11px;">giây</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; align-items: center; justify-content: flex-start; flex-wrap: wrap;">
+                            <button class="btn btn-secondary btn-sm" id="btn-test-hma-ip">
+                                <i class="fa-solid fa-location-crosshairs"></i> Kiểm tra IP hiện tại
+                            </button>
+                            <button class="btn btn-outline btn-sm" id="btn-test-hma-change">
+                                <i class="fa-solid fa-arrows-rotate"></i> Test Đổi IP
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" id="btn-hma-disconnect">
+                                <i class="fa-solid fa-plug-circle-xmark"></i> Ngắt VPN
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 4. TikTok Auto-Posting Preferences Panel -->
+            <section class="panel config-panel" style="margin-top: 16px;">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-brands fa-tiktok text-accent"></i>
+                        <h3>4. TikTok Posting Automation Preferences</h3>
+                    </div>
+                    <button class="btn btn-hero btn-sm" id="btn-save-all-settings">
+                        <i class="fa-solid fa-floppy-disk"></i> LƯU TOÀN BỘ CÀI ĐẶT (SAVE ALL SETTINGS)
+                    </button>
+                </div>
+                <div class="panel-body-config" style="padding: 20px;">
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label class="sub-label">Chế độ Đăng Video lên TikTok</label>
+                            <select id="select-tiktok-post-mode" class="form-select">
+                                <option value="auto_post">🚀 Tự động hoàn toàn (Auto Submit - Nạp video, điền caption và bấm Đăng)</option>
+                                <option value="draft">📝 Bán tự động (Draft Mode - Nạp video & caption, giữ cửa sổ để bạn xem lại)</option>
+                            </select>
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label">Trình duyệt sau khi hoàn thành</label>
+                            <select id="select-tiktok-close-browser" class="form-select">
+                                <option value="no">Giữ trình duyệt AdsPower mở để quan sát</option>
+                                <option value="yes">Tự động đóng trình duyệt AdsPower</option>
+                            </select>
+                        </div>
+                        <div class="form-col" style="max-width: 150px;">
+                            <label class="sub-label">Thời gian chờ tối đa</label>
+                            <input type="number" id="input-tiktok-timeout" class="form-input" min="30" max="300" value="60" style="text-align: center;">
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
+
 
         <!-- Tab 0.1: YouTube Target Channels Manager -->
         <div id="tab-channels" class="tab-content">
@@ -261,6 +403,28 @@
                         </div>
                     </div>
 
+                    <div class="form-row" style="margin-top: 12px;">
+                        <div class="form-col" style="flex: 1;">
+                            <label class="sub-label">
+                                <i class="fa-solid fa-bolt text-accent"></i> Liên kết Profile AdsPower (user_id hoặc serial)
+                            </label>
+                            <input type="text" id="input-acc-adspower" class="form-input" placeholder="e.g. k09abc1 hoặc serial 1">
+                        </div>
+                        <div class="form-col" style="flex: 1;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label class="sub-label">
+                                    <i class="fa-solid fa-list-check text-primary"></i> Chọn nhanh từ AdsPower
+                                </label>
+                                <button type="button" class="btn-link-xs" id="btn-refresh-adspower-profiles" style="background:none; border:none; color:var(--primary); font-size:11px; cursor:pointer; text-decoration:underline;">
+                                    <i class="fa-solid fa-arrows-rotate"></i> Nạp lại
+                                </button>
+                            </div>
+                            <select id="select-acc-adspower-quick" class="form-select">
+                                <option value="">-- Chọn profile AdsPower có sẵn --</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="form-group" style="margin-top: 12px;">
                         <label class="sub-label">Notes (note)</label>
                         <input type="text" id="input-acc-note" class="form-input" placeholder="Add notes...">
@@ -281,7 +445,7 @@
                                 <th>Account Name</th>
                                 <th>Password</th>
                                 <th>Mail / Confirm</th>
-                                <th>Original / Nurtured IP</th>
+                                <th>AdsPower & IP Vị Trí</th>
                                 <th>Target YouTube Channel</th>
                                 <th>Created Date</th>
                                 <th>Hashtags & Notes</th>
@@ -289,6 +453,7 @@
                             </tr>
                         </thead>
                         <tbody id="accounts-table-body">
+
                             <!-- Loaded dynamically via JS -->
                             <tr>
                                 <td colspan="9" class="table-empty">
@@ -380,7 +545,13 @@
                                 </select>
                             </div>
 
-                            <div class="pub-action-group">
+                            <div class="pub-action-group" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                <button class="btn btn-sm btn-outline" id="btn-pub-select-all-pending" title="Tích chọn tất cả các Part chưa đăng trên giao diện">
+                                    <i class="fa-regular fa-square-check"></i> Chọn Part chưa đăng
+                                </button>
+                                <button class="btn btn-sm btn-primary btn-post-auto" id="btn-pub-batch-post-selected" title="Đăng tuần tự các Part đang được tích chọn">
+                                    <i class="fa-brands fa-tiktok"></i> 🚀 Đăng Part đã chọn (<span id="pub-selected-parts-total">0</span>)
+                                </button>
                                 <button class="btn btn-sm btn-outline" id="btn-pub-copy-hashtags" title="Copy Caption and Hashtags to Clipboard">
                                     <i class="fa-regular fa-copy"></i> Copy Hashtags
                                 </button>
@@ -505,33 +676,59 @@
         <div id="tab-studio" class="tab-content">
             <div class="studio-layout-grid">
                 <!-- Column Left: Video Tree -->
-                <section class="panel video-explorer-panel">
+                <section class="panel video-explorer-panel" id="video-explorer-panel">
                     <div class="panel-header">
                         <div class="panel-title-group">
                             <i class="fa-solid fa-folder-tree text-primary"></i>
                             <h3>1. Video Explorer</h3>
+                            <span class="badge badge-info" id="explorer-total-badge" style="font-size: 10px; margin-left: 4px;">0 Video</span>
+                        </div>
+                        <div class="panel-header-actions">
+                            <button type="button" class="btn-icon-xs" id="btn-toggle-all-folders" title="Mở rộng / Thu gọn tất cả thư mục">
+                                <i class="fa-solid fa-layer-group"></i>
+                            </button>
+                            <button type="button" class="btn-icon-xs" id="btn-collapse-explorer-panel" title="Thu nhỏ / Mở rộng khung Video Explorer">
+                                <i class="fa-solid fa-chevron-up" id="icon-collapse-explorer"></i>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="explorer-toolbar">
-                        <div class="batch-select-all">
-                            <label class="custom-checkbox">
-                                <input type="checkbox" id="chk-select-all">
-                                <span class="checkmark"></span>
-                                <span class="label-text">Select all unedited videos</span>
-                            </label>
-                        </div>
-                        <div class="filter-group">
-                            <button class="filter-btn active" data-filter="all">All</button>
-                            <button class="filter-btn" data-filter="unedited">Unedited</button>
-                            <button class="filter-btn" data-filter="edited">Edited</button>
-                        </div>
-                    </div>
+                    <div class="explorer-body" id="explorer-body">
+                        <div class="explorer-toolbar">
+                            <!-- Search box -->
+                            <div class="explorer-search-wrapper">
+                                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                <input type="text" id="input-explorer-search" class="explorer-search-input" placeholder="🔍 Tìm kiếm video hoặc kênh..." autocomplete="off">
+                                <button type="button" id="btn-clear-explorer-search" class="btn-clear-search hidden" title="Xóa tìm kiếm">&times;</button>
+                            </div>
 
-                    <div class="video-tree-container" id="video-tree-container">
-                        <div class="empty-state">
-                            <i class="fa-solid fa-folder-open"></i>
-                            <p>Set your source workspace directory and click <strong>"Scan Source Data"</strong>.</p>
+                            <!-- Actions & Filters -->
+                            <div class="explorer-actions-row">
+                                <div class="batch-select-all">
+                                    <label class="custom-checkbox">
+                                        <input type="checkbox" id="chk-select-all">
+                                        <span class="checkmark"></span>
+                                        <span class="label-text">Chọn video chưa edit</span>
+                                    </label>
+                                </div>
+                                <div class="filter-group">
+                                    <button type="button" class="filter-btn active" data-filter="all">Tất cả</button>
+                                    <button type="button" class="filter-btn" data-filter="unedited">Chưa edit</button>
+                                    <button type="button" class="filter-btn" data-filter="edited">Đã edit</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="video-tree-container" id="video-tree-container">
+                            <div class="empty-state">
+                                <i class="fa-solid fa-folder-open"></i>
+                                <p>Nhập đường dẫn Google Drive/Thư mục nguồn và bấm <strong>"Quét dữ liệu nguồn"</strong>.</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Resize Handle Bar -->
+                        <div class="explorer-resize-handle" id="explorer-resize-handle" title="Kéo lên / xuống để thay đổi chiều cao danh sách">
+                            <div class="resize-grip"></div>
                         </div>
                     </div>
                 </section>
@@ -816,6 +1013,145 @@
         </div>
     </div>
 
-    <script src="script.js?v=14"></script>
+    <!-- Modal Select Parts to Post to TikTok (Single / Multi / All) -->
+    <div class="modal-overlay hidden" id="part-selection-modal">
+        <div class="modal-card" style="max-width: 580px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #ec4899, #8b5cf6); display: flex; align-items: center; justify-content: center; color: white;">
+                        <i class="fa-brands fa-tiktok" style="font-size: 18px;"></i>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0; font-size: 16px; font-weight: 800;">Tùy Chọn Đăng TikTok (Multi-Part)</h4>
+                        <span id="part-select-clip-subtitle" style="font-size: 12px; color: var(--text-secondary);">Chọn 1 part, nhiều part hoặc đăng tất cả</span>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-part-select-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="modal-body" style="padding: 20px;">
+                <!-- Clip Title Box -->
+                <div style="background: rgba(0, 0, 0, 0.06); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Video đang chọn:</div>
+                    <div id="part-select-clip-title" style="font-size: 14px; font-weight: 800; color: var(--text-primary); line-height: 1.4;">Tên Clip</div>
+                    <div id="part-select-target-account" style="font-size: 12px; color: var(--accent); font-weight: 700; margin-top: 4px;">Đăng lên: @account</div>
+                </div>
+
+                <!-- Quick Action Buttons -->
+                <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 13px; font-weight: 700;">Danh sách các Part (<span id="part-select-count">0</span> part):</div>
+                    <div style="display: flex; gap: 6px;">
+                        <button type="button" class="btn btn-xs btn-outline" id="btn-select-all-parts">Tất cả</button>
+                        <button type="button" class="btn btn-xs btn-outline" id="btn-select-pending-parts">Chỉ chưa đăng</button>
+                        <button type="button" class="btn btn-xs btn-outline" id="btn-deselect-all-parts">Bỏ chọn</button>
+                    </div>
+                </div>
+
+                <!-- Parts List with Checkboxes -->
+                <div id="part-selection-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; padding-right: 4px; margin-bottom: 18px;">
+                    <!-- Dynamically populated -->
+                </div>
+
+                <!-- Action Footer Buttons -->
+                <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: 16px; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-cancel-part-select">Hủy</button>
+                    <button type="button" class="btn btn-outline btn-sm" id="btn-post-all-parts-direct" style="border-color: #ec4899; color: #ec4899; font-weight: 700;">
+                        <i class="fa-solid fa-forward-fast"></i> 1. Đăng Tất Cả Part
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm btn-post-auto" id="btn-post-selected-parts" style="font-weight: 700;">
+                        <i class="fa-brands fa-tiktok"></i> 2. Đăng Part Đã Chọn (<span id="selected-parts-count">0</span>)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal TikTok Auto-Posting Interactive Pipeline -->
+    <div class="modal-overlay hidden" id="posting-progress-modal">
+        <div class="modal-card" style="max-width: 650px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #ec4899, #8b5cf6); display: flex; align-items: center; justify-content: center; color: white;">
+                        <i class="fa-brands fa-tiktok" style="font-size: 18px;"></i>
+                    </div>
+                    <div>
+                        <h4 id="posting-modal-title" style="margin: 0; font-size: 16px; font-weight: 800;">Đang Đăng Clip Lên TikTok</h4>
+                        <span id="posting-modal-subtitle" style="font-size: 12px; color: var(--text-secondary);">Tự động đổi IP HMA & điều khiển AdsPower Chrome</span>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-posting-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="modal-body" style="padding: 20px;">
+                <!-- Account & Target Info Banner -->
+                <div class="posting-meta-card" style="background: rgba(0, 0, 0, 0.08); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--border-color);">
+                    <div class="posting-meta-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <span class="text-muted" style="font-size: 11px; display: block;">Tài khoản TikTok:</span>
+                            <div id="posting-meta-acc" style="font-weight: 800; color: var(--accent);">@user</div>
+                        </div>
+                        <div>
+                            <span class="text-muted" style="font-size: 11px; display: block;">IP Vị trí mục tiêu:</span>
+                            <div id="posting-meta-ip" style="font-weight: 700; color: var(--primary);">US</div>
+                        </div>
+                        <div>
+                            <span class="text-muted" style="font-size: 11px; display: block;">Profile AdsPower:</span>
+                            <div id="posting-meta-profile" style="font-weight: 700;">Default</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--text-primary); border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                        <i class="fa-solid fa-film text-primary"></i> <span id="posting-meta-clip-title">Tên clip</span>
+                    </div>
+                </div>
+
+                <!-- 4-Step Visual Stepper -->
+                <div class="posting-stepper" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px;">
+                    <div class="posting-step active" id="step-hma">
+                        <div class="step-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                        <div class="step-info">
+                            <span class="step-title">1. Đổi IP HMA</span>
+                            <span class="step-status" id="step-hma-status">Đang chạy...</span>
+                        </div>
+                    </div>
+                    <div class="posting-step" id="step-ads">
+                        <div class="step-icon"><i class="fa-solid fa-bolt"></i></div>
+                        <div class="step-info">
+                            <span class="step-title">2. AdsPower</span>
+                            <span class="step-status" id="step-ads-status">Chờ...</span>
+                        </div>
+                    </div>
+                    <div class="posting-step" id="step-upload">
+                        <div class="step-icon"><i class="fa-brands fa-tiktok"></i></div>
+                        <div class="step-info">
+                            <span class="step-title">3. Tải lên Clip</span>
+                            <span class="step-status" id="step-upload-status">Chờ...</span>
+                        </div>
+                    </div>
+                    <div class="posting-step" id="step-done">
+                        <div class="step-icon"><i class="fa-solid fa-circle-check"></i></div>
+                        <div class="step-info">
+                            <span class="step-title">4. Hoàn tất</span>
+                            <span class="step-status" id="step-done-status">Chờ...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Log Window -->
+                <div class="posting-terminal-logs" id="posting-terminal-logs" style="background: rgba(0,0,0,0.85); color: #22c55e; font-family: monospace; font-size: 11px; padding: 12px; border-radius: 6px; height: 140px; overflow-y: auto; line-height: 1.5; border: 1px solid var(--border-color);">
+                    <div class="log-line text-muted">[Sẵn sàng] Khởi tạo luồng tự động...</div>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button class="btn btn-secondary btn-sm" id="btn-finish-posting-modal">
+                        <i class="fa-solid fa-xmark"></i> Đóng
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=15"></script>
 </body>
 </html>
+
