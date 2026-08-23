@@ -1,0 +1,366 @@
+{
+  "region": "MX",
+  "region_name": "Mexico (es-MX)",
+  "updated_at": "2026-08-23 22:16:07",
+  "mexico_time": {
+    "current_time_str": "09:16 AM",
+    "current_date_str": "23/08/2026",
+    "timezone": "CST (UTC-6) - Mexico City",
+    "is_golden_time": false,
+    "next_slot": "12:30 PM CST (Nghỉ trưa)",
+    "recommendation": "Chuẩn bị video và kịch bản để đăng vào khung giờ trưa (12:30 - 14:00 CST)."
+  },
+  "active_niche": "all",
+  "period_days": 30,
+  "total_hashtags_found": 10,
+  "hashtags": [
+    {
+      "rank": 1,
+      "hashtag": "humormexicano",
+      "views": 5800000000,
+      "video_count": 210000,
+      "growth_pct": 145.2,
+      "viral_score": 96.8,
+      "niche": "humor",
+      "url": "https://www.tiktok.com/tag/humormexicano"
+    },
+    {
+      "rank": 2,
+      "hashtag": "chismestiktok",
+      "views": 3200000000,
+      "video_count": 140000,
+      "growth_pct": 112.4,
+      "viral_score": 94.5,
+      "niche": "chisme",
+      "url": "https://www.tiktok.com/tag/chismestiktok"
+    },
+    {
+      "rank": 3,
+      "hashtag": "leyendasdemexico",
+      "views": 1400000000,
+      "video_count": 48000,
+      "growth_pct": 178.6,
+      "viral_score": 95.2,
+      "niche": "misterio",
+      "url": "https://www.tiktok.com/tag/leyendasdemexico"
+    },
+    {
+      "rank": 4,
+      "hashtag": "mexicocheck",
+      "views": 18900000000,
+      "video_count": 890000,
+      "growth_pct": 65.3,
+      "viral_score": 91.0,
+      "niche": "curiosidades",
+      "url": "https://www.tiktok.com/tag/mexicocheck"
+    },
+    {
+      "rank": 5,
+      "hashtag": "historiasdeterror",
+      "views": 2400000000,
+      "video_count": 92000,
+      "growth_pct": 130.0,
+      "viral_score": 93.4,
+      "niche": "misterio",
+      "url": "https://www.tiktok.com/tag/historiasdeterror"
+    },
+    {
+      "rank": 6,
+      "hashtag": "storytime",
+      "views": 12500000000,
+      "video_count": 520000,
+      "growth_pct": 82.5,
+      "viral_score": 89.6,
+      "niche": "chisme",
+      "url": "https://www.tiktok.com/tag/storytime"
+    },
+    {
+      "rank": 7,
+      "hashtag": "ligamx",
+      "views": 4100000000,
+      "video_count": 160000,
+      "growth_pct": 98.4,
+      "viral_score": 88.7,
+      "niche": "futbol",
+      "url": "https://www.tiktok.com/tag/ligamx"
+    },
+    {
+      "rank": 8,
+      "hashtag": "datoscuriosos",
+      "views": 6700000000,
+      "video_count": 280000,
+      "growth_pct": 74.8,
+      "viral_score": 87.2,
+      "niche": "curiosidades",
+      "url": "https://www.tiktok.com/tag/datoscuriosos"
+    },
+    {
+      "rank": 9,
+      "hashtag": "comidamexicana",
+      "views": 8200000000,
+      "video_count": 340000,
+      "growth_pct": 59.1,
+      "viral_score": 85.3,
+      "niche": "comida",
+      "url": "https://www.tiktok.com/tag/comidamexicana"
+    },
+    {
+      "rank": 10,
+      "hashtag": "corridostumbados",
+      "views": 9500000000,
+      "video_count": 420000,
+      "growth_pct": 160.5,
+      "viral_score": 97.4,
+      "niche": "musica",
+      "url": "https://www.tiktok.com/tag/corridostumbados"
+    }
+  ],
+  "trending_sounds": [
+    {
+      "rank": 1,
+      "sound_id": "719823128912",
+      "title": "Ella Baila Sola",
+      "author": "Eslabon Armado & Peso Pluma",
+      "duration": 30,
+      "usage_count": 890000,
+      "growth_pct": 140.2,
+      "is_commercial": true,
+      "play_url": ""
+    },
+    {
+      "rank": 2,
+      "sound_id": "720194819284",
+      "title": "Sonido Suspenso Terror MX",
+      "author": "Misterios de México",
+      "duration": 18,
+      "usage_count": 310000,
+      "growth_pct": 115.6,
+      "is_commercial": false,
+      "play_url": ""
+    },
+    {
+      "rank": 3,
+      "sound_id": "721092839102",
+      "title": "Cumbia Buena Remix",
+      "author": "Grupo Sonidero MX",
+      "duration": 25,
+      "usage_count": 520000,
+      "growth_pct": 92.4,
+      "is_commercial": true,
+      "play_url": ""
+    },
+    {
+      "rank": 4,
+      "sound_id": "721948291039",
+      "title": "Efecto Chisme Storytime",
+      "author": "Drama Sound FX",
+      "duration": 12,
+      "usage_count": 410000,
+      "growth_pct": 88.0,
+      "is_commercial": false,
+      "play_url": ""
+    }
+  ],
+  "packaged_hot_topics": [
+    {
+      "id": "MX_humormexicano_1787498167",
+      "title": "Chủ đề Xu hướng #humormexicano (Mexico)",
+      "hashtag": "humormexicano",
+      "niche": "humor",
+      "viral_score": 96.8,
+      "views": 5800000000,
+      "growth_pct": 145.2,
+      "hashtag_bundle": [
+        "#parati",
+        "#mexico",
+        "#humormexicano",
+        "#comedia"
+      ],
+      "copy_hashtags": "#parati #mexico #humormexicano #comedia",
+      "sample_hooks_es_mx": [
+        "¡Wey, no vas a creer lo que me acaba de pasar! (humormexicano)",
+        "Cosas que solo pasan en México y nadie puede explicar con lógica 😂 (humormexicano)",
+        "¡No manches! Cuando crees que ya lo viste todo en México... (humormexicano)",
+        "Dime que eres mexicano sin decirme que eres mexicano 👇 (humormexicano)",
+        "¡No mames, esto se salió de control en menos de 10 segundos! (humormexicano)"
+      ],
+      "tiktok_tag_url": "https://www.tiktok.com/tag/humormexicano",
+      "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
+    },
+    {
+      "id": "MX_chismestiktok_1787498167",
+      "title": "Chủ đề Xu hướng #chismestiktok (Mexico)",
+      "hashtag": "chismestiktok",
+      "niche": "chisme",
+      "viral_score": 94.5,
+      "views": 3200000000,
+      "growth_pct": 112.4,
+      "hashtag_bundle": [
+        "#parati",
+        "#mexico",
+        "#chismestiktok",
+        "#storytime"
+      ],
+      "copy_hashtags": "#parati #mexico #chismestiktok #storytime",
+      "sample_hooks_es_mx": [
+        "Ponte cómodo porque este chisme está de no creerse... (chismestiktok)",
+        "¡No vas a creer el drama que se acaba de armar en México! (chismestiktok)",
+        "Storytime de cuando me enteré del secreto más turbio... (chismestiktok)",
+        "¡No manches! Lo que nadie se atrevió a decirte hasta hoy... (chismestiktok)",
+        "Agárrate que te traigo el chisme completito y con pruebas... (chismestiktok)"
+      ],
+      "tiktok_tag_url": "https://www.tiktok.com/tag/chismestiktok",
+      "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
+    },
+    {
+      "id": "MX_leyendasdemexico_1787498167",
+      "title": "Chủ đề Xu hướng #leyendasdemexico (Mexico)",
+      "hashtag": "leyendasdemexico",
+      "niche": "misterio",
+      "viral_score": 95.2,
+      "views": 1400000000,
+      "growth_pct": 178.6,
+      "hashtag_bundle": [
+        "#parati",
+        "#mexico",
+        "#leyendasdemexico",
+        "#terror"
+      ],
+      "copy_hashtags": "#parati #mexico #leyendasdemexico #terror",
+      "sample_hooks_es_mx": [
+        "La leyenda más aterradora de México que la gente prefiere callar... (leyendasdemexico)",
+        "Si vives en México y has visto esto de noche, ten mucho cuidado... (leyendasdemexico)",
+        "El suceso paranormal que dejó en shock a todo un pueblo mexicano. (leyendasdemexico)",
+        "¡Esto te va a dar escalofríos! El misterio real detrás de... (leyendasdemexico)",
+        "Lugares prohibidos de México a los que NUNCA deberías entrar solo. (leyendasdemexico)"
+      ],
+      "tiktok_tag_url": "https://www.tiktok.com/tag/leyendasdemexico",
+      "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
+    },
+    {
+      "id": "MX_mexicocheck_1787498167",
+      "title": "Chủ đề Xu hướng #mexicocheck (Mexico)",
+      "hashtag": "mexicocheck",
+      "niche": "curiosidades",
+      "viral_score": 91.0,
+      "views": 18900000000,
+      "growth_pct": 65.3,
+      "hashtag_bundle": [
+        "#parati",
+        "#mexico",
+        "#datoscuriosos",
+        "#sabiasque",
+        "#mexicocheck"
+      ],
+      "copy_hashtags": "#parati #mexico #datoscuriosos #sabiasque #mexicocheck",
+      "sample_hooks_es_mx": [
+        "3 cosas perturbadoras que solo existen en México y no sabías. (mexicocheck)",
+        "¿Sabías este dato brutal sobre México que no enseñan en la escuela? (mexicocheck)",
+        "El secreto mexicano que dejó con la boca abierta al mundo entero. (mexicocheck)",
+        "¡Qué locura! Esto solo pasa en la Ciudad de México y es real. (mexicocheck)",
+        "Lo que los turistas nunca entienden cuando visitan México... (mexicocheck)"
+      ],
+      "tiktok_tag_url": "https://www.tiktok.com/tag/mexicocheck",
+      "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
+    },
+    {
+      "id": "MX_historiasdeterror_1787498167",
+      "title": "Chủ đề Xu hướng #historiasdeterror (Mexico)",
+      "hashtag": "historiasdeterror",
+      "niche": "misterio",
+      "viral_score": 93.4,
+      "views": 2400000000,
+      "growth_pct": 130.0,
+      "hashtag_bundle": [
+        "#parati",
+        "#mexico",
+        "#leyendasdemexico",
+        "#terror",
+        "#historiasdeterror"
+      ],
+      "copy_hashtags": "#parati #mexico #leyendasdemexico #terror #historiasdeterror",
+      "sample_hooks_es_mx": [
+        "La leyenda más aterradora de México que la gente prefiere callar... (historiasdeterror)",
+        "Si vives en México y has visto esto de noche, ten mucho cuidado... (historiasdeterror)",
+        "El suceso paranormal que dejó en shock a todo un pueblo mexicano. (historiasdeterror)",
+        "¡Esto te va a dar escalofríos! El misterio real detrás de... (historiasdeterror)",
+        "Lugares prohibidos de México a los que NUNCA deberías entrar solo. (historiasdeterror)"
+      ],
+      "tiktok_tag_url": "https://www.tiktok.com/tag/historiasdeterror",
+      "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
+    },
+    {
+      "id": "MX_storytime_1787498167",
+      "title": "Chủ đề Xu hướng #storytime (Mexico)",
+      "hashtag": "storytime",
+      "niche": "chisme",
+      "viral_score": 89.6,
+      "views": 12500000000,
+      "growth_pct": 82.5,
+      "hashtag_bundle": [
+        "#parati",
+        "#mexico",
+        "#chismestiktok",
+        "#storytime"
+      ],
+      "copy_hashtags": "#parati #mexico #chismestiktok #storytime",
+      "sample_hooks_es_mx": [
+        "Ponte cómodo porque este chisme está de no creerse... (storytime)",
+        "¡No vas a creer el drama que se acaba de armar en México! (storytime)",
+        "Storytime de cuando me enteré del secreto más turbio... (storytime)",
+        "¡No manches! Lo que nadie se atrevió a decirte hasta hoy... (storytime)",
+        "Agárrate que te traigo el chisme completito y con pruebas... (storytime)"
+      ],
+      "tiktok_tag_url": "https://www.tiktok.com/tag/storytime",
+      "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
+    },
+    {
+      "id": "MX_ligamx_1787498167",
+      "title": "Chủ đề Xu hướng #ligamx (Mexico)",
+      "hashtag": "ligamx",
+      "niche": "futbol",
+      "viral_score": 88.7,
+      "views": 4100000000,
+      "growth_pct": 98.4,
+      "hashtag_bundle": [
+        "#parati",
+        "#mexico",
+        "#ligamx",
+        "#futbolmexicano"
+      ],
+      "copy_hashtags": "#parati #mexico #ligamx #futbolmexicano",
+      "sample_hooks_es_mx": [
+        "¡La polémica más grande de la Liga MX que nadie quiere hablar! (ligamx)",
+        "El momento exacto donde se definió la historia del fútbol mexicano. (ligamx)",
+        "¡Increíble lo que acaba de pasar en la Liga MX! ¿Fue penal o no? (ligamx)"
+      ],
+      "tiktok_tag_url": "https://www.tiktok.com/tag/ligamx",
+      "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
+    },
+    {
+      "id": "MX_datoscuriosos_1787498167",
+      "title": "Chủ đề Xu hướng #datoscuriosos (Mexico)",
+      "hashtag": "datoscuriosos",
+      "niche": "curiosidades",
+      "viral_score": 87.2,
+      "views": 6700000000,
+      "growth_pct": 74.8,
+      "hashtag_bundle": [
+        "#parati",
+        "#mexico",
+        "#datoscuriosos",
+        "#sabiasque"
+      ],
+      "copy_hashtags": "#parati #mexico #datoscuriosos #sabiasque",
+      "sample_hooks_es_mx": [
+        "3 cosas perturbadoras que solo existen en México y no sabías. (datoscuriosos)",
+        "¿Sabías este dato brutal sobre México que no enseñan en la escuela? (datoscuriosos)",
+        "El secreto mexicano que dejó con la boca abierta al mundo entero. (datoscuriosos)",
+        "¡Qué locura! Esto solo pasa en la Ciudad de México y es real. (datoscuriosos)",
+        "Lo que los turistas nunca entienden cuando visitan México... (datoscuriosos)"
+      ],
+      "tiktok_tag_url": "https://www.tiktok.com/tag/datoscuriosos",
+      "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
+    }
+  ]
+}
