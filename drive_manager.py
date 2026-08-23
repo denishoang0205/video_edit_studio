@@ -1002,3 +1002,74 @@ def batch_toggle_publishing_clips(account_name, clip_keys, posted=True):
         save_accounts_data(accounts_data)
         return True, None
     return False, "Không tìm thấy tài khoản"
+
+def get_pending_publishing_queue(account_name=None, channel_name=None, only_current_target=True):
+    """
+    Lấy danh sách các clip/part đang chờ xuất bản (posted == False) trên ổ đĩa.
+    Được chuẩn hóa cho n8n workflow và automated cron triggers.
+    """
+    matrix_data = get_publishing_matrix()
+    pending_queue = []
+    
+    for acc in matrix_data.get("accounts", []):
+        curr_acc_name = acc.get("account_name", "")
+        if account_name and curr_acc_name.lower() != str(account_name).lower():
+            continue
+            
+        target_channel = acc.get("target_channel", "")
+        
+        for clip in acc.get("clips", []):
+            if not clip.get("on_disk"):
+                continue
+                
+            clip_channel = clip.get("channel", "")
+            if channel_name and sanitize_filename(clip_channel) != sanitize_filename(channel_name):
+                continue
+                
+            if only_current_target and target_channel and sanitize_filename(clip_channel) != sanitize_filename(target_channel):
+                continue
+                
+            parts = clip.get("parts", [])
+            if parts:
+                for p in parts:
+                    if not p.get("posted"):
+                        pending_queue.append({
+                            "account_name": curr_acc_name,
+                            "channel": clip_channel,
+                            "title": clip.get("title", ""),
+                            "clip_key": clip.get("key", ""),
+                            "part_label": p.get("label", ""),
+                            "part_name": p.get("name", ""),
+                            "video_file": p.get("file_path", ""),
+                            "hashtag": acc.get("hashtag", ""),
+                            "target_ip": acc.get("build_up_ip") or acc.get("original_ip", ""),
+                            "adspower_id": acc.get("adspower_id") or acc.get("adspower_serial") or curr_acc_name,
+                            "parent_folder": clip.get("path", "")
+                        })
+            else:
+                if not clip.get("posted"):
+                    v_path = clip.get("path", "")
+                    video_file = ""
+                    if v_path and os.path.isdir(v_path):
+                        mp4s = [f for f in os.listdir(v_path) if f.endswith('.mp4')]
+                        if mp4s:
+                            video_file = os.path.join(v_path, mp4s[0])
+                    elif v_path and os.path.isfile(v_path):
+                        video_file = v_path
+                        
+                    pending_queue.append({
+                        "account_name": curr_acc_name,
+                        "channel": clip_channel,
+                        "title": clip.get("title", ""),
+                        "clip_key": clip.get("key", ""),
+                        "part_label": "",
+                        "part_name": "",
+                        "video_file": video_file,
+                        "hashtag": acc.get("hashtag", ""),
+                        "target_ip": acc.get("build_up_ip") or acc.get("original_ip", ""),
+                        "adspower_id": acc.get("adspower_id") or acc.get("adspower_serial") or curr_acc_name,
+                        "parent_folder": clip.get("path", "")
+                    })
+                    
+    return pending_queue
+

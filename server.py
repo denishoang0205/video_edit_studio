@@ -38,7 +38,7 @@ from drive_manager import (
     delete_finished_result, delete_all_finished_results,
     get_publishing_matrix, toggle_publishing_clip_status, change_account_target_channel, batch_toggle_publishing_clips,
     load_accounts_data, save_accounts_data, ensure_channel_folders,
-    load_settings, save_settings
+    load_settings, save_settings, get_pending_publishing_queue
 )
 from hma_manager import (
     find_hma_executable, get_current_public_ip, connect_hma, change_ip_hma, disconnect_hma
@@ -48,6 +48,7 @@ from adspower_manager import (
 )
 from tiktok_uploader import upload_video_to_tiktok_cdp
 from video_processor import get_video_duration, process_video_custom, split_video_custom
+from mexico_trend_service import mexico_trend_service
 
 
 PORT = 8000
@@ -296,6 +297,37 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(res).encode("utf-8"))
             return
 
+        # API: n8n Pending Clips Queue
+        if parsed.path == "/api/n8n/pending_clips":
+            acc_filter = query.get("account", [None])[0]
+            chan_filter = query.get("channel", [None])[0]
+            only_curr = query.get("only_current_target", ["true"])[0].lower() in ["true", "1", "yes"]
+            items = get_pending_publishing_queue(account_name=acc_filter, channel_name=chan_filter, only_current_target=only_curr)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "count": len(items), "items": items}, ensure_ascii=False).encode("utf-8"))
+            return
+
+        # API: Mexico TikTok Trend Discovery
+        if parsed.path == "/api/mexico_trends":
+            niche = query.get("niche", ["all"])[0]
+            period = int(query.get("period", ["7"])[0])
+            report = mexico_trend_service.get_full_trend_report(niche=niche, period=period)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(report, ensure_ascii=False).encode("utf-8"))
+            return
+
+        # API: Mexico Golden Time & Hours
+        if parsed.path == "/api/mexico_golden_hours":
+            data = mexico_trend_service.get_mexico_current_time()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+            return
 
         # Stream Video file for preview modal
         if parsed.path == "/video_stream":
@@ -468,6 +500,24 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.end_headers()
             self.wfile.write(json.dumps({"status": "opened"}).encode("utf-8"))
+            return
+
+        # API: Mexico Generate Hooks & 4-Tier Hashtag Bundle
+        if parsed.path == "/api/mexico_generate_hooks":
+            topic = body_data.get("topic", "")
+            niche = body_data.get("niche", "chisme")
+            hooks = mexico_trend_service.generate_mexican_hooks(topic, niche)
+            bundle = mexico_trend_service.generate_hashtag_bundle(niche, topic)
+            res = {
+                "topic": topic,
+                "niche": niche,
+                "hooks": hooks,
+                "hashtag_bundle": bundle
+            }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(res, ensure_ascii=False).encode("utf-8"))
             return
 
         # API: Save Accounts & YouTube Channels list
@@ -822,6 +872,40 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
                     "step_logs": step_logs
                 }).encode("utf-8"))
                 return
+
+        # API: System Scheduled Shutdown
+        if parsed.path == "/api/system/shutdown":
+            delay_sec = int(body_data.get("delay_seconds", 900))
+            msg = f"Hẹn giờ tắt máy tính sau {delay_sec} giây ({round(delay_sec/60)} phút)"
+            log_message(f"💤 {msg}")
+            try:
+                subprocess.Popen(["shutdown", "/s", "/t", str(delay_sec), "/c", "TikTok Studio Pro: Hoàn thành tác vụ ban đêm. Máy tính sẽ tự động tắt."])
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "message": msg, "delay_seconds": delay_sec}, ensure_ascii=False).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            return
+
+        # API: Cancel Scheduled Shutdown
+        if parsed.path == "/api/system/cancel_shutdown":
+            log_message("⚡ Đã hủy lệnh hẹn giờ tắt máy tính.")
+            try:
+                subprocess.Popen(["shutdown", "/a"])
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "message": "Đã hủy lệnh tắt máy tính thành công!"}, ensure_ascii=False).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            return
 
         self.send_error(404)
 
