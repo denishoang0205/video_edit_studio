@@ -54,6 +54,9 @@
                     <button class="tab-link" data-tab="tab-outputs">
                         <i class="fa-solid fa-circle-check"></i> Finished Library
                     </button>
+                    <button class="tab-link" data-tab="tab-mexico-trends">
+                        <i class="fa-solid fa-fire text-danger" style="color: #ff4757;"></i> Mexico Trends (MX)
+                    </button>
                 </nav>
 
                 <div class="header-actions">
@@ -1023,7 +1026,207 @@
             </section>
         </div>
 
-        <!-- Tab 7: Auto-Pilot Pipeline & Nightly Automation Hub -->
+        <!-- Tab 4: TikTok Mexico Trend & Viral Discovery Engine -->
+        <div id="tab-mexico-trends" class="tab-content">
+            <!-- 1. Real-time Mexico Golden Time & Status Banner -->
+            <section class="mexico-header-card" style="margin-bottom: 20px; background: linear-gradient(135deg, rgba(255, 71, 87, 0.08), rgba(255, 107, 129, 0.04)); border: 1px solid rgba(255, 71, 87, 0.25); border-radius: 12px; padding: 18px 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <div style="width: 46px; height: 46px; border-radius: 10px; background: linear-gradient(135deg, #ff4757, #ff6b81); display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);">
+                            <i class="fa-solid fa-fire"></i>
+                        </div>
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--text-primary);">TikTok Mexico Trend Radar (es-MX)</h3>
+                                <span class="badge" style="background: rgba(255, 71, 87, 0.15); color: #ff4757; font-weight: 700; font-size: 11px;">Region: MX 🇲🇽</span>
+                            </div>
+                            <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-secondary);">
+                                Khám phá chủ đề hot, thuật toán Hashtag 4 tầng và kịch bản Hook giữ chân 3s thị trường Mexico.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Mexico City Realtime Clock & Posting Slot -->
+                    <div style="display: flex; gap: 16px; align-items: center; background: var(--bg-card); padding: 10px 18px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="text-align: right;">
+                            <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
+                                <i class="fa-regular fa-clock"></i> Giờ Mexico City (CST / UTC-6)
+                            </div>
+                            <div id="mx-clock-display" style="font-size: 16px; font-weight: 800; color: var(--text-primary);">--:-- --</div>
+                        </div>
+                        <div style="border-left: 1px solid var(--border-color); padding-left: 14px;">
+                            <div id="mx-golden-status-badge" class="status-badge" style="background: rgba(46, 213, 115, 0.12); color: #2ed573; border: 1px solid rgba(46, 213, 115, 0.3); font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 20px;">
+                                <span class="status-dot" style="background: #2ed573;"></span> <span id="mx-golden-text">Đang kiểm tra...</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="btn-refresh-mexico-trends" style="background: #ff4757; border-color: #ff4757; box-shadow: 0 4px 10px rgba(255,71,87,0.3);">
+                            <i class="fa-solid fa-arrows-rotate"></i> Quét Xu Hướng Live
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Controls & Filter Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <label style="font-size: 13px; font-weight: 700; color: var(--text-secondary);">
+                        <i class="fa-solid fa-filter text-primary"></i> Ngách (Niche):
+                    </label>
+                    <select id="mx-niche-select" class="form-control" style="width: 220px; font-size: 13px; font-weight: 600;">
+                        <option value="all">🔥 Tất cả chủ đề hot</option>
+                        <option value="humor">😂 Humor & Comedia Mexicana</option>
+                        <option value="chisme">🤫 Chisme & Storytime</option>
+                        <option value="misterio">👻 Leyendas & Misterio MX</option>
+                        <option value="curiosidades">💡 Curiosidades & Cultura</option>
+                        <option value="futbol">⚽ Fútbol Mexicano (Liga MX)</option>
+                        <option value="comida">🌮 Comida & Tacos Callejeros</option>
+                        <option value="musica">🎵 Música & Corridos Tumbados</option>
+                    </select>
+
+                    <label style="font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-left: 10px;">
+                        <i class="fa-solid fa-calendar-days"></i> Chu kỳ:
+                    </label>
+                    <div class="btn-group" style="display: inline-flex; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color);">
+                        <button type="button" class="btn btn-xs btn-primary mx-period-btn" data-period="7" style="padding: 6px 12px; font-weight: 700;">7 Ngày</button>
+                        <button type="button" class="btn btn-xs btn-outline mx-period-btn" data-period="30" style="padding: 6px 12px; font-weight: 700;">30 Ngày</button>
+                    </div>
+                </div>
+
+                <div style="font-size: 12px; color: var(--text-muted);">
+                    <i class="fa-solid fa-circle-info"></i> Nguồn dữ liệu: <strong>TikTok Creative Center MX & Search Radar</strong>
+                </div>
+            </div>
+
+            <!-- 3. Main 2-Column Dashboard Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 420px; gap: 20px;">
+                <!-- Left Column: Top Trending Hashtags & Topics -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Hashtags Table Panel -->
+                    <section class="panel" style="margin: 0;">
+                        <div class="panel-header" style="padding: 14px 20px;">
+                            <div class="panel-title-group">
+                                <i class="fa-solid fa-hashtag" style="color: #ff4757;"></i>
+                                <h3 style="font-size: 15px;">Bảng Xếp Hạng Hashtag & Chủ Đề Tăng Trưởng Nhanh (Mexico)</h3>
+                                <span class="badge badge-primary" id="mx-hashtag-count-badge" style="font-size: 11px;">0 hashtags</span>
+                            </div>
+                        </div>
+                        <div class="panel-body" style="padding: 0; overflow-x: auto;">
+                            <table class="table-custom" style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: var(--bg-hover); font-size: 12px; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
+                                        <th style="padding: 10px 14px; text-align: center; width: 50px;">Hạng</th>
+                                        <th style="padding: 10px 14px; text-align: left;">Hashtag & Ngách</th>
+                                        <th style="padding: 10px 14px; text-align: right;">Lượt xem</th>
+                                        <th style="padding: 10px 14px; text-align: right;">Tăng trưởng</th>
+                                        <th style="padding: 10px 14px; text-align: center; width: 110px;">Viral Score</th>
+                                        <th style="padding: 10px 14px; text-align: center; width: 180px;">Hành động</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mx-hashtags-table-body">
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                            <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: #ff4757; margin-bottom: 10px; display: block;"></i>
+                                            Đang tải dữ liệu xu hướng TikTok Mexico...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- Packaged Hot Topics Carousel / Cards -->
+                    <section class="panel" style="margin: 0;">
+                        <div class="panel-header" style="padding: 14px 20px;">
+                            <div class="panel-title-group">
+                                <i class="fa-solid fa-box-archive text-success"></i>
+                                <h3 style="font-size: 15px;">Gói Chủ Đề Đóng Gói Sẵn Cho AI Content Agent & Video Factory</h3>
+                            </div>
+                        </div>
+                        <div class="panel-body" id="mx-packaged-topics-container" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                            <!-- Topics will be dynamically rendered here -->
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right Column: AI Hook Generator (es-MX) & Viral Sounds -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- 1. AI Mexican Hook Generator Card -->
+                    <section class="panel" style="margin: 0; border: 1px solid rgba(139, 92, 246, 0.3);">
+                        <div class="panel-header" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(236, 72, 153, 0.04)); padding: 14px 18px;">
+                            <div class="panel-title-group">
+                                <i class="fa-solid fa-wand-magic-sparkles" style="color: #8b5cf6;"></i>
+                                <h3 style="font-size: 14px; font-weight: 800;">AI Mexican Hook & Slang Generator</h3>
+                            </div>
+                        </div>
+                        <div class="panel-body" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                            <div>
+                                <label style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; display: block;">
+                                    Chủ đề video (Topic / Từ khóa):
+                                </label>
+                                <input type="text" id="mx-hook-topic-input" class="form-control" placeholder="VD: El Chavo del 8, Tacos al pastor, Fantasma en CDMX..." style="font-size: 13px;">
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <div>
+                                    <label style="font-size: 11px; font-weight: 700; color: var(--text-muted);">Ngách / Phong cách:</label>
+                                    <select id="mx-hook-niche-select" class="form-control" style="font-size: 12px;">
+                                        <option value="chisme">🤫 Chisme & Storytime</option>
+                                        <option value="humor">😂 Humor Mexicano</option>
+                                        <option value="misterio">👻 Leyendas & Misterio</option>
+                                        <option value="curiosidades">💡 Curiosidades</option>
+                                        <option value="futbol">⚽ Fútbol Liga MX</option>
+                                        <option value="comida">🌮 Comida Mexicana</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; align-items: flex-end;">
+                                    <button class="btn btn-primary" id="btn-generate-mx-hooks" style="width: 100%; font-size: 12px; font-weight: 700; background: linear-gradient(135deg, #8b5cf6, #ec4899); border: none;">
+                                        <i class="fa-solid fa-bolt"></i> Sinh Hook (es-MX)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Generated Hooks Display Area -->
+                            <div id="mx-generated-hooks-box" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                                    Gợi ý câu mở đầu 3s (Nhấn để Copy):
+                                </div>
+                                <div class="hook-item-box" style="background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: var(--text-primary); cursor: pointer; transition: all 0.2s;" title="Nhấn để copy câu hook">
+                                    <em>"¡Wey, no vas a creer lo que pasó cuando..."</em>
+                                    <span style="float: right; color: var(--primary); font-size: 11px;"><i class="fa-regular fa-copy"></i></span>
+                                </div>
+                            </div>
+
+                            <!-- 4-Tier Hashtag Preview Box -->
+                            <div id="mx-generated-hashtag-box" style="background: rgba(255, 71, 87, 0.06); border: 1px dashed rgba(255, 71, 87, 0.3); border-radius: 8px; padding: 10px 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                    <span style="font-size: 11px; font-weight: 700; color: #ff4757; text-transform: uppercase;">Bộ 4-Tier Hashtags Tối Ưu:</span>
+                                    <button class="btn btn-xs btn-outline" id="btn-copy-generated-tags" style="font-size: 10px; padding: 2px 8px;">
+                                        <i class="fa-regular fa-copy"></i> Copy tất cả
+                                    </button>
+                                </div>
+                                <div id="mx-generated-tags-text" style="font-size: 12px; color: var(--text-primary); font-weight: 600; word-break: break-word;">
+                                    #parati #mexico #chismestiktok #storytime #chisme
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 2. Top Trending Sounds / Nhạc Mexico Panel -->
+                    <section class="panel" style="margin: 0;">
+                        <div class="panel-header" style="padding: 14px 18px;">
+                            <div class="panel-title-group">
+                                <i class="fa-solid fa-music" style="color: #2ed573;"></i>
+                                <h3 style="font-size: 14px;">Top Âm Thanh / Nhạc Viral Mexico</h3>
+                            </div>
+                        </div>
+                        <div class="panel-body" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;" id="mx-sounds-container">
+                            <!-- Sounds will be dynamically rendered here -->
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 8: Auto-Pilot Pipeline & Nightly Automation Hub -->
         <div id="tab-autopilot" class="tab-content">
             <!-- Header Hero Banner -->
             <section class="panel" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(217, 70, 239, 0.12)); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px;">
@@ -1440,5 +1643,4 @@
     <script src="script.js?v=35"></script>
 </body>
 </html>
-
 

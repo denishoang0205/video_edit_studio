@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crewai-enterprise"
+version = "2.0.0"
+description = "Clean Architecture & Production-Ready Multi-Agent Framework"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "CrewAI Enterprise Engineer", email = "engineering@crewai.enterprise" }
+]
+dependencies = [
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.0",
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+    "celery>=5.4.0",
+    "redis>=5.0.0",
+    "httpx>=0.27.0",
+    "opentelemetry-api>=1.25.0",
+    "opentelemetry-sdk>=1.25.0",
+    "typer>=0.12.0",
+    "rich>=13.7.0",
+    "python-dotenv>=1.0.1",
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0"
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.30.0"]
+gemini = ["google-genai>=0.1.0"]
+all = [
+    "openai>=1.30.0",
+    "google-genai>=0.1.0"
+]
+
+[project.scripts]
+crewai-cli = "src.crewai_core.interfaces.cli.cli_app:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]

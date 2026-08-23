@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSettingsManager();
     initAccountsManager();
     initPublishingTracker();
+    initMexicoTrendRadar();
     initAutoPilotHub();
 });
 
@@ -41,8 +42,9 @@ function initTabs() {
 
             if (targetTab === 'tab-publishing') {
                 fetchPublishingMatrix();
-            }
-            if (targetTab === 'tab-autopilot') {
+            } else if (targetTab === 'tab-mexico-trends') {
+                loadMexicoTrends();
+            } else if (targetTab === 'tab-autopilot') {
                 loadAutopilotQueue();
             }
         });
@@ -3192,6 +3194,452 @@ window.fetchSettings = fetchSettings;
 window.saveAllSettings = saveAllSettings;
 window.testAdsPowerConnection = testAdsPowerConnection;
 window.checkHmaIp = checkHmaIp;
+
+
+/* ==========================================================================
+   8. TikTok Mexico Trend & Viral Discovery Engine (Radar MX)
+   ========================================================================== */
+
+let currentMexicoNiche = 'all';
+let currentMexicoPeriod = 7;
+let mexicoClockInterval = null;
+
+function initMexicoTrendRadar() {
+    const refreshBtn = document.getElementById('btn-refresh-mexico-trends');
+    const nicheSelect = document.getElementById('mx-niche-select');
+    const periodBtns = document.querySelectorAll('.mx-period-btn');
+    const generateHookBtn = document.getElementById('btn-generate-mx-hooks');
+    const copyGenTagsBtn = document.getElementById('btn-copy-generated-tags');
+    const hookTopicInput = document.getElementById('mx-hook-topic-input');
+
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => loadMexicoTrends());
+    }
+
+    if (nicheSelect) {
+        nicheSelect.addEventListener('change', (e) => {
+            currentMexicoNiche = e.target.value;
+            loadMexicoTrends();
+        });
+    }
+
+    if (periodBtns) {
+        periodBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                periodBtns.forEach(b => {
+                    b.classList.remove('btn-primary');
+                    b.classList.add('btn-outline');
+                });
+                btn.classList.remove('btn-outline');
+                btn.classList.add('btn-primary');
+                currentMexicoPeriod = parseInt(btn.dataset.period || '7');
+                loadMexicoTrends();
+            });
+        });
+    }
+
+    if (generateHookBtn) {
+        generateHookBtn.addEventListener('click', handleGenerateMexicoHooks);
+    }
+
+    if (hookTopicInput) {
+        hookTopicInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') handleGenerateMexicoHooks();
+        });
+    }
+
+    if (copyGenTagsBtn) {
+        copyGenTagsBtn.addEventListener('click', () => {
+            const tagsText = document.getElementById('mx-generated-tags-text')?.innerText || '';
+            if (tagsText) {
+                copyTextToClipboard(tagsText, 'Đã copy bộ 4-Tier Hashtags!');
+            }
+        });
+    }
+
+    // Start Mexico City Clock updater
+    updateMexicoTimeDisplay();
+    if (!mexicoClockInterval) {
+        mexicoClockInterval = setInterval(updateMexicoTimeDisplay, 30000);
+    }
+}
+
+async function updateMexicoTimeDisplay() {
+    try {
+        const res = await fetch('/api/mexico_golden_hours');
+        if (res.ok) {
+            const data = await res.json();
+            const clockEl = document.getElementById('mx-clock-display');
+            const goldenBadge = document.getElementById('mx-golden-status-badge');
+            const goldenText = document.getElementById('mx-golden-text');
+
+            if (clockEl) clockEl.innerText = `${data.current_time_str} (${data.current_date_str})`;
+            
+            if (goldenBadge && goldenText) {
+                if (data.is_golden_time) {
+                    goldenBadge.style.background = 'rgba(46, 213, 115, 0.15)';
+                    goldenBadge.style.color = '#2ed573';
+                    goldenBadge.style.borderColor = 'rgba(46, 213, 115, 0.4)';
+                    goldenText.innerText = `🔥 Giờ Vàng Đăng Bài: ${data.next_slot}`;
+                } else {
+                    goldenBadge.style.background = 'rgba(255, 171, 0, 0.15)';
+                    goldenBadge.style.color = '#ffab00';
+                    goldenBadge.style.borderColor = 'rgba(255, 171, 0, 0.4)';
+                    goldenText.innerText = `⏳ Ca tiếp theo: ${data.next_slot}`;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Lỗi cập nhật giờ Mexico:', e);
+    }
+}
+
+async function loadMexicoTrends() {
+    const tbody = document.getElementById('mx-hashtags-table-body');
+    const countBadge = document.getElementById('mx-hashtag-count-badge');
+    const refreshBtn = document.getElementById('btn-refresh-mexico-trends');
+
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: #ff4757; margin-bottom: 10px; display: block;"></i>
+                    Đang quét dữ liệu xu hướng TikTok Mexico thời gian thực...
+                </td>
+            </tr>
+        `;
+    }
+
+    if (refreshBtn) refreshBtn.classList.add('loading');
+
+    try {
+        const url = `/api/mexico_trends?niche=${encodeURIComponent(currentMexicoNiche)}&period=${currentMexicoPeriod}`;
+        const res = await fetch(url);
+        const report = await res.json();
+
+        if (countBadge) {
+            countBadge.innerText = `${report.total_hashtags_found || 0} hashtags`;
+        }
+
+        renderMexicoHashtags(report.hashtags || []);
+        renderPackagedTopics(report.packaged_hot_topics || []);
+        renderTrendingSounds(report.trending_sounds || []);
+        updateMexicoTimeDisplay();
+
+    } catch (err) {
+        console.error('Lỗi khi tải xu hướng Mexico:', err);
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 30px; color: var(--danger);">
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 22px; margin-bottom: 8px; display: block;"></i>
+                        Không thể kết nối đến dữ liệu xu hướng. Vui lòng thử lại!
+                    </td>
+                </tr>
+            `;
+        }
+    } finally {
+        if (refreshBtn) refreshBtn.classList.remove('loading');
+    }
+}
+
+function renderMexicoHashtags(hashtags) {
+    const tbody = document.getElementById('mx-hashtags-table-body');
+    if (!tbody) return;
+
+    if (!hashtags || hashtags.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                    Không tìm thấy hashtag nào cho bộ lọc này.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const rowsHtml = hashtags.map((item, idx) => {
+        let rankBadge = `<span style="font-weight: 800; color: var(--text-muted);">${item.rank || idx + 1}</span>`;
+        if (item.rank === 1) rankBadge = `<span style="background: #ffd700; color: #000; font-weight: 800; padding: 2px 8px; border-radius: 6px; font-size: 11px;">🥇 #1</span>`;
+        else if (item.rank === 2) rankBadge = `<span style="background: #e0e0e0; color: #000; font-weight: 800; padding: 2px 8px; border-radius: 6px; font-size: 11px;">🥈 #2</span>`;
+        else if (item.rank === 3) rankBadge = `<span style="background: #cd7f32; color: #fff; font-weight: 800; padding: 2px 8px; border-radius: 6px; font-size: 11px;">🥉 #3</span>`;
+
+        const viewsFormatted = formatViewsCount(item.views || 0);
+        const growth = item.growth_pct || 0;
+        const growthColor = growth >= 100 ? '#ff4757' : (growth >= 50 ? '#2ed573' : 'var(--text-primary)');
+        const viralScore = item.viral_score || 85.0;
+
+        // Build 4-tier copy string
+        const copyTagStr = `#parati #mexico #${item.hashtag} #${item.niche || 'tendencia'}`;
+
+        return `
+            <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;">
+                <td style="padding: 12px 14px; text-align: center;">${rankBadge}</td>
+                <td style="padding: 12px 14px;">
+                    <div style="font-weight: 800; font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                        <span style="color: #ff4757;">#</span>${item.hashtag}
+                    </div>
+                    <span class="badge" style="font-size: 10px; padding: 1px 6px; background: var(--bg-hover); color: var(--text-muted); margin-top: 2px; display: inline-block;">
+                        ${item.niche || 'chisme'}
+                    </span>
+                </td>
+                <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: var(--text-primary);">
+                    ${viewsFormatted}
+                </td>
+                <td style="padding: 12px 14px; text-align: right; font-weight: 800; color: ${growthColor};">
+                    +${growth}%
+                </td>
+                <td style="padding: 12px 14px; text-align: center;">
+                    <span style="background: rgba(255, 71, 87, 0.12); color: #ff4757; border: 1px solid rgba(255, 71, 87, 0.3); font-weight: 800; font-size: 11.5px; padding: 3px 8px; border-radius: 12px; display: inline-block;">
+                        ${viralScore} 🔥
+                    </span>
+                </td>
+                <td style="padding: 12px 14px; text-align: center;">
+                    <div style="display: flex; gap: 6px; justify-content: center;">
+                        <button class="btn btn-xs btn-outline" onclick="copyTextToClipboard('${copyTagStr}', 'Đã copy 4-Tier Hashtags của #${item.hashtag}!')" title="Copy bộ 4-Tier Hashtags">
+                            <i class="fa-regular fa-copy"></i> Tags
+                        </button>
+                        <button class="btn btn-xs btn-outline-primary" onclick="useTopicForHookGeneration('${item.hashtag}', '${item.niche}')" title="Sinh Hook mở đầu kịch bản">
+                            <i class="fa-solid fa-bolt"></i> Hook
+                        </button>
+                        <a href="${item.url || `https://www.tiktok.com/tag/${item.hashtag}`}" target="_blank" class="btn btn-xs btn-outline" title="Mở trên TikTok">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    tbody.innerHTML = rowsHtml;
+}
+
+function renderPackagedTopics(topics) {
+    const container = document.getElementById('mx-packaged-topics-container');
+    if (!container) return;
+
+    if (!topics || topics.length === 0) {
+        container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">Chưa có gói chủ đề nào được tạo.</div>`;
+        return;
+    }
+
+    const cardsHtml = topics.slice(0, 4).map(t => {
+        const hooksList = (t.sample_hooks_es_mx || []).map(h => 
+            `<li style="margin-bottom: 4px; cursor: pointer;" onclick="copyTextToClipboard('${h.replace(/'/g, "\\'")}', 'Đã copy câu Hook!')" title="Click để copy câu Hook này">
+                <i class="fa-regular fa-comment-dots text-primary"></i> <em>"${h}"</em>
+            </li>`
+        ).join('');
+
+        return `
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h4 style="margin: 0; font-size: 14px; font-weight: 800; color: var(--text-primary);">${t.title}</h4>
+                            <span class="badge" style="background: rgba(46, 213, 115, 0.15); color: #2ed573; font-weight: 800; font-size: 11px;">Score: ${t.viral_score}</span>
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                            <i class="fa-solid fa-clock"></i> Khung giờ đăng tối ưu: <strong>${t.recommended_post_hour}</strong>
+                        </div>
+                    </div>
+                    <button class="btn btn-xs btn-outline-success" onclick="copyTextToClipboard('${(t.copy_hashtags || '').replace(/'/g, "\\'")}', 'Đã copy toàn bộ Hashtags!')">
+                        <i class="fa-regular fa-copy"></i> Copy Toàn Bộ Hashtags
+                    </button>
+                </div>
+
+                <div style="background: var(--bg-hover); border-radius: 6px; padding: 8px 12px; font-size: 12px; margin-bottom: 8px;">
+                    <span style="font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 10px;">Bộ Hashtag 4 tầng:</span>
+                    <div style="color: #ff4757; font-weight: 700; margin-top: 2px;">${t.copy_hashtags}</div>
+                </div>
+
+                <div style="font-size: 12px; color: var(--text-secondary);">
+                    <span style="font-weight: 700; color: var(--text-muted); font-size: 10.5px; text-transform: uppercase;">Mẫu Hook 3s Giữ Chân (Click để copy):</span>
+                    <ul style="margin: 4px 0 0 0; padding-left: 18px; color: var(--text-primary); line-height: 1.5;">
+                        ${hooksList}
+                    </ul>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = cardsHtml;
+}
+
+function renderTrendingSounds(sounds) {
+    const container = document.getElementById('mx-sounds-container');
+    if (!container) return;
+
+    if (!sounds || sounds.length === 0) {
+        container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 15px;">Không có dữ liệu âm thanh.</div>`;
+        return;
+    }
+
+    const soundsHtml = sounds.map((s, idx) => {
+        return `
+            <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px;">
+                <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                    <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(46, 213, 115, 0.15); color: #2ed573; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0;">
+                        ${idx + 1}
+                    </div>
+                    <div style="min-width: 0;">
+                        <div style="font-size: 12.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${s.title}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${s.author} • ${formatViewsCount(s.usage_count || 0)} videos
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align: right; flex-shrink: 0; padding-left: 8px;">
+                    <span style="font-size: 11px; font-weight: 800; color: #2ed573;">+${s.growth_pct}%</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = soundsHtml;
+}
+
+async function handleGenerateMexicoHooks() {
+    const topicInput = document.getElementById('mx-hook-topic-input');
+    const nicheSelect = document.getElementById('mx-hook-niche-select');
+    const hooksBox = document.getElementById('mx-generated-hooks-box');
+    const tagsBox = document.getElementById('mx-generated-tags-text');
+    const btn = document.getElementById('btn-generate-mx-hooks');
+
+    const topic = topicInput?.value.trim() || 'este secreto viral';
+    const niche = nicheSelect?.value || 'chisme';
+
+    if (btn) btn.classList.add('loading');
+
+    try {
+        const res = await fetch('/api/mexico_generate_hooks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic, niche })
+        });
+        const data = await res.json();
+
+        if (hooksBox && data.hooks) {
+            const hookItems = data.hooks.map(h => `
+                <div class="hook-item-box" onclick="copyTextToClipboard('${h.replace(/'/g, "\\'")}', 'Đã copy câu hook!')" style="background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: var(--text-primary); cursor: pointer; transition: all 0.2s;" title="Nhấn để copy câu hook">
+                    <em>"${h}"</em>
+                    <span style="float: right; color: var(--primary); font-size: 11px;"><i class="fa-regular fa-copy"></i></span>
+                </div>
+            `).join('');
+
+            hooksBox.innerHTML = `
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                    Gợi ý câu mở đầu 3s (Nhấn để Copy):
+                </div>
+                ${hookItems}
+            `;
+        }
+
+        if (tagsBox && data.hashtag_bundle) {
+            tagsBox.innerText = data.hashtag_bundle.copy_ready_text || '';
+        }
+
+    } catch (err) {
+        console.error('Lỗi khi sinh hook Mexico:', err);
+    } finally {
+        if (btn) btn.classList.remove('loading');
+    }
+}
+
+function useTopicForHookGeneration(hashtag, niche) {
+    const topicInput = document.getElementById('mx-hook-topic-input');
+    const nicheSelect = document.getElementById('mx-hook-niche-select');
+    
+    if (topicInput) topicInput.value = hashtag;
+    if (nicheSelect && niche) nicheSelect.value = niche;
+
+    handleGenerateMexicoHooks();
+
+    // Scroll nhẹ đến box Hook Generator
+    document.getElementById('mx-hook-topic-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function copyTextToClipboard(text, successMsg = 'Đã copy vào bộ nhớ tạm!') {
+    if (!text) return;
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(successMsg);
+        }).catch(() => {
+            fallbackCopyText(text, successMsg);
+        });
+    } else {
+        fallbackCopyText(text, successMsg);
+    }
+}
+
+function fallbackCopyText(text, successMsg) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+        document.execCommand('copy');
+        showToast(successMsg);
+    } catch (err) {
+        prompt("Copy thủ công bên dưới:", text);
+    }
+    document.body.removeChild(textArea);
+}
+
+function showToast(message) {
+    let toast = document.getElementById('studio-global-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'studio-global-toast';
+        toast.style.position = 'fixed';
+        toast.style.bottom = '24px';
+        toast.style.right = '24px';
+        toast.style.background = '#2ed573';
+        toast.style.color = '#ffffff';
+        toast.style.padding = '10px 18px';
+        toast.style.borderRadius = '8px';
+        toast.style.fontSize = '13px';
+        toast.style.fontWeight = '700';
+        toast.style.boxShadow = '0 6px 18px rgba(0,0,0,0.18)';
+        toast.style.zIndex = '99999';
+        toast.style.transition = 'all 0.3s ease';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        document.body.appendChild(toast);
+    }
+    toast.innerText = message;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+    }, 2400);
+}
+
+function formatViewsCount(num) {
+    if (num >= 1000000000) {
+        return (num / 1000000000).toFixed(1) + 'B';
+    }
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+    }
+    if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+}
+
+// Bind to window for HTML inline access
+window.initMexicoTrendRadar = initMexicoTrendRadar;
+window.loadMexicoTrends = loadMexicoTrends;
+window.handleGenerateMexicoHooks = handleGenerateMexicoHooks;
+window.useTopicForHookGeneration = useTopicForHookGeneration;
+window.copyTextToClipboard = copyTextToClipboard;
 
 /* ==========================================================================
    Auto-Pilot Pipeline Hub (All-in-One Automation & Nightly Scheduler)

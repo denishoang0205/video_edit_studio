@@ -1,9 +1,9 @@
 {
   "region": "MX",
   "region_name": "Mexico (es-MX)",
-  "updated_at": "2026-08-23 22:16:07",
+  "updated_at": "2026-08-23 22:21:12",
   "mexico_time": {
-    "current_time_str": "09:16 AM",
+    "current_time_str": "09:21 AM",
     "current_date_str": "23/08/2026",
     "timezone": "CST (UTC-6) - Mexico City",
     "is_golden_time": false,
@@ -11,7 +11,7 @@
     "recommendation": "Chuẩn bị video và kịch bản để đăng vào khung giờ trưa (12:30 - 14:00 CST)."
   },
   "active_niche": "all",
-  "period_days": 30,
+  "period_days": 7,
   "total_hashtags_found": 10,
   "hashtags": [
     {
@@ -163,7 +163,7 @@
   ],
   "packaged_hot_topics": [
     {
-      "id": "MX_humormexicano_1787498167",
+      "id": "MX_humormexicano_1787498472",
       "title": "Chủ đề Xu hướng #humormexicano (Mexico)",
       "hashtag": "humormexicano",
       "niche": "humor",
@@ -188,7 +188,7 @@
       "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
     },
     {
-      "id": "MX_chismestiktok_1787498167",
+      "id": "MX_chismestiktok_1787498472",
       "title": "Chủ đề Xu hướng #chismestiktok (Mexico)",
       "hashtag": "chismestiktok",
       "niche": "chisme",
@@ -213,7 +213,7 @@
       "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
     },
     {
-      "id": "MX_leyendasdemexico_1787498167",
+      "id": "MX_leyendasdemexico_1787498472",
       "title": "Chủ đề Xu hướng #leyendasdemexico (Mexico)",
       "hashtag": "leyendasdemexico",
       "niche": "misterio",
@@ -238,7 +238,7 @@
       "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
     },
     {
-      "id": "MX_mexicocheck_1787498167",
+      "id": "MX_mexicocheck_1787498472",
       "title": "Chủ đề Xu hướng #mexicocheck (Mexico)",
       "hashtag": "mexicocheck",
       "niche": "curiosidades",
@@ -264,7 +264,7 @@
       "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
     },
     {
-      "id": "MX_historiasdeterror_1787498167",
+      "id": "MX_historiasdeterror_1787498472",
       "title": "Chủ đề Xu hướng #historiasdeterror (Mexico)",
       "hashtag": "historiasdeterror",
       "niche": "misterio",
@@ -290,7 +290,7 @@
       "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
     },
     {
-      "id": "MX_storytime_1787498167",
+      "id": "MX_storytime_1787498472",
       "title": "Chủ đề Xu hướng #storytime (Mexico)",
       "hashtag": "storytime",
       "niche": "chisme",
@@ -315,7 +315,7 @@
       "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
     },
     {
-      "id": "MX_ligamx_1787498167",
+      "id": "MX_ligamx_1787498472",
       "title": "Chủ đề Xu hướng #ligamx (Mexico)",
       "hashtag": "ligamx",
       "niche": "futbol",
@@ -338,7 +338,7 @@
       "recommended_post_hour": "12:30 PM CST (Nghỉ trưa)"
     },
     {
-      "id": "MX_datoscuriosos_1787498167",
+      "id": "MX_datoscuriosos_1787498472",
       "title": "Chủ đề Xu hướng #datoscuriosos (Mexico)",
       "hashtag": "datoscuriosos",
       "niche": "curiosidades",

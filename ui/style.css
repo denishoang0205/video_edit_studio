@@ -2494,4 +2494,41 @@ body.theme-light .pub-toolbar {
     color: var(--text-secondary);
 }
 
+/* ==========================================================================
+   TikTok Mexico Trend Radar Styles
+   ========================================================================== */
+.hook-item-box {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    user-select: none;
+}
+
+.hook-item-box:hover {
+    background: rgba(139, 92, 246, 0.12) !important;
+    border-color: rgba(139, 92, 246, 0.4) !important;
+    transform: translateX(4px);
+}
+
+.hook-item-box:active {
+    transform: scale(0.98);
+}
+
+.mexico-header-card {
+    transition: all 0.3s ease;
+}
+
+.mexico-header-card:hover {
+    border-color: rgba(255, 71, 87, 0.45) !important;
+    box-shadow: 0 6px 20px rgba(255, 71, 87, 0.08);
+}
+
+#btn-refresh-mexico-trends.loading i {
+    animation: spin 1s infinite linear;
+}
+
+#btn-generate-mx-hooks.loading i {
+    animation: spin 1s infinite linear;
+}
+
+
 
