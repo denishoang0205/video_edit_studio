@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Montserrat:wght@600;700;800&family=Be+Vietnam+Pro:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=30">
+    <link rel="stylesheet" href="style.css?v=35">
 </head>
 <body class="theme-system">
     <div class="app-layout">
@@ -29,6 +29,9 @@
             <div class="header-right-group">
                 <!-- Tab Navigation Links -->
                 <nav class="tab-navigation">
+                    <button class="tab-link tab-link-autopilot" data-tab="tab-autopilot" id="tab-btn-autopilot" style="background: linear-gradient(135deg, #6366f1, #d946ef); color: white; font-weight: 800; border-radius: 6px; box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4);">
+                        <i class="fa-solid fa-rocket"></i> Auto-Pilot Pipeline
+                    </button>
                     <button class="tab-link active" data-tab="tab-config">
                         <i class="fa-solid fa-sliders"></i> Settings (AdsPower & HMA)
                     </button>
@@ -54,6 +57,11 @@
                 </nav>
 
                 <div class="header-actions">
+                    <!-- Nút Kích Hoạt Pipeline All-in-One -->
+                    <button class="btn btn-autopilot" id="btn-open-autopilot-modal" style="background: linear-gradient(135deg, #6366f1, #d946ef); color: white; border: none; font-weight: 800; border-radius: 8px; padding: 7px 14px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35); font-size: 13px; transition: transform 0.15s ease;" title="Mở Trung Tâm Tự Động Hóa Pipeline (n8n / Nightly Scheduler)">
+                        <i class="fa-solid fa-rocket"></i> Kích Hoạt Pipeline
+                    </button>
+
                     <!-- Dark/Light Theme Toggle -->
                     <button class="btn-theme-toggle" id="theme-toggle" title="Toggle Light/Dark Mode">
                         <i class="fa-solid fa-circle-half-stroke"></i>
@@ -497,6 +505,22 @@
 
                 <!-- Right Main Content: Active Account Details & Clips Feed -->
                 <main class="panel pub-main-panel">
+                    <!-- Banner Auto-Pilot Pipeline -->
+                    <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(217, 70, 239, 0.15)); border: 1px solid rgba(99, 102, 241, 0.35); padding: 12px 18px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 38px; height: 38px; border-radius: 8px; background: linear-gradient(135deg, #6366f1, #d946ef); display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.4);">
+                                <i class="fa-solid fa-rocket" style="font-size: 18px;"></i>
+                            </div>
+                            <div>
+                                <h4 style="margin: 0; font-size: 14px; font-weight: 800;">🚀 Auto-Pilot Pipeline (Đăng Tự Động Hàng Loạt)</h4>
+                                <span style="font-size: 12px; color: var(--text-secondary);">Tự động đăng toàn bộ clip chờ đăng ➔ Đổi IP HMA ➔ AdsPower ➔ TikTok ➔ Telegram</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" id="btn-banner-open-autopilot" style="background: linear-gradient(135deg, #6366f1, #d946ef); border: none; font-weight: 800; padding: 7px 16px; border-radius: 8px; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); cursor: pointer;">
+                            <i class="fa-solid fa-bolt"></i> Kích Hoạt Pipeline Ngay
+                        </button>
+                    </div>
+
                     <!-- Top Bar: Account info & Target Channel Switcher -->
                     <div class="pub-header-card" id="pub-active-account-header">
                         <div class="pub-account-info-banner">
@@ -998,6 +1022,156 @@
                 </div>
             </section>
         </div>
+
+        <!-- Tab 7: Auto-Pilot Pipeline & Nightly Automation Hub -->
+        <div id="tab-autopilot" class="tab-content">
+            <!-- Header Hero Banner -->
+            <section class="panel" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(217, 70, 239, 0.12)); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <div style="width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, #6366f1, #d946ef); display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45); font-size: 24px;">
+                            <i class="fa-solid fa-rocket"></i>
+                        </div>
+                        <div>
+                            <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: var(--text-primary);">Trung Tâm Tự Động Hóa Pipeline (Auto-Pilot Hub)</h2>
+                            <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">Tự động đăng toàn bộ clip chờ đăng ➔ Đổi IP HMA ➔ AdsPower Chrome ➔ TikTok Studio ➔ Báo cáo Telegram ➔ Hẹn giờ tắt máy</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn btn-outline" id="btn-page-open-n8n" style="font-weight: 700;">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở n8n Dashboard
+                        </button>
+                        <button type="button" class="btn btn-primary" id="btn-page-start-autopilot" style="background: linear-gradient(135deg, #6366f1, #d946ef); border: none; font-weight: 800; padding: 10px 22px; border-radius: 8px; box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4); font-size: 14px; cursor: pointer;">
+                            <i class="fa-solid fa-play"></i> BẮT ĐẦU CHẠY PIPELINE
+                        </button>
+                        <button type="button" class="btn btn-danger hidden" id="btn-page-stop-autopilot" style="font-weight: 800; padding: 10px 22px;">
+                            <i class="fa-solid fa-stop"></i> Dừng Pipeline
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4 Engine Stats Cards -->
+            <div class="stats-overview-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px;">
+                <div class="stats-card glow-primary">
+                    <div class="stats-card-left">
+                        <span class="stats-label">Python Studio Server</span>
+                        <h2 style="font-size: 18px; color: #22c55e;">Port 8000 (Active)</h2>
+                    </div>
+                    <div class="stats-card-icon bg-primary-soft"><i class="fa-solid fa-server"></i></div>
+                </div>
+                <div class="stats-card glow-accent">
+                    <div class="stats-card-left">
+                        <span class="stats-label">n8n Workflow Engine</span>
+                        <h2 style="font-size: 18px; color: #a855f7;">Port 5678 (Active)</h2>
+                    </div>
+                    <div class="stats-card-icon bg-accent-soft"><i class="fa-solid fa-diagram-project"></i></div>
+                </div>
+                <div class="stats-card glow-warning">
+                    <div class="stats-card-left">
+                        <span class="stats-label">Clip Sẵn Sàng Đăng</span>
+                        <h2 id="tab-autopilot-queue-count" style="color: var(--primary);">0 Clip</h2>
+                    </div>
+                    <div class="stats-card-icon bg-warning-soft"><i class="fa-solid fa-layer-group"></i></div>
+                </div>
+                <div class="stats-card glow-success">
+                    <div class="stats-card-left">
+                        <span class="stats-label">Tài Khoản TikTok Đích</span>
+                        <h2 id="tab-autopilot-accounts-count" style="color: var(--accent);">0 Acc</h2>
+                    </div>
+                    <div class="stats-card-icon bg-success-soft"><i class="fa-brands fa-tiktok"></i></div>
+                </div>
+            </div>
+
+            <!-- 2-Column Grid: Queue on Left, Execution Console & Options on Right -->
+            <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px;">
+                <!-- Column Left: Pending Queue Table -->
+                <section class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title-group">
+                            <i class="fa-solid fa-list-check text-primary"></i>
+                            <h3>Hàng Đợi Xuất Bản (Pending Clips Queue)</h3>
+                        </div>
+                        <button type="button" class="btn btn-xs btn-outline" id="btn-page-refresh-queue">
+                            <i class="fa-solid fa-arrows-rotate"></i> Quét lại
+                        </button>
+                    </div>
+                    <div class="table-scroll-area" style="max-height: 440px; overflow-y: auto;">
+                        <table class="dashboard-table">
+                            <thead>
+                                <tr>
+                                    <th width="40">STT</th>
+                                    <th>Kênh & Tên Clip</th>
+                                    <th width="100">Part</th>
+                                    <th width="130">Tài khoản đích</th>
+                                    <th width="70" style="text-align: center;">IP</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tab-autopilot-table-body">
+                                <tr><td colspan="5" class="table-empty">Đang tải danh sách clip chờ đăng...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Column Right: Options & Live Console -->
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    <!-- Options Card -->
+                    <section class="panel" style="padding: 16px;">
+                        <h3 style="font-size: 14px; margin-bottom: 12px; font-weight: 800;"><i class="fa-solid fa-sliders text-accent"></i> Cấu Hình Tự Động Hóa:</h3>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <label class="toggle-card" style="padding: 8px 12px; margin: 0;">
+                                <input type="checkbox" id="tab-opt-ai" checked>
+                                <span class="toggle-slider"></span>
+                                <div class="toggle-info">
+                                    <strong>AI Gemini Tự Sinh Caption</strong>
+                                    <span style="font-size: 11px;">Tạo tiêu đề & hashtag viral triệu view</span>
+                                </div>
+                            </label>
+                            <label class="toggle-card" style="padding: 8px 12px; margin: 0;">
+                                <input type="checkbox" id="tab-opt-hma" checked>
+                                <span class="toggle-slider"></span>
+                                <div class="toggle-info">
+                                    <strong>Tự Đổi IP HMA VPN</strong>
+                                    <span style="font-size: 11px;">Theo đúng quốc gia tài khoản mục tiêu</span>
+                                </div>
+                            </label>
+                            <label class="toggle-card" style="padding: 8px 12px; margin: 0; border-color: rgba(239, 68, 68, 0.3);">
+                                <input type="checkbox" id="tab-opt-shutdown">
+                                <span class="toggle-slider"></span>
+                                <div class="toggle-info">
+                                    <strong style="color: #ef4444;">Tự Động Tắt Máy Khi Xong (Shutdown)</strong>
+                                    <span style="font-size: 11px;">Hẹn giờ tắt máy tính sau 15 phút</span>
+                                </div>
+                            </label>
+                        </div>
+                    </section>
+
+                    <!-- Real-time Console Panel -->
+                    <section class="panel" style="flex: 1; display: flex; flex-direction: column;">
+                        <div class="panel-header">
+                            <div class="panel-title-group">
+                                <i class="fa-solid fa-terminal text-success"></i>
+                                <h3>Console Thực Thi Thời Gian Thực</h3>
+                            </div>
+                            <span class="badge badge-secondary" id="tab-autopilot-status-badge">Sẵn sàng</span>
+                        </div>
+                        <div style="padding: 12px; flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 12px; font-weight: 700;" id="tab-autopilot-current-task">Chờ kích hoạt</span>
+                                <span style="font-size: 12px; font-weight: 800; color: var(--primary);" id="tab-autopilot-progress-percent">0%</span>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div id="tab-autopilot-progress-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #6366f1, #d946ef); transition: width 0.3s ease;"></div>
+                            </div>
+                            <div id="tab-autopilot-logs" style="background: rgba(0,0,0,0.9); color: #22c55e; font-family: monospace; font-size: 11px; padding: 10px; border-radius: 6px; height: 180px; overflow-y: auto; line-height: 1.5; border: 1px solid var(--border-color); flex: 1;">
+                                <div class="log-line text-muted">[Sẵn sàng] Bấm "BẮT ĐẦU CHẠY PIPELINE" để khởi động chu trình tự động.</div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal Video Player Preview -->
@@ -1151,7 +1325,120 @@
         </div>
     </div>
 
-    <script src="script.js?v=15"></script>
+    <!-- Modal: Auto-Pilot Hub (Tự Động Hóa Pipeline & Nightly Automation) -->
+    <div class="modal-overlay hidden" id="modal-autopilot-pipeline">
+        <div class="modal-card" style="max-width: 720px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(217, 70, 239, 0.15)); border-bottom: 1px solid var(--border-color);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #d946ef); display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);">
+                        <i class="fa-solid fa-rocket" style="font-size: 20px;"></i>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0; font-size: 17px; font-weight: 800;">Trung Tâm Tự Động Hóa Pipeline (Auto-Pilot Hub)</h4>
+                        <span style="font-size: 12px; color: var(--text-secondary);">Tự động đăng toàn bộ clip chờ đăng ➔ Đổi IP HMA ➔ AdsPower ➔ TikTok ➔ Telegram</span>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-autopilot-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <!-- Engine Status Banner -->
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.06); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; gap: 16px; align-items: center;">
+                        <span style="font-size: 12px;"><i class="fa-solid fa-server text-primary"></i> Python API: <strong style="color: #22c55e;">Port 8000 (Active)</strong></span>
+                        <span style="font-size: 12px;"><i class="fa-solid fa-diagram-project text-accent"></i> n8n Engine: <strong id="autopilot-n8n-status" style="color: #22c55e;">Port 5678</strong></span>
+                    </div>
+                    <button type="button" class="btn btn-outline btn-xs" id="btn-open-n8n-tab" title="Mở n8n Workflow Dashboard">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở n8n Dashboard
+                    </button>
+                </div>
+
+                <!-- Queue Summary Card -->
+                <div style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px; padding: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 13px; font-weight: 700; color: var(--primary);">
+                            <i class="fa-solid fa-layer-group"></i> Hàng đợi clip chờ xuất bản:
+                        </span>
+                        <span class="badge badge-primary" id="autopilot-queue-badge" style="font-size: 11px;">Đang quét...</span>
+                    </div>
+                    <div id="autopilot-queue-preview" style="max-height: 120px; overflow-y: auto; font-size: 12px; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
+                        <!-- Dynamically populated queue items -->
+                    </div>
+                </div>
+
+                <!-- Pipeline Options -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <label class="toggle-card" style="padding: 10px 12px; margin: 0;">
+                        <input type="checkbox" id="autopilot-opt-ai" checked>
+                        <span class="toggle-slider"></span>
+                        <div class="toggle-info">
+                            <strong>AI Gemini Tự Sinh Caption</strong>
+                            <span style="font-size: 11px;">Tạo tiêu đề & hashtag triệu view</span>
+                        </div>
+                    </label>
+
+                    <label class="toggle-card" style="padding: 10px 12px; margin: 0;">
+                        <input type="checkbox" id="autopilot-opt-hma" checked>
+                        <span class="toggle-slider"></span>
+                        <div class="toggle-info">
+                            <strong>Tự Đổi IP HMA VPN</strong>
+                            <span style="font-size: 11px;">Theo quốc gia tài khoản mục tiêu</span>
+                        </div>
+                    </label>
+
+                    <label class="toggle-card" style="padding: 10px 12px; margin: 0;">
+                        <input type="checkbox" id="autopilot-opt-telegram" checked>
+                        <span class="toggle-slider"></span>
+                        <div class="toggle-info">
+                            <strong>Báo Cáo Telegram Bot</strong>
+                            <span style="font-size: 11px;">Gửi thông báo về điện thoại</span>
+                        </div>
+                    </label>
+
+                    <label class="toggle-card" style="padding: 10px 12px; margin: 0; border-color: rgba(239, 68, 68, 0.3);">
+                        <input type="checkbox" id="autopilot-opt-shutdown">
+                        <span class="toggle-slider"></span>
+                        <div class="toggle-info">
+                            <strong style="color: #ef4444;">Tự Động Tắt Máy Khi Xong</strong>
+                            <span style="font-size: 11px;">Hẹn giờ Shutdown sau 15 phút</span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Live Progress & Execution Box -->
+                <div id="autopilot-execution-box" class="hidden" style="margin-top: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 12px; font-weight: 700;" id="autopilot-current-task">Đang xử lý...</span>
+                        <span style="font-size: 12px; font-weight: 800; color: var(--primary);" id="autopilot-progress-percent">0%</span>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.1); height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 10px;">
+                        <div id="autopilot-progress-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #6366f1, #d946ef); transition: width 0.3s ease;"></div>
+                    </div>
+                    <div id="autopilot-logs" style="background: rgba(0,0,0,0.85); color: #22c55e; font-family: monospace; font-size: 11px; padding: 10px; border-radius: 6px; height: 120px; overflow-y: auto; line-height: 1.5; border: 1px solid var(--border-color);">
+                        <div class="log-line text-muted">[Sẵn sàng] Bấm "Bắt đầu chạy Pipeline" để tiến hành.</div>
+                    </div>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 14px; margin-top: 4px;">
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-autopilot-queue">
+                        <i class="fa-solid fa-arrows-rotate"></i> Quét Lại Hàng Đợi
+                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn btn-danger btn-sm hidden" id="btn-stop-autopilot">
+                            <i class="fa-solid fa-stop"></i> Dừng Pipeline
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" id="btn-start-autopilot" style="background: linear-gradient(135deg, #6366f1, #d946ef); border: none; font-weight: 800; padding: 8px 18px; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);">
+                            <i class="fa-solid fa-play"></i> BẮT ĐẦU CHẠY PIPELINE
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=35"></script>
 </body>
 </html>
+
 

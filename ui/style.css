@@ -175,6 +175,33 @@ body.theme-light .tab-link:hover {
     box-shadow: 0 2px 8px var(--primary-glow);
 }
 
+.tab-link-autopilot {
+    background: linear-gradient(135deg, #6366f1, #d946ef) !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35) !important;
+    border-radius: var(--radius-sm);
+}
+
+.tab-link-autopilot:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(217, 70, 239, 0.45) !important;
+}
+
+.tab-link-autopilot.active {
+    background: linear-gradient(135deg, #4f46e5, #c026d3) !important;
+    box-shadow: 0 0 16px rgba(217, 70, 239, 0.6) !important;
+}
+
+.btn-autopilot {
+    transition: all 0.2s ease;
+}
+
+.btn-autopilot:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5) !important;
+}
+
 .header-actions {
     display: flex;
     align-items: center;

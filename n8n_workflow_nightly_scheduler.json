@@ -1,0 +1,225 @@
+{
+  "name": "🌙 TikTok Studio Pro - Nightly 00:00 Auto Poster & Auto Shutdown",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 * * *"
+            }
+          ]
+        }
+      },
+      "id": "node-midnight-trigger",
+      "name": "🌙 1. Lên lịch Đúng 12h Đêm (00:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 240]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0,6,12,18 * * *"
+            }
+          ]
+        }
+      },
+      "id": "node-multi-slot-trigger",
+      "name": "⏰ 1b. Khung giờ Vàng (0h, 6h, 12h, 18h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 420]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-nightly-run",
+        "options": {}
+      },
+      "id": "node-manual-webhook-nightly",
+      "name": "⚡ 1c. Bấm chạy thử thủ công",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 600],
+      "webhookId": "nightly-manual-trigger"
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/n8n/pending_clips?only_current_target=true",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node-get-pending-clips-nightly",
+      "name": "📥 2. Lấy Clip chờ đăng từ SSD Local",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Kiểm tra danh sách clip chờ đăng\nconst response = $input.first().json;\nconst items = response.items || [];\n\nif (items.length === 0) {\n  return [];\n}\n\n// Lấy clip đầu tiên trong hàng đợi để đăng\nconst nextClip = items[0];\n\nreturn [{\n  json: {\n    account_name: nextClip.account_name,\n    channel: nextClip.channel,\n    title: nextClip.title,\n    clip_key: nextClip.clip_key,\n    part_label: nextClip.part_label || '',\n    video_file: nextClip.video_file,\n    hashtag_default: nextClip.hashtag || '#fyp #viral #trending',\n    target_ip: nextClip.target_ip || 'US',\n    adspower_id: nextClip.adspower_id,\n    has_more_pending: items.length > 1\n  }\n}];"
+      },
+      "id": "node-select-clip-nightly",
+      "name": "🎯 3. Chọn Clip cần đăng",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 420]
+    },
+    {
+      "parameters": {
+        "model": "gemini-1.5-flash",
+        "prompt": "Bạn là chuyên gia tối ưu video TikTok triệu view.\nHãy tạo 1 tiêu đề ngắn gọn (dưới 100 ký tự) và 5-6 hashtag viral cho video: \"{{ $json.title }}\" thuộc kênh: \"{{ $json.channel }}\" ({{ $json.part_label }}).\n\nTrả về DUY NHẤT định dạng JSON:\n{\n  \"caption\": \"Tiêu đề ngắn thu hút\",\n  \"hashtags\": \"#hashtag1 #hashtag2 #fyp #trending\"\n}"
+      },
+      "id": "node-gemini-nightly",
+      "name": "🤖 4. AI Gemini tạo Caption Ban Đêm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/pipeline/auto_process_and_post",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"account_name\": \"{{ $('🎯 3. Chọn Clip cần đăng').item.json.account_name }}\",\n  \"clip_key\": \"{{ $('🎯 3. Chọn Clip cần đăng').item.json.clip_key }}\",\n  \"channel\": \"{{ $('🎯 3. Chọn Clip cần đăng').item.json.channel }}\",\n  \"title\": \"{{ $('🎯 3. Chọn Clip cần đăng').item.json.title }}\",\n  \"video_file\": \"{{ $('🎯 3. Chọn Clip cần đăng').item.json.video_file }}\",\n  \"part_label\": \"{{ $('🎯 3. Chọn Clip cần đăng').item.json.part_label }}\",\n  \"override_caption\": \"{{ $json.caption || $('🎯 3. Chọn Clip cần đăng').item.json.title }}\",\n  \"override_hashtags\": \"{{ $json.hashtags || $('🎯 3. Chọn Clip cần đăng').item.json.hashtag_default }}\",\n  \"auto_submit\": true\n}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "node-call-autopost-nightly",
+      "name": "🚀 5. Python Server Thực Thi Đăng Clip",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 420]
+    },
+    {
+      "parameters": {
+        "chatId": "-1001234567890",
+        "text": "=🌙 **[TikTok Nightly Bot] ĐÃ ĐĂNG VIDEO THÀNH CÔNG LÚC ĐÊM!**\n━━━━━━━━━━━━━━━━━━━━\n👤 **Tài khoản:** @{{ $('🎯 3. Chọn Clip cần đăng').item.json.account_name }}\n📺 **Kênh:** {{ $('🎯 3. Chọn Clip cần đăng').item.json.channel }}\n🎬 **Clip:** {{ $('🎯 3. Chọn Clip cần đăng').item.json.title }} {{ $('🎯 3. Chọn Clip cần đăng').item.json.part_label }}\n✍️ **Caption AI:** {{ $('🤖 4. AI Gemini tạo Caption Ban Đêm').item.json.caption }}\n🏷️ **Hashtags:** {{ $('🤖 4. AI Gemini tạo Caption Ban Đêm').item.json.hashtags }}\n⏰ **Thời gian đăng:** {{ $now.format('YYYY-MM-DD HH:mm:ss') }}\n━━━━━━━━━━━━━━━━━━━━\n💤 Máy tính sẽ tự động tắt sau 15 phút để bảo vệ máy.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-telegram-nightly",
+      "name": "📢 6. Gửi báo cáo qua Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1420, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/system/shutdown",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"delay_seconds\": 900\n}",
+        "options": {}
+      },
+      "id": "node-auto-shutdown-nightly",
+      "name": "💤 7. Hẹn giờ Tự Động Tắt Máy (15 phút)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1660, 420]
+    }
+  ],
+  "connections": {
+    "🌙 1. Lên lịch Đúng 12h Đêm (00:00)": {
+      "main": [
+        [
+          {
+            "node": "📥 2. Lấy Clip chờ đăng từ SSD Local",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏰ 1b. Khung giờ Vàng (0h, 6h, 12h, 18h)": {
+      "main": [
+        [
+          {
+            "node": "📥 2. Lấy Clip chờ đăng từ SSD Local",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚡ 1c. Bấm chạy thử thủ công": {
+      "main": [
+        [
+          {
+            "node": "📥 2. Lấy Clip chờ đăng từ SSD Local",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 2. Lấy Clip chờ đăng từ SSD Local": {
+      "main": [
+        [
+          {
+            "node": "🎯 3. Chọn Clip cần đăng",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 3. Chọn Clip cần đăng": {
+      "main": [
+        [
+          {
+            "node": "🤖 4. AI Gemini tạo Caption Ban Đêm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🤖 4. AI Gemini tạo Caption Ban Đêm": {
+      "main": [
+        [
+          {
+            "node": "🚀 5. Python Server Thực Thi Đăng Clip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🚀 5. Python Server Thực Thi Đăng Clip": {
+      "main": [
+        [
+          {
+            "node": "📢 6. Gửi báo cáo qua Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📢 6. Gửi báo cáo qua Telegram": {
+      "main": [
+        [
+          {
+            "node": "💤 7. Hẹn giờ Tự Động Tắt Máy (15 phút)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSettingsManager();
     initAccountsManager();
     initPublishingTracker();
+    initAutoPilotHub();
 });
 
 
@@ -40,6 +41,9 @@ function initTabs() {
 
             if (targetTab === 'tab-publishing') {
                 fetchPublishingMatrix();
+            }
+            if (targetTab === 'tab-autopilot') {
+                loadAutopilotQueue();
             }
         });
     });
@@ -3188,4 +3192,346 @@ window.fetchSettings = fetchSettings;
 window.saveAllSettings = saveAllSettings;
 window.testAdsPowerConnection = testAdsPowerConnection;
 window.checkHmaIp = checkHmaIp;
+
+/* ==========================================================================
+   Auto-Pilot Pipeline Hub (All-in-One Automation & Nightly Scheduler)
+   ========================================================================== */
+let isAutopilotRunning = false;
+let autopilotCancelRequested = false;
+let pendingQueueCache = [];
+
+function initAutoPilotHub() {
+    const btnOpenModal = document.getElementById('btn-open-autopilot-modal');
+    const btnCloseModal = document.getElementById('btn-close-autopilot-modal');
+    const modal = document.getElementById('modal-autopilot-pipeline');
+    const btnRefreshQueue = document.getElementById('btn-refresh-autopilot-queue');
+    const btnStartModal = document.getElementById('btn-start-autopilot');
+    const btnStopModal = document.getElementById('btn-stop-autopilot');
+    const btnOpenN8nModal = document.getElementById('btn-open-n8n-tab');
+
+    // Page Tab Elements
+    const btnBannerOpen = document.getElementById('btn-banner-open-autopilot');
+    const btnStartPage = document.getElementById('btn-page-start-autopilot');
+    const btnStopPage = document.getElementById('btn-page-stop-autopilot');
+    const btnRefreshPage = document.getElementById('btn-page-refresh-queue');
+    const btnOpenN8nPage = document.getElementById('btn-page-open-n8n');
+
+    // Header Button -> Open Modal
+    if (btnOpenModal && modal) {
+        btnOpenModal.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+            loadAutopilotQueue();
+        });
+    }
+
+    // Modal Close
+    if (btnCloseModal && modal) {
+        btnCloseModal.addEventListener('click', () => {
+            if (isAutopilotRunning) {
+                if (!confirm('Tiến trình Auto-Pilot đang chạy! Bạn có chắc muốn đóng cửa sổ? (Tiến trình vẫn tiếp tục chạy ngầm)')) {
+                    return;
+                }
+            }
+            modal.classList.add('hidden');
+        });
+    }
+
+    // Banner Button in Posting Tracker -> Switch to Auto-Pilot Tab
+    if (btnBannerOpen) {
+        btnBannerOpen.addEventListener('click', () => {
+            const tabBtn = document.getElementById('tab-btn-autopilot');
+            if (tabBtn) {
+                tabBtn.click();
+            } else if (modal) {
+                modal.classList.remove('hidden');
+                loadAutopilotQueue();
+            }
+        });
+    }
+
+    // Refresh Queue
+    if (btnRefreshQueue) btnRefreshQueue.addEventListener('click', loadAutopilotQueue);
+    if (btnRefreshPage) btnRefreshPage.addEventListener('click', loadAutopilotQueue);
+
+    // Open n8n Dashboard
+    const openN8nHandler = () => window.open('http://localhost:5678', '_blank');
+    if (btnOpenN8nModal) btnOpenN8nModal.addEventListener('click', openN8nHandler);
+    if (btnOpenN8nPage) btnOpenN8nPage.addEventListener('click', openN8nHandler);
+
+    // Start / Stop Pipeline
+    if (btnStartModal) btnStartModal.addEventListener('click', startAutopilotPipeline);
+    if (btnStartPage) btnStartPage.addEventListener('click', startAutopilotPipeline);
+    if (btnStopModal) btnStopModal.addEventListener('click', stopAutopilotPipeline);
+    if (btnStopPage) btnStopPage.addEventListener('click', stopAutopilotPipeline);
+
+    // Pre-load on init
+    loadAutopilotQueue();
+}
+
+async function loadAutopilotQueue() {
+    const queueBadgeModal = document.getElementById('autopilot-queue-badge');
+    const queuePreviewModal = document.getElementById('autopilot-queue-preview');
+    const queueCountPage = document.getElementById('tab-autopilot-queue-count');
+    const accountsCountPage = document.getElementById('tab-autopilot-accounts-count');
+    const tableBodyPage = document.getElementById('tab-autopilot-table-body');
+
+    if (queueBadgeModal) queueBadgeModal.textContent = 'Đang quét...';
+    if (queuePreviewModal) queuePreviewModal.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 10px;">Đang tải danh sách clip chờ đăng...</div>';
+    if (tableBodyPage) tableBodyPage.innerHTML = '<tr><td colspan="5" class="table-empty">Đang tải danh sách clip chờ đăng...</td></tr>';
+
+    try {
+        const res = await fetch('/api/n8n/pending_clips?only_current_target=true');
+        const data = await res.json();
+        if (data.success) {
+            pendingQueueCache = data.items || [];
+            const total = pendingQueueCache.length;
+
+            // Unique accounts
+            const uniqueAccs = new Set(pendingQueueCache.map(i => i.account_name));
+
+            // Update Counts
+            if (queueCountPage) queueCountPage.textContent = `${total} Clip`;
+            if (accountsCountPage) accountsCountPage.textContent = `${uniqueAccs.size} Acc`;
+
+            if (queueBadgeModal) {
+                queueBadgeModal.textContent = `${total} clip sẵn sàng`;
+                queueBadgeModal.className = total > 0 ? 'badge badge-primary' : 'badge badge-secondary';
+            }
+
+            // Populate Modal Preview
+            if (queuePreviewModal) {
+                if (total === 0) {
+                    queuePreviewModal.innerHTML = '<div style="color: var(--text-secondary); padding: 8px; text-align: center;"><i class="fa-solid fa-circle-check text-success"></i> Tuyệt vời! Tất cả video đã được đăng tải hoặc không có clip nào chờ đăng.</div>';
+                } else {
+                    queuePreviewModal.innerHTML = pendingQueueCache.map((item, idx) => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.08); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
+                                <span style="font-weight: 700; color: var(--primary); font-size: 11px;">#${idx+1} [${escapeHtml(item.channel || '')}]</span>
+                                <strong style="font-size: 12px; margin-left: 4px;">${escapeHtml(item.title || '')}</strong>
+                                ${item.part_label ? `<span class="badge badge-info" style="font-size: 10px; margin-left: 4px;">${escapeHtml(item.part_label)}</span>` : ''}
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-secondary);">
+                                👤 @<strong>${escapeHtml(item.account_name || '')}</strong> (IP: ${escapeHtml(item.target_ip || 'US')})
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Populate Full Page Table
+            if (tableBodyPage) {
+                if (total === 0) {
+                    tableBodyPage.innerHTML = '<tr><td colspan="5" class="table-empty"><i class="fa-solid fa-circle-check text-success"></i> Tuyệt vời! Tất cả video đã được đăng tải hoặc không có clip nào chờ đăng.</td></tr>';
+                } else {
+                    tableBodyPage.innerHTML = pendingQueueCache.map((item, idx) => `
+                        <tr>
+                            <td style="text-align: center; font-weight: 700;">${idx+1}</td>
+                            <td>
+                                <div style="font-size: 11px; color: var(--primary); font-weight: 700;">${escapeHtml(item.channel || '')}</div>
+                                <div style="font-weight: 700; font-size: 13px;">${escapeHtml(item.title || '')}</div>
+                            </td>
+                            <td>
+                                ${item.part_label ? `<span class="badge badge-info">${escapeHtml(item.part_label)}</span>` : '<span class="text-muted">Full</span>'}
+                            </td>
+                            <td>
+                                <span style="font-weight: 800; color: var(--accent);">@${escapeHtml(item.account_name || '')}</span>
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="badge badge-primary">${escapeHtml(item.target_ip || 'US')}</span>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            }
+        }
+    } catch (err) {
+        if (queueBadgeModal) queueBadgeModal.textContent = 'Lỗi quét';
+        if (queuePreviewModal) queuePreviewModal.innerHTML = `<div style="color: #ef4444; padding: 8px;">Lỗi kết nối: ${err.message}</div>`;
+        if (tableBodyPage) tableBodyPage.innerHTML = `<tr><td colspan="5" style="color: #ef4444; text-align: center;">Lỗi kết nối: ${err.message}</td></tr>`;
+    }
+}
+
+function appendAutopilotLog(msg, type = 'info') {
+    const timeStr = new Date().toLocaleTimeString();
+    const containers = [
+        document.getElementById('autopilot-logs'),
+        document.getElementById('tab-autopilot-logs')
+    ];
+
+    containers.forEach(container => {
+        if (!container) return;
+        const logLine = document.createElement('div');
+        logLine.className = 'log-line';
+        if (type === 'success') logLine.style.color = '#22c55e';
+        else if (type === 'error') logLine.style.color = '#ef4444';
+        else if (type === 'warn') logLine.style.color = '#f59e0b';
+        else logLine.style.color = '#60a5fa';
+
+        logLine.textContent = `[${timeStr}] ${msg}`;
+        container.appendChild(logLine);
+        container.scrollTop = container.scrollHeight;
+    });
+}
+
+async function startAutopilotPipeline() {
+    if (pendingQueueCache.length === 0) {
+        await loadAutopilotQueue();
+        if (pendingQueueCache.length === 0) {
+            alert('Không có clip nào trong hàng đợi chờ xuất bản!');
+            return;
+        }
+    }
+
+    const optShutdown = (document.getElementById('autopilot-opt-shutdown')?.checked) ||
+                        (document.getElementById('tab-opt-shutdown')?.checked) || false;
+
+    isAutopilotRunning = true;
+    autopilotCancelRequested = false;
+
+    const execBoxModal = document.getElementById('autopilot-execution-box');
+    const btnStartModal = document.getElementById('btn-start-autopilot');
+    const btnStopModal = document.getElementById('btn-stop-autopilot');
+    const btnStartPage = document.getElementById('btn-page-start-autopilot');
+    const btnStopPage = document.getElementById('btn-page-stop-autopilot');
+    const statusBadgePage = document.getElementById('tab-autopilot-status-badge');
+
+    if (execBoxModal) execBoxModal.classList.remove('hidden');
+    if (btnStartModal) btnStartModal.classList.add('hidden');
+    if (btnStopModal) btnStopModal.classList.remove('hidden');
+    if (btnStartPage) btnStartPage.classList.add('hidden');
+    if (btnStopPage) btnStopPage.classList.remove('hidden');
+    if (statusBadgePage) {
+        statusBadgePage.textContent = 'Đang chạy...';
+        statusBadgePage.className = 'badge badge-primary';
+    }
+
+    // Clear logs
+    const logsModal = document.getElementById('autopilot-logs');
+    const logsPage = document.getElementById('tab-autopilot-logs');
+    if (logsModal) logsModal.innerHTML = '';
+    if (logsPage) logsPage.innerHTML = '';
+
+    appendAutopilotLog(`🚀 Bắt đầu quy trình Auto-Pilot Pipeline (${pendingQueueCache.length} clip)...`, 'info');
+
+    const total = pendingQueueCache.length;
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < total; i++) {
+        if (autopilotCancelRequested) {
+            appendAutopilotLog('⚠️ Tiến trình đã bị người dùng dừng lại!', 'warn');
+            break;
+        }
+
+        const item = pendingQueueCache[i];
+        const clipTitle = `${item.title} ${item.part_label ? `(${item.part_label})` : ''}`.trim();
+        const percent = Math.round((i / total) * 100);
+
+        // Update progress UI on both Modal & Page
+        const progressBars = [document.getElementById('autopilot-progress-bar'), document.getElementById('tab-autopilot-progress-bar')];
+        const percentTexts = [document.getElementById('autopilot-progress-percent'), document.getElementById('tab-autopilot-progress-percent')];
+        const currentTasks = [document.getElementById('autopilot-current-task'), document.getElementById('tab-autopilot-current-task')];
+
+        progressBars.forEach(b => { if (b) b.style.width = `${percent}%`; });
+        percentTexts.forEach(p => { if (p) p.textContent = `${percent}%`; });
+        currentTasks.forEach(t => { if (t) t.textContent = `[${i+1}/${total}] Đang đăng: ${clipTitle} (@${item.account_name})`; });
+
+        appendAutopilotLog(`▶️ [${i+1}/${total}] Chuẩn bị đăng: "${clipTitle}" cho tài khoản @${item.account_name}`, 'info');
+
+        try {
+            const payload = {
+                account_name: item.account_name,
+                clip_key: item.clip_key,
+                channel: item.channel,
+                title: item.title,
+                video_file: item.video_file,
+                part_label: item.part_label,
+                auto_submit: true
+            };
+
+            appendAutopilotLog(`   ⚡ Đang kết nối AdsPower & TikTok Studio...`, 'info');
+            const res = await fetch('/api/publishing/post_to_tiktok', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                successCount++;
+                appendAutopilotLog(`   🎉 ĐĂNG THÀNH CÔNG: "${clipTitle}"!`, 'success');
+            } else {
+                failCount++;
+                appendAutopilotLog(`   ❌ Thất bại: ${data.error || 'Lỗi không xác định'}`, 'error');
+            }
+        } catch (err) {
+            failCount++;
+            appendAutopilotLog(`   ❌ Lỗi kết nối: ${err.message}`, 'error');
+        }
+
+        // Nghỉ ngắn 4 giây giữa các clip
+        if (i < total - 1 && !autopilotCancelRequested) {
+            appendAutopilotLog('   ⏳ Chờ 4 giây trước clip tiếp theo...', 'info');
+            await new Promise(r => setTimeout(r, 4000));
+        }
+    }
+
+    const progressBars = [document.getElementById('autopilot-progress-bar'), document.getElementById('tab-autopilot-progress-bar')];
+    const percentTexts = [document.getElementById('autopilot-progress-percent'), document.getElementById('tab-autopilot-progress-percent')];
+    const currentTasks = [document.getElementById('autopilot-current-task'), document.getElementById('tab-autopilot-current-task')];
+
+    progressBars.forEach(b => { if (b) b.style.width = '100%'; });
+    percentTexts.forEach(p => { if (p) p.textContent = '100%'; });
+    currentTasks.forEach(t => { if (t) t.textContent = 'Hoàn thành toàn bộ Pipeline!'; });
+
+    appendAutopilotLog(`🏁 HOÀN TẤT PIPELINE! Thành công: ${successCount} | Thất bại: ${failCount}`, successCount > 0 ? 'success' : 'warn');
+
+    if (statusBadgePage) {
+        statusBadgePage.textContent = 'Đã hoàn thành';
+        statusBadgePage.className = 'badge badge-success';
+    }
+
+    // Nếu chọn tự động tắt máy
+    if (optShutdown && !autopilotCancelRequested) {
+        appendAutopilotLog('💤 Đang kích hoạt chế độ hẹn giờ tự động tắt máy tính sau 15 phút...', 'warn');
+        try {
+            await fetch('/api/system/shutdown', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ delay_seconds: 900 })
+            });
+            appendAutopilotLog('✅ Đã hẹn giờ Shutdown máy tính thành công. Bạn có thể yên tâm đi ngủ!', 'success');
+        } catch (e) {
+            appendAutopilotLog(`⚠️ Lỗi hẹn giờ tắt máy: ${e.message}`, 'error');
+        }
+    }
+
+    // Refresh UI matrix
+    if (typeof fetchPublishingMatrix === 'function') {
+        fetchPublishingMatrix();
+    }
+    await loadAutopilotQueue();
+
+    isAutopilotRunning = false;
+    if (btnStartModal) btnStartModal.classList.remove('hidden');
+    if (btnStopModal) btnStopModal.classList.add('hidden');
+    if (btnStartPage) btnStartPage.classList.remove('hidden');
+    if (btnStopPage) btnStopPage.classList.add('hidden');
+}
+
+async function stopAutopilotPipeline() {
+    autopilotCancelRequested = true;
+    appendAutopilotLog('🛑 Đang gửi tín hiệu dừng pipeline...', 'warn');
+    try {
+        await fetch('/api/pipeline/stop_batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        await fetch('/api/system/cancel_shutdown', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    } catch (e) {}
+}
+
+window.initAutoPilotHub = initAutoPilotHub;
+window.loadAutopilotQueue = loadAutopilotQueue;
+window.startAutopilotPipeline = startAutopilotPipeline;
+window.stopAutopilotPipeline = stopAutopilotPipeline;
+
+
 

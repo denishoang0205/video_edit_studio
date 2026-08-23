@@ -1,0 +1,171 @@
+{
+  "name": "🎬 TikTok Studio Pro - Automated Video Publisher & AI Captioner",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "id": "node-schedule-trigger",
+      "name": "⏰ 1. Lên lịch tự động (Mỗi 4 tiếng)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-tiktok-post",
+        "options": {}
+      },
+      "id": "node-manual-webhook",
+      "name": "⚡ 1b. Thủ công qua Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 500],
+      "webhookId": "tiktok-manual-trigger"
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/n8n/pending_clips?only_current_target=true",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node-get-pending-clips",
+      "name": "📥 2. Lấy danh sách Clip chờ đăng",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Kiểm tra danh sách clip chờ đăng\nconst response = $input.first().json;\nconst items = response.items || [];\n\nif (items.length === 0) {\n  return [];\n}\n\n// Lấy clip đầu tiên trong hàng đợi để xử lý\nconst nextClip = items[0];\n\nreturn [{\n  json: {\n    account_name: nextClip.account_name,\n    channel: nextClip.channel,\n    title: nextClip.title,\n    clip_key: nextClip.clip_key,\n    part_label: nextClip.part_label || '',\n    video_file: nextClip.video_file,\n    hashtag_default: nextClip.hashtag || '',\n    target_ip: nextClip.target_ip || 'US',\n    adspower_id: nextClip.adspower_id\n  }\n}];"
+      },
+      "id": "node-select-next-clip",
+      "name": "🎯 3. Chọn Clip tiếp theo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "model": "gemini-1.5-flash",
+        "prompt": "Bạn là chuyên gia sáng tạo nội dung TikTok triệu view.\nHãy tạo 1 tiêu đề ngắn gọn (dưới 100 ký tự) và danh sách 5-7 hashtag viral (bắt đầu bằng #) cho video có tiêu đề gốc: \"{{ $json.title }}\" thuộc kênh: \"{{ $json.channel }}\" ({{ $json.part_label }}).\n\nĐịnh dạng trả về duy nhất định dạng JSON (không kèm markdown):\n{\n  \"caption\": \"Tiêu đề ngắn thu hút kèm icon\",\n  \"hashtags\": \"#hashtag1 #hashtag2 #fyp #viral #trending\"\n}"
+      },
+      "id": "node-gemini-ai-caption",
+      "name": "🤖 4. AI Gemini tạo Caption Viral",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/pipeline/auto_process_and_post",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"account_name\": \"{{ $('🎯 3. Chọn Clip tiếp theo').item.json.account_name }}\",\n  \"clip_key\": \"{{ $('🎯 3. Chọn Clip tiếp theo').item.json.clip_key }}\",\n  \"channel\": \"{{ $('🎯 3. Chọn Clip tiếp theo').item.json.channel }}\",\n  \"title\": \"{{ $('🎯 3. Chọn Clip tiếp theo').item.json.title }}\",\n  \"video_file\": \"{{ $('🎯 3. Chọn Clip tiếp theo').item.json.video_file }}\",\n  \"part_label\": \"{{ $('🎯 3. Chọn Clip tiếp theo').item.json.part_label }}\",\n  \"override_caption\": \"{{ $json.caption || $('🎯 3. Chọn Clip tiếp theo').item.json.title }}\",\n  \"override_hashtags\": \"{{ $json.hashtags || $('🎯 3. Chọn Clip tiếp theo').item.json.hashtag_default }}\",\n  \"auto_submit\": true\n}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "node-call-python-api",
+      "name": "🚀 5. Gọi Python Auto-Post (AdsPower + HMA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 400]
+    },
+    {
+      "parameters": {
+        "chatId": "-1001234567890",
+        "text": "=🎉 **[TikTok Studio Pro] ĐÃ ĐĂNG VIDEO THÀNH CÔNG!**\n━━━━━━━━━━━━━━━━━━━━\n👤 **Tài khoản:** @{{ $('🎯 3. Chọn Clip tiếp theo').item.json.account_name }}\n📺 **Kênh:** {{ $('🎯 3. Chọn Clip tiếp theo').item.json.channel }}\n🎬 **Tiêu đề:** {{ $('🎯 3. Chọn Clip tiếp theo').item.json.title }} {{ $('🎯 3. Chọn Clip tiếp theo').item.json.part_label }}\n✍️ **Caption:** {{ $('🤖 4. AI Gemini tạo Caption Viral').item.json.caption }}\n🏷️ **Hashtags:** {{ $('🤖 4. AI Gemini tạo Caption Viral').item.json.hashtags }}\n⏰ **Thời gian:** {{ $now.format('YYYY-MM-DD HH:mm:ss') }}\n━━━━━━━━━━━━━━━━━━━━\n✅ Trạng thái: Thành công 100%",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-telegram-success",
+      "name": "📢 6. Báo cáo qua Telegram Bot",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1400, 400]
+    }
+  ],
+  "connections": {
+    "⏰ 1. Lên lịch tự động (Mỗi 4 tiếng)": {
+      "main": [
+        [
+          {
+            "node": "📥 2. Lấy danh sách Clip chờ đăng",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚡ 1b. Thủ công qua Webhook": {
+      "main": [
+        [
+          {
+            "node": "📥 2. Lấy danh sách Clip chờ đăng",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 2. Lấy danh sách Clip chờ đăng": {
+      "main": [
+        [
+          {
+            "node": "🎯 3. Chọn Clip tiếp theo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 3. Chọn Clip tiếp theo": {
+      "main": [
+        [
+          {
+            "node": "🤖 4. AI Gemini tạo Caption Viral",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🤖 4. AI Gemini tạo Caption Viral": {
+      "main": [
+        [
+          {
+            "node": "🚀 5. Gọi Python Auto-Post (AdsPower + HMA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🚀 5. Gọi Python Auto-Post (AdsPower + HMA)": {
+      "main": [
+        [
+          {
+            "node": "📢 6. Báo cáo qua Telegram Bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
