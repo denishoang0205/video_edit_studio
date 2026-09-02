@@ -134,10 +134,31 @@ Mở tab **Settings** trên Webapp (hoặc chỉnh sửa file `data/settings.jso
 
 ---
 
+## 🚀 Triển Khai Máy Chủ & Cloud Deployment
+
+TikTok Studio Pro hỗ trợ đầy đủ các hình thức đóng gói & triển khai cho môi trường Server / VPS / Cloud:
+
+### 1. Triển khai bằng Docker Compose (Khuyên dùng)
+```bash
+git clone https://github.com/denishoang0205/video_edit_studio.git
+cd video_edit_studio
+docker compose up -d --build
+```
+
+### 2. Triển khai 1-Click trên Linux VPS (Ubuntu / Debian)
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+👉 Chi tiết hướng dẫn cấu hình Nginx Reverse Proxy, SSL HTTPS và Systemd Service: xem tại [docs/HUONG_DAN_DEPLOY.md](docs/HUONG_DAN_DEPLOY.md).
+
+---
+
 ## 🛡️ Bảo Mật & Đóng Gói Lên GitHub
 
-* Dự án đã được thiết lập sẵn file **`.gitignore`** tiêu chuẩn:
-  * Toàn bộ dữ liệu nhạy cảm (tài khoản cá nhân `accounts.json`, khóa API `settings.json`, cookies và video tải về) **sẽ không bao giờ bị lộ hoặc vô tình commit lên Git**.
+* Dự án đã được thiết lập sẵn file **`.gitignore`** và **`.dockerignore`** tiêu chuẩn:
+  * Toàn bộ dữ liệu nhạy cảm (tài khoản cá nhân `accounts.json`, khóa API `settings.json`, cookies và video tải về) **sẽ không bao giờ bị lộ hoặc vô tình commit lên Git / Docker image**.
   * File mẫu `data/accounts.example.json` và `data/settings.example.json` được cung cấp sẵn để người dùng mới có thể chạy ngay sau khi clone.
 
 ---

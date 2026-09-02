@@ -2245,7 +2245,12 @@ body.theme-light .dashboard-table tbody tr:hover {
 
 .log-line {
     word-break: break-all;
+    line-height: 1.5;
 }
+.log-line.log-success { color: #2ed573; font-weight: 600; }
+.log-line.log-error { color: #ff4757; }
+.log-line.log-highlight { color: #ffa502; font-weight: 600; }
+.log-line.log-info { color: #70a1ff; }
 
 /* ==========================================================================
    7. Tab 3: Finished outputs

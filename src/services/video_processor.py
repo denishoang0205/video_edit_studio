@@ -689,7 +689,8 @@ def process_and_split_video(
     is_short=False,
     export_full=False,
     youtube_heatmap=None,
-    log_cb=None
+    log_cb=None,
+    progress_cb=None
 ):
     """
     Quy trình biên tập tổng thể nâng cấp:
@@ -711,9 +712,14 @@ def process_and_split_video(
     if is_short_video:
         log_cb(f"⚡ [Video Ngắn] Thời lượng {duration:.1f}s <= 60s: Biên tập trọn vẹn 1 clip chuẩn...")
         part_1_path = os.path.join(video_out_dir, f"{title} - part 1.mp4")
+        if progress_cb:
+            progress_cb(0, 1)
         success = process_video_custom(actual_video_file, part_1_path, title, settings, log_cb=log_cb)
         if not success:
             return []
+        
+        if progress_cb:
+            progress_cb(1, 1)
         
         if export_full:
             full_path = os.path.join(video_out_dir, "edited_full.mp4")
@@ -784,11 +790,14 @@ def process_and_split_video(
             en_str = f"{int(en//60)}:{int(en%60):02d}"
             log_cb(f"   + Part {h['part_idx']}: {st_str} ➔ {en_str} ({h['duration']:.1f}s | Điểm viral: {h['score']:.2f})")
 
+        total_parts = len(highlights)
         split_files = []
-        for h in highlights:
+        for p_idx, h in enumerate(highlights):
             part_idx = h["part_idx"]
+            if progress_cb:
+                progress_cb(p_idx, total_parts)
             out_part_path = os.path.join(video_out_dir, f"{title} - part {part_idx}.mp4")
-            log_cb(f"⚙️ Đang biên tập & render Part {part_idx} ({h['duration']:.1f}s)...")
+            log_cb(f"⚙️ Đang biên tập & render Part {part_idx}/{total_parts} ({h['duration']:.1f}s)...")
             
             # Render trực tiếp từ video gốc với thời gian bắt đầu và thời lượng của highlight
             ok = process_video_custom(
@@ -805,6 +814,8 @@ def process_and_split_video(
                 log_cb(f"   ✅ Hoàn thành Part {part_idx}: {os.path.basename(out_part_path)}")
             else:
                 log_cb(f"   ❌ Lỗi khi render Part {part_idx}")
+            if progress_cb:
+                progress_cb(p_idx + 1, total_parts)
 
         if export_full:
             full_path = os.path.join(video_out_dir, "edited_full.mp4")

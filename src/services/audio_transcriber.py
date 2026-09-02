@@ -17,6 +17,8 @@ except ImportError:
     from config import FFMPEG_EXE
 
 
+import html
+
 def parse_timestamp(ts_str):
     """Chuyển chuỗi timestamp (00:01:23.456 hoặc 00:01:23,456) sang số giây (float)"""
     ts_str = ts_str.strip().replace(',', '.')
@@ -29,53 +31,125 @@ def parse_timestamp(ts_str):
 
 
 def clean_subtitle_text(text):
-    """Loại bỏ thẻ HTML, định dạng WebVTT thừa và chuẩn hóa khoảng trắng"""
+    """Loại bỏ thẻ HTML, thực thể HTML (&gt;), ký hiệu người nói (>>, Speaker:, [Music]) và chuẩn hóa khoảng trắng"""
+    if not text:
+        return ""
+    # 1. Giải mã thực thể HTML (&gt; -> >, &amp; -> &, &quot; -> ", v.v.)
+    text = html.unescape(text)
+    # 2. Xóa thẻ WebVTT/HTML <...> và {...}
     text = re.sub(r'<[^>]+>', '', text)
     text = re.sub(r'\{[^\}]+\}', '', text)
+    # 3. Xóa các ký hiệu chỉ định người nói của YouTube và phim ảnh
+    text = re.sub(r'(?:^|\s)(?:&gt;|>|-){1,3}\s*', ' ', text)
+    text = re.sub(r'\[[^\]]+\]', ' ', text)  # [Music], [Applause]
+    text = re.sub(r'\([^\)]+\)', ' ', text)  # (laughing), (cheers)
+    text = re.sub(r'^[A-Z0-9_\s]{2,20}:\s*', '', text)  # JOHN:, SPEAKER 1:
     text = re.sub(r'[\r\n]+', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 
 def parse_vtt_or_srt(sub_path):
-    """Đọc và chuyển đổi tệp WebVTT hoặc SRT thành danh sách timed segments"""
+    """
+    Đọc và chuyển đổi tệp WebVTT hoặc SRT thành danh sách timed segments sạch sẽ:
+    - Loại bỏ triệt để hiện tượng lặp lại dòng (rolling cues) của YouTube WebVTT.
+    - Xóa sạch ký tự người nói (>>, >) và các thẻ âm thanh nền ([Music], [Applause]).
+    - Gom nhóm các câu thoại tự nhiên, ngắn gọn (4-8 từ/phân đoạn), chuẩn nhịp TikTok.
+    """
     if not os.path.exists(sub_path):
         return []
 
-    segments = []
     with open(sub_path, 'r', encoding='utf-8', errors='ignore') as f:
         content = f.read()
 
-    pattern = re.compile(
+    cue_pattern = re.compile(
         r'(?:(\d+)\s*\n)?'
         r'(\d{1,2}:\d{2}:\d{2}[,\.]\d{2,3}|\d{2}:\d{2}[,\.]\d{2,3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[,\.]\d{2,3}|\d{2}:\d{2}[,\.]\d{2,3})[^\n]*\n'
         r'([\s\S]*?)(?=\n\s*(?:\d+\s*\n)?\d{1,2}:\d{2}:\d{2}[,\.]|\n\s*\n\s*$|\Z)',
         re.MULTILINE
     )
 
-    last_text = ""
-    for match in pattern.finditer(content):
+    # 1. Bóc tách danh sách từ kèm mốc thời gian chi tiết
+    timed_words = []
+    
+    for match in cue_pattern.finditer(content):
         _, start_str, end_str, text_raw = match.groups()
-        start = parse_timestamp(start_str)
-        end = parse_timestamp(end_str)
-        text = clean_subtitle_text(text_raw)
+        cue_start = parse_timestamp(start_str)
+        cue_end = parse_timestamp(end_str)
+        
+        lines = text_raw.split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Xử lý cue có karaoke timestamps <00:00:00.000><c> word</c>
+            if '<' in line and '>' in line:
+                tokens = re.findall(r'(?:<(\d{1,2}:\d{2}:\d{2}[,\.]\d{3})>)?(?:<c>)?([^<]+)(?:</c>)?', line)
+                current_time = cue_start
+                for ts_match, word in tokens:
+                    if ts_match:
+                        current_time = parse_timestamp(ts_match)
+                    w_clean = clean_subtitle_text(word)
+                    if w_clean:
+                        for sub_w in w_clean.split():
+                            timed_words.append((round(current_time, 2), sub_w))
+            else:
+                # Xử lý dòng tĩnh (chống trùng lặp với các từ vừa nạp)
+                clean_static = clean_subtitle_text(line)
+                if clean_static:
+                    words = clean_static.split()
+                    recent_words = " ".join([w[1] for w in timed_words[-len(words):]]) if timed_words else ""
+                    if recent_words.lower() != clean_static.lower():
+                        dur_per_word = (cue_end - cue_start) / max(1, len(words))
+                        for i, w in enumerate(words):
+                            timed_words.append((round(cue_start + i * dur_per_word, 2), w))
 
-        if not text or text == last_text:
+    # 2. Khử trùng lặp các từ phát sinh liên tiếp trong khoảng thời gian hẹp
+    deduped_words = []
+    for t, w in timed_words:
+        if deduped_words and deduped_words[-1][1].lower() == w.lower() and abs(deduped_words[-1][0] - t) < 0.35:
             continue
+        deduped_words.append((t, w))
 
-        if segments and (start - segments[-1]["end"]) <= 0.4 and len(segments[-1]["text"].split()) < 12 and not segments[-1]["text"].endswith(('.', '!', '?')):
-            segments[-1]["end"] = end
-            segments[-1]["text"] = f"{segments[-1]['text']} {text}"
-            last_text = text
+    if not deduped_words:
+        return []
+
+    # 3. Gom nhóm từ thành các phân đoạn phụ đề ngắn gọn, chuẩn nhịp TikTok
+    segments = []
+    curr_chunk = []
+    curr_start = 0.0
+    
+    for t, w in deduped_words:
+        if not curr_chunk:
+            curr_start = t
+            curr_chunk.append(w)
         else:
-            segments.append({
-                "start": round(start, 2),
-                "end": round(end, 2),
-                "duration": round(end - start, 2),
-                "text": text
-            })
-            last_text = text
-
+            curr_chunk.append(w)
+            chunk_text = " ".join(curr_chunk)
+            dur = t - curr_start
+            
+            # Điều kiện ngắt phân đoạn:
+            # - Kết thúc câu bằng dấu chấm, hỏi, than (. ! ?)
+            # - Hoặc đạt 6-8 từ hoặc thời lượng >= 3.0s
+            # - Hoặc dấu phẩy khi đã có từ 4 từ trở lên
+            if w.endswith(('.', '!', '?')) or len(curr_chunk) >= 7 or dur >= 3.0 or (w.endswith(',') and len(curr_chunk) >= 4):
+                segments.append({
+                    "start": curr_start,
+                    "end": round(t + 0.5, 2),
+                    "duration": round(t + 0.5 - curr_start, 2),
+                    "text": chunk_text
+                })
+                curr_chunk = []
+                
+    if curr_chunk:
+        segments.append({
+            "start": curr_start,
+            "end": round(curr_start + 1.8, 2),
+            "duration": 1.8,
+            "text": " ".join(curr_chunk)
+        })
+        
     return segments
 
 

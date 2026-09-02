@@ -1,0 +1,17 @@
+﻿services:
+  tiktok-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tiktok_studio_pro
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+      - ./storage:/app/storage
+      - ./input_sources:/app/input_sources
+      - ./output_product:/app/output_product

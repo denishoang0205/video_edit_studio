@@ -20,6 +20,24 @@ def format_ass_time(seconds):
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
+import html
+import re
+
+def clean_sub_text(text):
+    """Làm sạch ký hiệu người nói, thực thể HTML và chuẩn hóa câu trước khi nạp vào ASS"""
+    if not text:
+        return ""
+    text = html.unescape(text)
+    text = re.sub(r'<[^>]+>', '', text)
+    text = re.sub(r'\{[^\}]+\}', '', text)
+    text = re.sub(r'(?:^|\s)(?:&gt;|>|-){1,3}\s*', ' ', text)
+    text = re.sub(r'\[[^\]]+\]', ' ', text)
+    text = re.sub(r'\([^\)]+\)', ' ', text)
+    text = re.sub(r'^[A-Z0-9_\s]{2,20}:\s*', '', text)
+    text = re.sub(r'[\r\n]+', ' ', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+
 def generate_ass_subtitles(segments, output_ass_path, style="tiktok-yellow", canvas_w=1080, canvas_h=1920):
     """
     Tạo tệp phụ đề .ass (Advanced SubStation Alpha) chuyên nghiệp cho TikTok/Shorts:
@@ -27,7 +45,9 @@ def generate_ass_subtitles(segments, output_ass_path, style="tiktok-yellow", can
     - white-glass: Chữ trắng nền hộp mờ
     - classic: Chữ trắng viền đen tối giản
     """
-    os.makedirs(os.path.dirname(output_ass_path), exist_ok=True)
+    dir_path = os.path.dirname(output_ass_path)
+    if dir_path:
+        os.makedirs(dir_path, exist_ok=True)
 
     font_size = 28 if canvas_h >= 1920 else 22
     margin_v = 280 if canvas_h >= 1920 else 180  # Đặt ở vùng an toàn 1/3 dưới, tránh che bởi giao diện TikTok
@@ -75,7 +95,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     events = []
     for seg in segments:
-        text = seg.get("text", "").strip()
+        text = clean_sub_text(seg.get("text", ""))
         if not text:
             continue
         

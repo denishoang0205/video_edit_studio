@@ -63,7 +63,7 @@ from src.services.video_processor import (
 )
 
 
-PORT = 8000
+PORT = int(os.environ.get("PORT", 8000))
 LOG_MESSAGES = []
 CURRENT_TASK = "Sẵn sàng"
 PROGRESS_PERCENT = 0
@@ -176,163 +176,173 @@ def batch_worker(payload):
 
     history = load_history()
 
-    for idx, item in enumerate(video_items):
-        if CANCEL_REQUESTED:
-            log_message("⚠️ Tiến trình đã bị dừng bởi người dùng.")
-            break
+    try:
+        for idx, item in enumerate(video_items):
+            if CANCEL_REQUESTED:
+                log_message("⚠️ Tiến trình đã bị dừng bởi người dùng.")
+                break
 
-        raw_path = item.get("path")
-        title = item.get("title")
-        channel = item.get("channel", "Channel")
-        is_short_flag = item.get("is_short", False)
+            raw_path = item.get("path")
+            title = item.get("title")
+            channel = item.get("channel", "Channel")
+            is_short_flag = item.get("is_short", False)
 
-        # 1. Làm sạch và unescape đường dẫn / tiêu đề nếu bị escape từ Webform
-        if raw_path:
-            raw_path = raw_path.replace(r"\'", "'").replace(r'\"', '"').strip().strip('"').strip("'")
-            raw_path = os.path.normpath(raw_path)
+            # 1. Làm sạch và unescape đường dẫn / tiêu đề nếu bị escape từ Webform
+            if raw_path:
+                raw_path = raw_path.replace(r"\'", "'").replace(r'\"', '"').strip().strip('"').strip("'")
+                raw_path = os.path.normpath(raw_path)
 
-        if title:
-            title = title.replace(r"\'", "'").replace(r'\"', '"').strip()
+            if title:
+                title = title.replace(r"\'", "'").replace(r'\"', '"').strip()
 
-        if channel:
-            channel = channel.replace(r"\'", "'").replace(r'\"', '"').strip()
+            if channel:
+                channel = channel.replace(r"\'", "'").replace(r'\"', '"').strip()
 
-        # Nếu path là folder, tìm file video bên trong
-        actual_video_file = raw_path
-        if raw_path and os.path.isdir(raw_path):
-            files = os.listdir(raw_path)
-            for f in files:
-                if f.endswith(('.mp4', '.mkv', '.mov', '.avi')) and not f.startswith(('part_', 'edited_')):
-                    actual_video_file = os.path.join(raw_path, f)
-                    break
-            if actual_video_file == raw_path:
+            # Nếu path là folder, tìm file video bên trong
+            actual_video_file = raw_path
+            if raw_path and os.path.isdir(raw_path):
+                files = os.listdir(raw_path)
                 for f in files:
-                    if f.endswith(('.mp4', '.mkv', '.mov')):
+                    if f.endswith(('.mp4', '.mkv', '.mov', '.avi')) and not f.startswith(('part_', 'edited_')):
                         actual_video_file = os.path.join(raw_path, f)
                         break
-
-        # 2. Tìm kiếm dự phòng thông minh nếu đường dẫn trực tiếp không tồn tại
-        if not actual_video_file or os.path.isdir(actual_video_file) or not os.path.exists(actual_video_file):
-            from src.core.config import VIDEO_DIR
-            clean_title = (title or "").replace(r"\'", "'").replace(r'\"', '"').strip()
-            san_title = sanitize_filename(clean_title)
-            
-            candidate_dirs = [
-                os.path.join(VIDEO_DIR, channel),
-                os.path.join(VIDEO_DIR, sanitize_filename(channel)),
-                os.path.join(BASE_DIR, "video", channel),
-                os.path.join(BASE_DIR, "video", sanitize_filename(channel)),
-                VIDEO_DIR,
-                os.path.join(BASE_DIR, "video")
-            ]
-            
-            found_file = None
-            for cdir in candidate_dirs:
-                if not os.path.exists(cdir):
-                    continue
-                for root, dirs, files in os.walk(cdir):
+                if actual_video_file == raw_path:
                     for f in files:
-                        if not f.lower().endswith(('.mp4', '.mkv', '.mov', '.avi', '.webm')) or f.startswith(('part_', 'edited_', 'title_banner')):
-                            continue
-                        f_stem = os.path.splitext(f)[0]
-                        if (f_stem == clean_title or 
-                            f_stem == san_title or 
-                            sanitize_filename(f_stem).lower() == san_title.lower() or
-                            (clean_title and clean_title[:25].lower() in f_stem.lower()) or
-                            (san_title and san_title[:25].lower() in sanitize_filename(f_stem).lower())):
-                            found_file = os.path.join(root, f)
+                        if f.endswith(('.mp4', '.mkv', '.mov')):
+                            actual_video_file = os.path.join(raw_path, f)
+                            break
+
+            # 2. Tìm kiếm dự phòng thông minh nếu đường dẫn trực tiếp không tồn tại
+            if not actual_video_file or os.path.isdir(actual_video_file) or not os.path.exists(actual_video_file):
+                from src.core.config import VIDEO_DIR
+                clean_title = (title or "").replace(r"\'", "'").replace(r'\"', '"').strip()
+                san_title = sanitize_filename(clean_title)
+                
+                candidate_dirs = [
+                    os.path.join(VIDEO_DIR, channel),
+                    os.path.join(VIDEO_DIR, sanitize_filename(channel)),
+                    os.path.join(BASE_DIR, "video", channel),
+                    os.path.join(BASE_DIR, "video", sanitize_filename(channel)),
+                    VIDEO_DIR,
+                    os.path.join(BASE_DIR, "video")
+                ]
+                
+                found_file = None
+                for cdir in candidate_dirs:
+                    if not os.path.exists(cdir):
+                        continue
+                    for root, dirs, files in os.walk(cdir):
+                        for f in files:
+                            if not f.lower().endswith(('.mp4', '.mkv', '.mov', '.avi', '.webm')) or f.startswith(('part_', 'edited_', 'title_banner')):
+                                continue
+                            f_stem = os.path.splitext(f)[0]
+                            if (f_stem == clean_title or 
+                                f_stem == san_title or 
+                                sanitize_filename(f_stem).lower() == san_title.lower() or
+                                (clean_title and clean_title[:25].lower() in f_stem.lower()) or
+                                (san_title and san_title[:25].lower() in sanitize_filename(f_stem).lower())):
+                                found_file = os.path.join(root, f)
+                                break
+                        if found_file:
                             break
                     if found_file:
                         break
-                if found_file:
-                    break
-            
-            if found_file and os.path.exists(found_file):
-                actual_video_file = found_file
-                log_message(f"🔍 Tự động phát hiện tệp video nguồn: {os.path.basename(actual_video_file)}")
+                
+                if found_file and os.path.exists(found_file):
+                    actual_video_file = found_file
+                    log_message(f"🔍 Tự động phát hiện tệp video nguồn: {os.path.basename(actual_video_file)}")
 
-        # Kiểm tra an toàn lần cuối
-        if not actual_video_file or os.path.isdir(actual_video_file) or not os.path.exists(actual_video_file):
-            log_message(f"❌ Lỗi: Thư mục nguồn '{title}' không chứa file video hợp lệ!")
-            continue
+            # Kiểm tra an toàn lần cuối
+            if not actual_video_file or os.path.isdir(actual_video_file) or not os.path.exists(actual_video_file):
+                log_message(f"❌ Lỗi: Thư mục nguồn '{title}' không chứa file video hợp lệ!")
+                continue
 
-        CURRENT_TASK = f"({idx+1}/{total}) Đang xử lý: {title}"
-        log_message(f"▶️ [{idx+1}/{total}] Bắt đầu xử lý: {title} (Kênh: {channel})")
-        PROGRESS_PERCENT = int((idx / total) * 100)
+            CURRENT_TASK = f"({idx+1}/{total}) Đang xử lý: {title}"
+            log_message(f"▶️ [{idx+1}/{total}] Bắt đầu xử lý: {title} (Kênh: {channel})")
+            PROGRESS_PERCENT = int((idx / total) * 100)
 
-        # Thư mục xuất thành phẩm phân cấp: dest_folder / channel / title
-        sanitized_channel = sanitize_filename(channel)
-        sanitized_title = sanitize_filename(title)
-        video_out_dir = os.path.join(dest_folder, sanitized_channel, sanitized_title)
-        os.makedirs(video_out_dir, exist_ok=True)
+            # Thư mục xuất thành phẩm phân cấp: dest_folder / channel / title
+            sanitized_channel = sanitize_filename(channel)
+            sanitized_title = sanitize_filename(title)
+            video_out_dir = os.path.join(dest_folder, sanitized_channel, sanitized_title)
+            os.makedirs(video_out_dir, exist_ok=True)
 
-        # Kiểm tra file heatmap cache nếu có
-        heatmap_data = None
-        heatmap_cand = os.path.splitext(actual_video_file)[0] + ".heatmap.json"
-        if os.path.exists(heatmap_cand):
-            try:
-                with open(heatmap_cand, "r", encoding="utf-8") as hf:
-                    heatmap_data = json.load(hf)
-            except Exception:
-                pass
+            # Kiểm tra file heatmap cache nếu có
+            heatmap_data = None
+            heatmap_cand = os.path.splitext(actual_video_file)[0] + ".heatmap.json"
+            if os.path.exists(heatmap_cand):
+                try:
+                    with open(heatmap_cand, "r", encoding="utf-8") as hf:
+                        heatmap_data = json.load(hf)
+                except Exception:
+                    pass
 
-        # Thực thi quy trình biên tập thông minh (Short giữ nguyên 1 clip, Long cắt cao trào 30s-45s/1m)
-        split_files = process_and_split_video(
-            actual_video_file=actual_video_file,
-            video_out_dir=video_out_dir,
-            title=title,
-            settings=settings,
-            split_mode=split_mode,
-            is_short=is_short_flag,
-            export_full=export_full,
-            youtube_heatmap=heatmap_data,
-            log_cb=log_message
-        )
+            def item_progress_cb(done_parts, total_parts):
+                global PROGRESS_PERCENT
+                base = (idx / total) * 100
+                step = (1.0 / total) * (done_parts / max(1, total_parts)) * 100
+                PROGRESS_PERCENT = min(99, int(base + step))
 
-        if not split_files:
-            log_message(f"❌ Thất bại khi biên tập: {title}")
-            continue
+            # Thực thi quy trình biên tập thông minh (Short giữ nguyên 1 clip, Long cắt cao trào 30s-45s/1m)
+            split_files = process_and_split_video(
+                actual_video_file=actual_video_file,
+                video_out_dir=video_out_dir,
+                title=title,
+                settings=settings,
+                split_mode=split_mode,
+                is_short=is_short_flag,
+                export_full=export_full,
+                youtube_heatmap=heatmap_data,
+                log_cb=log_message,
+                progress_cb=item_progress_cb
+            )
 
-        # Ghi nhận trạng thái vào history
-        history[title] = {
-            "title": title,
-            "channel": channel,
-            "status": "edited",
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "output_dir": video_out_dir,
-            "parts_count": len(split_files)
-        }
-        save_history(history)
-        log_message(f"🎉 Hoàn thành xuất sắc: {title} ({len(split_files)} parts)")
+            if not split_files:
+                log_message(f"❌ Thất bại khi biên tập: {title}")
+                continue
 
-        # Xóa file video gốc & heatmap cache để tiết kiệm dung lượng đĩa
-        if actual_video_file and os.path.exists(actual_video_file):
-            try:
-                os.remove(actual_video_file)
-                log_message(f"🗑️ Đã xóa tệp video gốc: {os.path.basename(actual_video_file)}")
-                if os.path.exists(heatmap_cand):
-                    os.remove(heatmap_cand)
-            except Exception as e:
-                log_message(f"⚠️ Lỗi khi xóa video gốc: {e}")
+            # Ghi nhận trạng thái vào history
+            history[title] = {
+                "title": title,
+                "channel": channel,
+                "status": "edited",
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "output_dir": video_out_dir,
+                "parts_count": len(split_files)
+            }
+            save_history(history)
+            log_message(f"🎉 Hoàn thành xuất sắc: {title} ({len(split_files)} parts)")
 
-    PROGRESS_PERCENT = 100
-    CURRENT_TASK = "Hoàn thành toàn bộ batch!"
-    log_message("🏁 ĐÃ HOÀN TẤT TẤT CẢ CÁC TÁC VỤ BIÊN TẬP.")
-    
-    # Bắn thông báo Telegram
-    try:
-        send_telegram_notification(
-            f"🎉 <b>[HOÀN TẤT BIÊN TẬP BATCH VIDEO]</b>\n\n"
-            f"🎬 <b>Tổng số video đã xử lý:</b> {total} video\n"
-            f"📐 <b>Tỉ lệ khung hình:</b> {settings.get('aspect_ratio', '3:4')}\n"
-            f"⚡ <b>Chế độ biên tập:</b> {split_mode}\n"
-            f"📁 <b>Thư mục xuất:</b> <code>{os.path.basename(dest_folder)}</code>\n\n"
-            f"🚀 Các clip đã sẵn sàng trong Pipeline để tự động đăng lên TikTok!"
-        )
-    except Exception as te:
-        log_message(f"⚠️ Không thể gửi thông báo Telegram: {te}")
+            # Xóa file video gốc & heatmap cache để tiết kiệm dung lượng đĩa
+            if actual_video_file and os.path.exists(actual_video_file):
+                try:
+                    os.remove(actual_video_file)
+                    log_message(f"🗑️ Đã xóa tệp video gốc: {os.path.basename(actual_video_file)}")
+                    if os.path.exists(heatmap_cand):
+                        os.remove(heatmap_cand)
+                except Exception as e:
+                    log_message(f"⚠️ Lỗi khi xóa video gốc: {e}")
+
+        PROGRESS_PERCENT = 100
+        CURRENT_TASK = "Hoàn thành toàn bộ batch!"
+        log_message("🏁 ĐÃ HOÀN TẤT TẤT CẢ CÁC TÁC VỤ BIÊN TẬP.")
         
-    IS_RUNNING = False
+        # Bắn thông báo Telegram
+        try:
+            send_telegram_notification(
+                f"🎉 <b>[HOÀN TẤT BIÊN TẬP BATCH VIDEO]</b>\n\n"
+                f"🎬 <b>Tổng số video đã xử lý:</b> {total} video\n"
+                f"📐 <b>Tỉ lệ khung hình:</b> {settings.get('aspect_ratio', '3:4')}\n"
+                f"⚡ <b>Chế độ biên tập:</b> {split_mode}\n"
+                f"📁 <b>Thư mục xuất:</b> <code>{os.path.basename(dest_folder)}</code>\n\n"
+                f"🚀 Các clip đã sẵn sàng trong Pipeline để tự động đăng lên TikTok!"
+            )
+        except Exception as te:
+            log_message(f"⚠️ Không thể gửi thông báo Telegram: {te}")
+    except Exception as batch_err:
+        log_message(f"❌ Lỗi ngoài dự kiến trong Batch Render: {batch_err}")
+    finally:
+        IS_RUNNING = False
 
 class StudioServerHandler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"

@@ -1261,7 +1261,6 @@ function setProcessState(running) {
         btnStop?.classList.add('hidden');
         if (statusDot) statusDot.className = 'status-dot online';
         if (statusText) statusText.textContent = 'Ready';
-        if (progressInterval) clearInterval(progressInterval);
     }
 }
 
@@ -1369,9 +1368,16 @@ async function updateProgressUI(data) {
         }
     }
 
-    // Update Logs
+    // Update Logs with rich colorful styling
     if (data.logs && data.logs.length > 0 && term) {
-        term.innerHTML = data.logs.map(l => `<div class="log-line">${escapeHtml(l)}</div>`).join('');
+        term.innerHTML = data.logs.map(l => {
+            let cls = 'log-line';
+            if (l.includes('✅') || l.includes('🎉') || l.includes('🏁')) cls += ' log-success';
+            else if (l.includes('❌') || l.includes('⚠️')) cls += ' log-error';
+            else if (l.includes('🔥') || l.includes('⚡') || l.includes('🚀')) cls += ' log-highlight';
+            else if (l.includes('⚙️') || l.includes('▶️') || l.includes('🔍')) cls += ' log-info';
+            return `<div class="${cls}">${escapeHtml(l)}</div>`;
+        }).join('');
         term.scrollTop = term.scrollHeight;
     }
 }
@@ -1382,10 +1388,8 @@ async function checkAndPollProgress() {
         const data = await res.json();
         await updateProgressUI(data);
 
-        if (data.is_running) {
-            setProcessState(true);
-            startPollingProgress();
-        }
+        setProcessState(Boolean(data.is_running));
+        startPollingProgress();
     } catch (err) {
         console.error("checkAndPollProgress error:", err);
     }
@@ -1401,8 +1405,10 @@ function startPollingProgress() {
             const data = await res.json();
             await updateProgressUI(data);
 
-            // Trigger completion event when transitions from running to not running
-            if (!data.is_running && isRunning) {
+            // Sync process state if external or auto triggered
+            if (data.is_running && !isRunning) {
+                setProcessState(true);
+            } else if (!data.is_running && isRunning) {
                 setProcessState(false);
                 playNotificationSound();
                 showToast("🎉 HOÀN TẤT BIÊN TẬP TẤT CẢ VIDEO! Các clip đã sẵn sàng trong Finished Library.");
@@ -1427,11 +1433,29 @@ function startPollingProgress() {
                 setTimeout(() => {
                     document.title = "cris. studio - Video Automation Platform";
                 }, 8000);
+            } else if (!data.is_running && !isRunning) {
+                // Ensure UI buttons are in sync (Ready & Start button visible)
+                const btnStart = document.getElementById('btn-start-processing');
+                const btnStop = document.getElementById('btn-stop-processing');
+                if (btnStart && btnStart.classList.contains('hidden')) {
+                    btnStart.classList.remove('hidden');
+                }
+                if (btnStop && !btnStop.classList.contains('hidden')) {
+                    btnStop.classList.add('hidden');
+                }
+                const statusDot = document.querySelector('.sidebar-status .status-dot') || document.querySelector('.status-dot');
+                const statusText = document.getElementById('status-text');
+                if (statusDot && statusDot.classList.contains('busy')) {
+                    statusDot.className = 'status-dot online';
+                }
+                if (statusText && statusText.textContent === 'Rendering videos...') {
+                    statusText.textContent = 'Ready';
+                }
             }
         } catch (err) {
             console.error("Progress fetch error:", err);
         }
-    }, 1200);
+    }, 1000);
 }
 
 /* ==========================================================================
