@@ -11,43 +11,130 @@ let currentActiveTheme = 'dark'; // 'dark' or 'light'
 
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
+    initDashboardSubtabs();
     initTheme();
     initLivePreview();
     setupEventListeners();
     initSettingsManager();
     initAccountsManager();
     initPublishingTracker();
-    initMexicoTrendRadar();
     initAutoPilotHub();
+    initDownloadVideoPipeline();
+    initTikTokAnalyticsEngine();
+    checkAndPollProgress();
 });
 
 
 /* ==========================================================================
    1. Tab Navigation & Theme Engine
    ========================================================================== */
+const TAB_HEADER_METADATA = {
+    'tab-dashboard': {
+        title: 'Dashboard',
+        subtitle: 'Tổng quan hệ thống, thống kê video tải về và tiến độ biên tập toàn diện'
+    },
+    'tab-download': {
+        title: 'Download Video',
+        subtitle: 'Quét và tải video/shorts tự động từ danh sách kênh YouTube mục tiêu'
+    },
+    'tab-studio': {
+        title: 'Editor Studio',
+        subtitle: 'Cấu hình thông số render, Live Preview Canvas trực quan và chọn video biên tập'
+    },
+    'tab-outputs': {
+        title: 'Finished Library',
+        subtitle: 'Thư viện video thành phẩm, sắp xếp thông minh theo trạng thái tải lên TikTok'
+    },
+    'tab-autopilot': {
+        title: 'Automation Pipeline',
+        subtitle: 'Trung tâm tự động hóa toàn diện từ Download ➔ Edit ➔ Render ➔ Upload TikTok'
+    },
+    'tab-publishing': {
+        title: 'Posting Tracker',
+        subtitle: 'Ma trận phân phối và theo dõi trạng thái xuất bản clip lên tài khoản TikTok'
+    },
+    'tab-tiktok': {
+        title: 'Account Management',
+        subtitle: 'Quản lý tài khoản TikTok, AdsPower Browser profiles và cấu hình đăng video'
+    },
+    'tab-channels': {
+        title: 'YouTube Channels',
+        subtitle: 'Danh sách các kênh YouTube nguồn và phân loại nội dung mục tiêu'
+    },
+    'tab-config': {
+        title: 'Settings',
+        subtitle: 'Cài đặt đường dẫn thư mục, AdsPower Local API, HMA VPN, Gemini AI và Telegram Bot'
+    }
+};
+
 function initTabs() {
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
+    const titleEl = document.getElementById('current-tab-title');
+    const subEl = document.getElementById('current-tab-subtitle');
+    const mainContent = document.querySelector('.app-main-content');
 
     tabLinks.forEach(link => {
         link.addEventListener('click', () => {
             const targetTab = link.dataset.tab;
+            if (!targetTab) return;
             
             // Toggle active classes
             tabLinks.forEach(l => l.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
             
             link.classList.add('active');
-            document.getElementById(targetTab).classList.add('active');
+            const targetEl = document.getElementById(targetTab);
+            if (targetEl) {
+                targetEl.classList.add('active');
+            }
+
+            // Cập nhật Tiêu đề và Mô tả trên Top Bar
+            const meta = TAB_HEADER_METADATA[targetTab];
+            if (meta) {
+                if (titleEl) titleEl.textContent = meta.title;
+                if (subEl) subEl.textContent = meta.subtitle;
+            }
+
+            // Cuộn trang lên đầu mượt mà
+            if (mainContent) {
+                mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+            }
 
             if (targetTab === 'tab-publishing') {
                 fetchPublishingMatrix();
-            } else if (targetTab === 'tab-mexico-trends') {
-                loadMexicoTrends();
             } else if (targetTab === 'tab-autopilot') {
                 loadAutopilotQueue();
+            } else if (targetTab === 'tab-download') {
+                onDownloadTabActivated();
             }
         });
+    });
+}
+
+function initDashboardSubtabs() {
+    const btnWebapp = document.getElementById('btn-subtab-webapp');
+    const btnTiktok = document.getElementById('btn-subtab-tiktok');
+    const viewWebapp = document.getElementById('subtab-webapp');
+    const viewTiktok = document.getElementById('subtab-tiktok');
+
+    if (!btnWebapp || !btnTiktok || !viewWebapp || !viewTiktok) return;
+
+    btnWebapp.addEventListener('click', () => {
+        btnWebapp.classList.add('active');
+        btnTiktok.classList.remove('active');
+        viewWebapp.style.display = 'block';
+        viewTiktok.style.display = 'none';
+    });
+
+    btnTiktok.addEventListener('click', () => {
+        btnTiktok.classList.add('active');
+        btnWebapp.classList.remove('active');
+        viewWebapp.style.display = 'none';
+        viewTiktok.style.display = 'block';
+        if (typeof loadAnalyticsData === 'function') {
+            loadAnalyticsData();
+        }
     });
 }
 
@@ -112,7 +199,14 @@ function initLivePreview() {
     const canvasBannerText = document.getElementById('canvas-banner-text');
     const effectBlur = document.getElementById('effect-blur-bg');
     const canvasBgBlur = document.getElementById('canvas-bg-blur');
+    const effectHFlip = document.getElementById('effect-hflip');
+    const effectColorBoost = document.getElementById('effect-color-boost');
+    const canvasFgVideo = document.getElementById('canvas-fg-video');
+    const canvasFlipIndicator = document.getElementById('canvas-flip-indicator');
+    const canvasHdrIndicator = document.getElementById('canvas-hdr-indicator');
     const bannerPosition = document.getElementById('banner-position');
+    const splitModeSelect = document.getElementById('split-mode');
+    const canvasSplitTagText = document.getElementById('canvas-split-tag-text');
 
     // Ratio Switcher
     ratioInputs.forEach(input => {
@@ -121,95 +215,226 @@ function initLivePreview() {
             e.target.closest('.ratio-card').classList.add('active');
             
             const val = e.target.value;
-            mockupCanvas.className = `mockup-canvas ratio-${val.replace(':', '-')}-canvas`;
-            previewRatioLabel.textContent = `${val} Canvas`;
+            if (mockupCanvas) mockupCanvas.className = `mockup-canvas ratio-${val.replace(':', '-')}-canvas`;
+            if (previewRatioLabel) previewRatioLabel.textContent = `${val} Canvas`;
         });
     });
 
     // Box Style
-    boxStyleSelect.addEventListener('change', (e) => {
-        canvasBanner.className = `canvas-banner banner-${e.target.value}`;
-    });
+    if (boxStyleSelect && canvasBanner) {
+        boxStyleSelect.addEventListener('change', (e) => {
+            canvasBanner.className = `canvas-banner banner-${e.target.value}`;
+        });
+    }
 
-    // Font
+    // Dynamic Font System
     const fontMap = {
         "Poppins-Bold": "Poppins, sans-serif",
         "Montserrat-Bold": "Montserrat, sans-serif",
         "Arial-Bold": "Arial, sans-serif",
+        "Arial": "Arial, sans-serif",
+        "SegoeUI-Bold": "'Segoe UI', sans-serif",
+        "Tahoma-Bold": "Tahoma, sans-serif",
+        "Impact": "Impact, sans-serif",
         "BeVietnamPro-Bold": "'Be Vietnam Pro', sans-serif"
     };
+
+    const loadDynamicFonts = async () => {
+        if (!fontSelect) return;
+        try {
+            const res = await fetch('/api/assets/fonts');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data && data.fonts && Array.isArray(data.fonts)) {
+                const currentVal = fontSelect.value;
+                const existingValues = new Set(Array.from(fontSelect.options).map(opt => opt.value));
+                
+                data.fonts.forEach(f => {
+                    if (!existingValues.has(f.id)) {
+                        const opt = document.createElement('option');
+                        opt.value = f.id;
+                        opt.textContent = f.name + (f.is_custom ? " (Assets)" : "");
+                        fontSelect.appendChild(opt);
+                        existingValues.add(f.id);
+                    }
+                    if (!fontMap[f.id]) {
+                        fontMap[f.id] = `"${f.name}", "${f.id}", sans-serif`;
+                    }
+                });
+                if (currentVal) fontSelect.value = currentVal;
+            }
+        } catch (e) {
+            console.warn("Could not load dynamic fonts:", e);
+        }
+    };
+    loadDynamicFonts();
+
     const updateFontFamily = () => {
-        const family = fontMap[fontSelect.value] || "sans-serif";
+        if (!fontSelect || !canvasBanner) return;
+        const family = fontMap[fontSelect.value] || `"${fontSelect.value}", sans-serif`;
         canvasBanner.style.fontFamily = family;
         if (canvasBannerText) {
             canvasBannerText.style.fontFamily = family;
         }
     };
-    fontSelect.addEventListener('change', updateFontFamily);
-    updateFontFamily(); // Áp dụng ngay khi khởi tạo trang
+    if (fontSelect) {
+        fontSelect.addEventListener('change', updateFontFamily);
+    }
 
     // Font Size
-    fontSizeInput.addEventListener('input', (e) => {
-        fontSizeVal.textContent = `${e.target.value}px`;
-        // Scale proportionally in miniature canvas
-        const scaledSize = Math.max(9, Math.round(e.target.value * 0.22));
-        canvasBanner.style.fontSize = `${scaledSize}px`;
-    });
+    if (fontSizeInput) {
+        fontSizeInput.addEventListener('input', (e) => {
+            if (fontSizeVal) fontSizeVal.textContent = `${e.target.value}px`;
+            // Scale proportionally in miniature canvas
+            const scaledSize = Math.max(9, Math.round(e.target.value * 0.22));
+            if (canvasBanner) canvasBanner.style.fontSize = `${scaledSize}px`;
+        });
+    }
 
     // Text Live Sync
-    previewTextInput.addEventListener('input', (e) => {
-        canvasBannerText.textContent = e.target.value.toUpperCase() || "SAMPLE VIDEO TITLE";
-    });
+    if (previewTextInput) {
+        previewTextInput.addEventListener('input', (e) => {
+            if (canvasBannerText) {
+                canvasBannerText.textContent = e.target.value.toUpperCase() || "SAMPLE VIDEO TITLE";
+            }
+        });
+    }
 
     // Blur Background Toggle
-    effectBlur.addEventListener('change', (e) => {
-        canvasBgBlur.style.opacity = e.target.checked ? '0.85' : '0.1';
-    });
+    if (effectBlur && canvasBgBlur) {
+        effectBlur.addEventListener('change', (e) => {
+            canvasBgBlur.style.opacity = e.target.checked ? '0.85' : '0.1';
+            const blurBadge = document.querySelector('.badge-blur-status');
+            if (blurBadge) {
+                blurBadge.style.opacity = e.target.checked ? '1' : '0.4';
+            }
+        });
+    }
+
+    // Horizontal Flip (Mirror) Toggle with Reactive Canvas
+    if (effectHFlip && canvasFgVideo) {
+        effectHFlip.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                canvasFgVideo.classList.add('is-flipped');
+                if (canvasFlipIndicator) canvasFlipIndicator.classList.remove('hidden');
+            } else {
+                canvasFgVideo.classList.remove('is-flipped');
+                if (canvasFlipIndicator) canvasFlipIndicator.classList.add('hidden');
+            }
+        });
+    }
+
+    // Color & Contrast Boost (HDR Vibe) Toggle with Reactive Canvas
+    if (effectColorBoost && canvasFgVideo) {
+        effectColorBoost.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                canvasFgVideo.classList.add('is-color-boosted');
+                if (canvasHdrIndicator) canvasHdrIndicator.classList.remove('hidden');
+            } else {
+                canvasFgVideo.classList.remove('is-color-boosted');
+                if (canvasHdrIndicator) canvasHdrIndicator.classList.add('hidden');
+            }
+        });
+    }
 
     // Banner Position
-    bannerPosition.addEventListener('change', (e) => {
-        const pos = e.target.value;
-        if (pos === 'top') {
-            canvasBanner.style.top = '18px';
-            canvasBanner.style.bottom = 'auto';
-        } else if (pos === 'center') {
-            canvasBanner.style.top = '40%';
-            canvasBanner.style.bottom = 'auto';
-        } else if (pos === 'bottom') {
-            canvasBanner.style.top = 'auto';
-            canvasBanner.style.bottom = '18px';
-        }
-    });
+    if (bannerPosition && canvasBanner) {
+        bannerPosition.addEventListener('change', (e) => {
+            const pos = e.target.value;
+            if (pos === 'top') {
+                canvasBanner.style.top = '16px';
+                canvasBanner.style.bottom = 'auto';
+            } else if (pos === 'center') {
+                canvasBanner.style.top = '40%';
+                canvasBanner.style.bottom = 'auto';
+            } else if (pos === 'bottom') {
+                canvasBanner.style.top = 'auto';
+                canvasBanner.style.bottom = '16px';
+            }
+        });
+    }
+
+    // Split Mode Badge Sync
+    const splitLabelMap = {
+        'auto-highlight-45s': 'Auto Climax 45s',
+        'auto-highlight-60s': 'Auto Climax 60s',
+        'auto-highlight-30s': 'Auto Climax 30s',
+        'fixed-3': 'Fixed 3 Parts',
+        'fixed-6': 'Fixed 6 Parts',
+        'no-split': 'Full Video (No Split)'
+    };
+    if (splitModeSelect && canvasSplitTagText) {
+        splitModeSelect.addEventListener('change', (e) => {
+            canvasSplitTagText.textContent = splitLabelMap[e.target.value] || e.target.value;
+        });
+    }
 
     // Hàm đồng bộ tất cả các thuộc tính xem trước trên canvas khi tải trang
     const syncAllPreview = () => {
         updateFontFamily();
         
         // Đồng bộ cỡ chữ
-        fontSizeVal.textContent = `${fontSizeInput.value}px`;
-        const scaledSize = Math.max(9, Math.round(fontSizeInput.value * 0.22));
-        canvasBanner.style.fontSize = `${scaledSize}px`;
+        if (fontSizeInput && fontSizeVal) {
+            fontSizeVal.textContent = `${fontSizeInput.value}px`;
+            const scaledSize = Math.max(9, Math.round(fontSizeInput.value * 0.22));
+            if (canvasBanner) canvasBanner.style.fontSize = `${scaledSize}px`;
+        }
         
         // Đồng bộ kiểu hộp banner
-        canvasBanner.className = `canvas-banner banner-${boxStyleSelect.value}`;
+        if (boxStyleSelect && canvasBanner) {
+            canvasBanner.className = `canvas-banner banner-${boxStyleSelect.value}`;
+        }
         
         // Đồng bộ văn bản mẫu
-        canvasBannerText.textContent = previewTextInput.value.toUpperCase() || "SAMPLE VIDEO TITLE";
+        if (previewTextInput && canvasBannerText) {
+            canvasBannerText.textContent = previewTextInput.value.toUpperCase() || "SAMPLE VIDEO TITLE";
+        }
         
         // Đồng bộ độ mờ nền
-        canvasBgBlur.style.opacity = effectBlur.checked ? '0.85' : '0.1';
+        if (effectBlur && canvasBgBlur) {
+            canvasBgBlur.style.opacity = effectBlur.checked ? '0.85' : '0.1';
+        }
+
+        // Đồng bộ Flip
+        if (effectHFlip && canvasFgVideo) {
+            if (effectHFlip.checked) {
+                canvasFgVideo.classList.add('is-flipped');
+                if (canvasFlipIndicator) canvasFlipIndicator.classList.remove('hidden');
+            } else {
+                canvasFgVideo.classList.remove('is-flipped');
+                if (canvasFlipIndicator) canvasFlipIndicator.classList.add('hidden');
+            }
+        }
+
+        // Đồng bộ Color Boost
+        if (effectColorBoost && canvasFgVideo) {
+            if (effectColorBoost.checked) {
+                canvasFgVideo.classList.add('is-color-boosted');
+                if (canvasHdrIndicator) canvasHdrIndicator.classList.remove('hidden');
+            } else {
+                canvasFgVideo.classList.remove('is-color-boosted');
+                if (canvasHdrIndicator) canvasHdrIndicator.classList.add('hidden');
+            }
+        }
         
         // Đồng bộ vị trí banner
-        const pos = bannerPosition.value;
-        if (pos === 'top') {
-            canvasBanner.style.top = '18px';
-            canvasBanner.style.bottom = 'auto';
-        } else if (pos === 'center') {
-            canvasBanner.style.top = '40%';
-            canvasBanner.style.bottom = 'auto';
-        } else if (pos === 'bottom') {
-            canvasBanner.style.top = 'auto';
-            canvasBanner.style.bottom = '18px';
+        if (bannerPosition && canvasBanner) {
+            const pos = bannerPosition.value;
+            if (pos === 'top') {
+                canvasBanner.style.top = '16px';
+                canvasBanner.style.bottom = 'auto';
+            } else if (pos === 'center') {
+                canvasBanner.style.top = '40%';
+                canvasBanner.style.bottom = 'auto';
+            } else if (pos === 'bottom') {
+                canvasBanner.style.top = 'auto';
+                canvasBanner.style.bottom = '16px';
+            }
+        }
+
+        // Đồng bộ Split Mode
+        if (splitModeSelect && canvasSplitTagText) {
+            canvasSplitTagText.textContent = splitLabelMap[splitModeSelect.value] || splitModeSelect.value;
         }
     };
     syncAllPreview();
@@ -222,6 +447,8 @@ function setupEventListeners() {
     const btnScan = document.getElementById('btn-scan-source');
     const btnRefresh = document.getElementById('btn-refresh-data');
     const chkSelectAll = document.getElementById('chk-select-all');
+    const btnSelectAllUnedited = document.getElementById('btn-select-all-unedited-btn');
+    const btnDeselectAll = document.getElementById('btn-deselect-all-btn');
     const btnStart = document.getElementById('btn-start-processing');
     const btnStop = document.getElementById('btn-stop-processing');
     const btnOpenDest = document.getElementById('btn-open-dest-folder');
@@ -258,6 +485,33 @@ function setupEventListeners() {
         });
         updateSelectedCount();
     });
+
+    if (btnSelectAllUnedited) {
+        btnSelectAllUnedited.addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('.video-checkbox');
+            checkboxes.forEach(cb => {
+                const isEdited = cb.dataset.edited === 'true';
+                if (!isEdited) {
+                    cb.checked = true;
+                    selectedVideos.add(cb.dataset.path);
+                }
+            });
+            if (chkSelectAll) chkSelectAll.checked = true;
+            updateSelectedCount();
+        });
+    }
+
+    if (btnDeselectAll) {
+        btnDeselectAll.addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('.video-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+            });
+            selectedVideos.clear();
+            if (chkSelectAll) chkSelectAll.checked = false;
+            updateSelectedCount();
+        });
+    }
 
     filterBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -305,6 +559,25 @@ function setupEventListeners() {
     if (btnDeleteAllFinished) {
         btnDeleteAllFinished.addEventListener('click', () => {
             deleteAllFinishedVideos();
+        });
+    }
+
+    // Finished Library Filter Tabs & Live Search
+    const finishedFilterBtns = document.querySelectorAll('.finished-filter-btn');
+    finishedFilterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            finishedFilterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentFinishedFilter = btn.dataset.filter;
+            renderFinishedLibrary();
+        });
+    });
+
+    const inputSearchFinished = document.getElementById('input-search-finished');
+    if (inputSearchFinished) {
+        inputSearchFinished.addEventListener('input', (e) => {
+            currentFinishedSearch = e.target.value.trim().toLowerCase();
+            renderFinishedLibrary();
         });
     }
 
@@ -446,18 +719,40 @@ function renderVideoTree(folders) {
         folderEl.dataset.folderName = folder.name;
 
         folderEl.innerHTML = `
-            <div class="folder-header" title="Bấm để mở/thu gọn thư mục ${escapeHtml(folder.name)}">
+            <div class="folder-header" title="Click to expand/collapse channel ${escapeHtml(folder.name)}">
                 <div class="folder-left">
                     <i class="fa-solid fa-folder-open text-primary folder-icon"></i>
                     <span class="folder-name-text">${escapeHtml(folder.name)}</span>
                 </div>
                 <div class="folder-right">
-                    <span class="badge ${editedVids === totalVids ? 'badge-success' : 'badge-info'}" style="font-size: 10px;">${editedVids}/${totalVids} Đã edit</span>
+                    <button type="button" class="btn-xs btn-outline-success btn-select-folder-all" title="Select / Deselect unedited videos in ${escapeAttr(folder.name)}">
+                        <i class="fa-solid fa-check"></i> Select Channel
+                    </button>
+                    <span class="badge ${editedVids === totalVids ? 'badge-success' : 'badge-info'}" style="font-size: 10px;">${editedVids}/${totalVids} Edited</span>
                     <i class="fa-solid fa-chevron-down folder-chevron"></i>
                 </div>
             </div>
             <div class="folder-items-list"></div>
         `;
+
+        const btnSelectFolder = folderEl.querySelector('.btn-select-folder-all');
+        if (btnSelectFolder) {
+            btnSelectFolder.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const uneditedCheckboxes = folderEl.querySelectorAll('.video-checkbox[data-edited="false"]');
+                if (uneditedCheckboxes.length === 0) return;
+                let allChecked = Array.from(uneditedCheckboxes).every(cb => cb.checked);
+                uneditedCheckboxes.forEach(cb => {
+                    cb.checked = !allChecked;
+                    if (!allChecked) {
+                        selectedVideos.add(cb.dataset.path);
+                    } else {
+                        selectedVideos.delete(cb.dataset.path);
+                    }
+                });
+                updateSelectedCount();
+            });
+        }
 
         const listEl = folderEl.querySelector('.folder-items-list');
 
@@ -468,8 +763,8 @@ function renderVideoTree(folders) {
             itemEl.dataset.channelName = folder.name.toLowerCase();
 
             const badgeHtml = video.edited 
-                ? '<span class="badge-status edited"><i class="fa-solid fa-check"></i> Đã edit</span>'
-                : '<span class="badge-status unedited"><i class="fa-regular fa-circle"></i> Chưa edit</span>';
+                ? '<span class="badge-status edited"><i class="fa-solid fa-check"></i> Edited</span>'
+                : '<span class="badge-status unedited"><i class="fa-regular fa-circle"></i> Unedited</span>';
 
             itemEl.innerHTML = `
                 <div class="video-item-left">
@@ -481,6 +776,17 @@ function renderVideoTree(folders) {
                 </div>
                 <div>${badgeHtml}</div>
             `;
+
+            // Click row to preview title live
+            itemEl.addEventListener('click', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.closest('.custom-checkbox')) return;
+                document.querySelectorAll('.video-tree-item').forEach(el => el.classList.remove('is-preview-active'));
+                itemEl.classList.add('is-preview-active');
+                const sampleInput = document.getElementById('preview-text-input');
+                const canvasBannerText = document.getElementById('canvas-banner-text');
+                if (sampleInput) sampleInput.value = video.title;
+                if (canvasBannerText) canvasBannerText.textContent = video.title.toUpperCase();
+            });
 
             // Checkbox event
             const cb = itemEl.querySelector('.video-checkbox');
@@ -722,7 +1028,16 @@ function initExplorerControls() {
 }
 
 function updateSelectedCount() {
-    document.getElementById('selected-count-badge').textContent = selectedVideos.size;
+    const badge = document.getElementById('selected-count-badge');
+    if (badge) badge.textContent = selectedVideos.size;
+    const pill = document.getElementById('selected-summary-pill-container');
+    if (pill) {
+        if (selectedVideos.size > 0) {
+            pill.classList.add('has-selection');
+        } else {
+            pill.classList.remove('has-selection');
+        }
+    }
 }
 
 
@@ -892,7 +1207,13 @@ async function startBatchProcessing() {
         banner_font_size: parseInt(document.getElementById('banner-font-size').value),
         banner_position: document.getElementById('banner-position').value,
         split_mode: document.getElementById('split-mode').value,
-        export_full: document.getElementById('export-full-toggle').value === 'yes'
+        export_full: document.getElementById('export-full-toggle').value === 'yes',
+        localization_settings: {
+            target_lang: document.getElementById('localization-target-lang')?.value || 'none',
+            voice_gender: document.getElementById('localization-voice-gender')?.value || 'male',
+            dubbing_mode: document.getElementById('localization-dubbing-mode')?.value || 'dub_and_sub',
+            sub_style: document.getElementById('localization-sub-style')?.value || 'tiktok-yellow'
+        }
     };
 
     try {
@@ -927,22 +1248,150 @@ function setProcessState(running) {
     isRunning = running;
     const btnStart = document.getElementById('btn-start-processing');
     const btnStop = document.getElementById('btn-stop-processing');
-    const statusDot = document.querySelector('.status-dot');
+    const statusDot = document.querySelector('.sidebar-status .status-dot') || document.querySelector('.status-dot');
     const statusText = document.getElementById('status-text');
 
     if (running) {
-        btnStart.classList.add('hidden');
-        btnStop.classList.remove('hidden');
-        statusDot.className = 'status-dot busy';
-        statusText.textContent = 'Rendering videos...';
+        btnStart?.classList.add('hidden');
+        btnStop?.classList.remove('hidden');
+        if (statusDot) statusDot.className = 'status-dot busy';
+        if (statusText) statusText.textContent = 'Rendering videos...';
     } else {
-        btnStart.classList.remove('hidden');
-        btnStop.classList.add('hidden');
-        statusDot.className = 'status-dot online';
-        statusText.textContent = 'Ready';
+        btnStart?.classList.remove('hidden');
+        btnStop?.classList.add('hidden');
+        if (statusDot) statusDot.className = 'status-dot online';
+        if (statusText) statusText.textContent = 'Ready';
         if (progressInterval) clearInterval(progressInterval);
     }
 }
+
+// --- Sound & Visual Notifications ---
+function playNotificationSound() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        
+        // Chime Note 1
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, now); // D5
+        osc1.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
+        gain1.gain.setValueAtTime(0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.5);
+
+        // Chime Note 2 (Success tone)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(880, now + 0.12); // A5
+        osc2.frequency.exponentialRampToValueAtTime(1174.66, now + 0.3); // D6
+        gain2.gain.setValueAtTime(0.35, now + 0.12);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.12);
+        osc2.stop(now + 0.8);
+    } catch (e) {
+        // AudioContext silent fallback
+    }
+}
+
+function navigateToTab(targetTab) {
+    const tabLinks = document.querySelectorAll('.tab-link');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const titleEl = document.getElementById('current-tab-title');
+    const subEl = document.getElementById('current-tab-subtitle');
+    const mainContent = document.querySelector('.app-main-content');
+
+    tabLinks.forEach(l => l.classList.toggle('active', l.dataset.tab === targetTab));
+    tabContents.forEach(c => c.classList.toggle('active', c.id === targetTab));
+
+    const meta = (typeof TAB_HEADER_METADATA !== 'undefined') ? TAB_HEADER_METADATA[targetTab] : null;
+    if (meta) {
+        if (titleEl) titleEl.textContent = meta.title;
+        if (subEl) subEl.textContent = meta.subtitle;
+    }
+    if (mainContent) mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (targetTab === 'tab-outputs') {
+        fetchResults();
+    } else if (targetTab === 'tab-publishing') {
+        fetchPublishingMatrix();
+    } else if (targetTab === 'tab-autopilot') {
+        loadAutopilotQueue();
+    } else if (targetTab === 'tab-download') {
+        onDownloadTabActivated();
+    }
+}
+window.navigateToTab = navigateToTab;
+
+async function updateProgressUI(data) {
+    const percEl = document.getElementById('progress-percentage');
+    const fillEl = document.getElementById('progress-fill');
+    const taskEl = document.getElementById('progress-current-task');
+    const statusEl = document.getElementById('render-status-text');
+    const statusIndicator = document.getElementById('render-status-indicator');
+    const term = document.getElementById('terminal-logs-window');
+
+    const perc = data.percentage || 0;
+    if (percEl) percEl.textContent = `${perc}%`;
+    if (fillEl) fillEl.style.width = `${perc}%`;
+
+    if (data.is_running) {
+        document.title = `(${perc}%) 🎬 Đang Render... - cris. studio`;
+        if (taskEl) taskEl.textContent = data.current_task || "Đang xử lý video...";
+        if (statusEl) statusEl.textContent = "Processing...";
+    } else {
+        if (perc >= 100) {
+            document.title = `✅ ĐÃ XONG! - cris. studio`;
+            if (taskEl) {
+                taskEl.innerHTML = `<span style="color: #2ed573; font-weight: 700;">🎉 Hoàn tất toàn bộ batch!</span> <a href="#tab-outputs" onclick="navigateToTab('tab-outputs'); return false;" style="color: #3b82f6; text-decoration: underline; margin-left: 8px; font-weight: 600;">Xem Thư Viện Thành Phẩm ➔</a>`;
+            }
+            if (statusEl) statusEl.innerHTML = `<span style="color: #2ed573; font-weight: 700;">Completed</span>`;
+        } else {
+            document.title = `cris. studio - Video Automation Platform`;
+            if (taskEl) taskEl.textContent = data.current_task || "Idle (No active tasks)";
+            if (statusEl) statusEl.textContent = "Waiting...";
+        }
+    }
+
+    if (statusIndicator) {
+        const dot = statusIndicator.querySelector('.dot');
+        if (dot) {
+            dot.className = `dot ${data.is_running ? 'running' : (perc >= 100 ? 'completed' : 'idle')}`;
+        }
+    }
+
+    // Update Logs
+    if (data.logs && data.logs.length > 0 && term) {
+        term.innerHTML = data.logs.map(l => `<div class="log-line">${escapeHtml(l)}</div>`).join('');
+        term.scrollTop = term.scrollHeight;
+    }
+}
+
+async function checkAndPollProgress() {
+    try {
+        const res = await fetch('/api/progress');
+        const data = await res.json();
+        await updateProgressUI(data);
+
+        if (data.is_running) {
+            setProcessState(true);
+            startPollingProgress();
+        }
+    } catch (err) {
+        console.error("checkAndPollProgress error:", err);
+    }
+}
+
+let lastLoggedFinishedState = false;
 
 function startPollingProgress() {
     if (progressInterval) clearInterval(progressInterval);
@@ -950,26 +1399,34 @@ function startPollingProgress() {
         try {
             const res = await fetch('/api/progress');
             const data = await res.json();
+            await updateProgressUI(data);
 
-            // Progress Fill
-            document.getElementById('progress-percentage').textContent = `${data.percentage || 0}%`;
-            document.getElementById('progress-fill').style.width = `${data.percentage || 0}%`;
-            document.getElementById('progress-current-task').textContent = data.current_task || "Rendering...";
-            document.getElementById('render-status-text').textContent = data.is_running ? "Processing..." : "Completed";
-
-            // Update Logs
-            if (data.logs) {
-                const term = document.getElementById('terminal-logs-window');
-                term.innerHTML = data.logs.map(l => `<div class="log-line">${l}</div>`).join('');
-                term.scrollTop = term.scrollHeight;
-            }
-
-            // Sync finish status
+            // Trigger completion event when transitions from running to not running
             if (!data.is_running && isRunning) {
                 setProcessState(false);
+                playNotificationSound();
+                showToast("🎉 HOÀN TẤT BIÊN TẬP TẤT CẢ VIDEO! Các clip đã sẵn sàng trong Finished Library.");
+                
+                // HTML5 Desktop Notification
+                if ('Notification' in window) {
+                    if (Notification.permission === 'granted') {
+                        new Notification("TikTok Studio Pro", {
+                            body: "🎉 Đã hoàn tất biên tập toàn bộ video thành công!",
+                            icon: "/favicon.png"
+                        });
+                    } else if (Notification.permission !== 'denied') {
+                        Notification.requestPermission();
+                    }
+                }
+
+                // Tự động làm mới danh sách thành phẩm
                 fetchResults();
-                const source = document.getElementById('source-drive-link').value.trim();
-                if (source) scanSourcePath(source); // Refresh Tree & Dashboard values
+                const source = document.getElementById('source-drive-link')?.value.trim();
+                if (source) scanSourcePath(source);
+
+                setTimeout(() => {
+                    document.title = "cris. studio - Video Automation Platform";
+                }, 8000);
             }
         } catch (err) {
             console.error("Progress fetch error:", err);
@@ -992,8 +1449,26 @@ function escapeHtml(str) {
 
 function escapeAttr(str) {
     if (!str) return '';
-    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
+
+function escapeJs(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+}
+
+let allFinishedResults = [];
+let currentFinishedFilter = 'all';
+let currentFinishedSearch = '';
 
 async function fetchResults() {
     try {
@@ -1001,72 +1476,137 @@ async function fetchResults() {
         const res = await fetch(`/api/results?dest=${encodeURIComponent(dest)}`);
         const data = await res.json();
 
-        const container = document.getElementById('finished-list-container');
-        const badgeCount = document.getElementById('finished-total-badge');
-        const results = data.results || [];
+        allFinishedResults = data.results || [];
         
+        // Update header count badge and filter tab counts
+        const badgeCount = document.getElementById('finished-total-badge');
         if (badgeCount) {
-            badgeCount.textContent = `${results.length} video${results.length === 1 ? '' : 's'}`;
+            badgeCount.textContent = `${allFinishedResults.length} video${allFinishedResults.length === 1 ? '' : 's'}`;
         }
 
-        if (results.length === 0) {
-            container.innerHTML = `
-                <div class="empty-finished-state">
-                    <i class="fa-solid fa-clapperboard"></i>
-                    <p>Chưa có video thành phẩm nào trong thư mục đích.</p>
-                </div>
-            `;
-            return;
-        }
+        const countAll = document.getElementById('count-finished-all');
+        const countUnup = document.getElementById('count-finished-unuploaded');
+        const countUp = document.getElementById('count-finished-uploaded');
 
-        container.innerHTML = '';
-        results.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'finished-card';
+        const unupCount = data.unuploaded_count !== undefined ? data.unuploaded_count : allFinishedResults.filter(r => !r.is_uploaded).length;
+        const upCount = data.uploaded_count !== undefined ? data.uploaded_count : allFinishedResults.filter(r => r.is_uploaded).length;
 
-            // Tạo các nút part nhỏ để xem nhanh
-            let partsHtml = '';
-            if (item.parts && item.parts.length > 0) {
-                partsHtml = `
-                    <div class="finished-parts-chips">
-                        ${item.parts.map((p, idx) => `
-                            <button type="button" class="finished-part-chip" onclick="playFinishedVideo('${encodeURIComponent(p.url)}', '${escapeAttr(item.title)} - Part ${idx + 1}')" title="Xem trước ${escapeAttr(p.name)}">
-                                <i class="fa-solid fa-play" style="font-size: 8px;"></i> Part ${idx + 1}
-                            </button>
-                        `).join('')}
-                    </div>
-                `;
-            }
+        if (countAll) countAll.textContent = allFinishedResults.length;
+        if (countUnup) countUnup.textContent = unupCount;
+        if (countUp) countUp.textContent = upCount;
 
-            card.innerHTML = `
-                <div class="finished-info" style="flex: 1; min-width: 0;">
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <span class="finished-title" style="font-size: 13px; font-weight: 700; color: var(--text-primary);" title="${escapeAttr(item.title)}">
-                            <i class="fa-solid fa-circle-check text-success"></i> ${escapeHtml(item.title)}
-                        </span>
-                        <span class="badge" style="font-weight: 700; background: rgba(139, 92, 246, 0.12); color: var(--accent); border: 1px solid rgba(139, 92, 246, 0.2); padding: 2px 8px; border-radius: 4px; font-size: 11px;">
-                            ${escapeHtml(item.folder_name)}
-                        </span>
-                    </div>
-                    ${partsHtml}
-                </div>
-                <div class="finished-actions" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-right: 4px;">
-                        ${item.parts.length} videos
-                    </span>
-                    <button class="btn btn-sm btn-secondary" onclick="openOutputDirectory('${escapeAttr(item.path)}')" title="Mở thư mục chứa video trên máy">
-                        <i class="fa-solid fa-folder-open"></i> Mở thư mục
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteFinishedVideo('${escapeAttr(item.path)}', '${escapeAttr(item.title)}', '${escapeAttr(item.folder_name)}')" title="Xóa video thành phẩm này">
-                        <i class="fa-solid fa-trash-can"></i> Xóa
-                    </button>
-                </div>
-            `;
-            container.appendChild(card);
-        });
+        renderFinishedLibrary();
     } catch (err) {
         console.error("Fetch results error:", err);
     }
+}
+
+function renderFinishedLibrary() {
+    const container = document.getElementById('finished-list-container');
+    if (!container) return;
+
+    if (allFinishedResults.length === 0) {
+        container.innerHTML = `
+            <div class="empty-finished-state">
+                <i class="fa-solid fa-clapperboard"></i>
+                <p>Chưa có video thành phẩm nào trong thư mục đích.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Lọc theo trạng thái Upload TikTok (all / unuploaded / uploaded)
+    let filtered = allFinishedResults.filter(item => {
+        if (currentFinishedFilter === 'unuploaded') return !item.is_uploaded;
+        if (currentFinishedFilter === 'uploaded') return item.is_uploaded;
+        return true;
+    });
+
+    // Lọc theo từ khóa tìm kiếm
+    if (currentFinishedSearch) {
+        filtered = filtered.filter(item => {
+            const t = (item.title || '').toLowerCase();
+            const f = (item.folder_name || '').toLowerCase();
+            const a = (item.posted_account || '').toLowerCase();
+            return t.includes(currentFinishedSearch) || f.includes(currentFinishedSearch) || a.includes(currentFinishedSearch);
+        });
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-finished-state">
+                <i class="fa-solid fa-filter-circle-xmark"></i>
+                <p>No finished videos found matching the current filter.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = '';
+    filtered.forEach(item => {
+        const card = document.createElement('div');
+        card.className = `finished-card ${item.is_uploaded ? 'is-uploaded' : 'is-unuploaded'}`;
+
+        // Status Badge
+        const statusBadgeHtml = item.is_uploaded
+            ? `<span class="badge-uploaded"><i class="fa-solid fa-circle-check"></i> Uploaded to TikTok ${item.posted_account ? '(@' + escapeHtml(item.posted_account) + ')' : ''}</span>`
+            : `<span class="badge-unuploaded"><i class="fa-solid fa-cloud-arrow-up"></i> Pending Upload</span>`;
+
+        // Time Badge
+        const timeBadgeHtml = item.created_at
+            ? `<span class="badge-time" title="Render / Modified Time"><i class="fa-regular fa-clock"></i> ${escapeHtml(item.created_at)}</span>`
+            : '';
+
+        // Tạo các nút part nhỏ để xem nhanh
+        let partsHtml = '';
+        if (item.parts && item.parts.length > 0) {
+            partsHtml = `
+                <div class="finished-parts-chips">
+                    ${item.parts.map((p, idx) => {
+                        const partIsPosted = p.posted || false;
+                        const partChipClass = `finished-part-chip ${partIsPosted ? 'is-posted' : ''}`;
+                        const partIcon = partIsPosted
+                            ? `<i class="fa-solid fa-check" style="font-size: 9px; color: #34d399;"></i>`
+                            : `<i class="fa-solid fa-play" style="font-size: 8px;"></i>`;
+                        const partTitle = `${escapeAttr(item.title)} - Part ${idx + 1} (${partIsPosted ? 'Posted' : 'Pending'})`;
+                        return `
+                            <button type="button" class="${partChipClass}" onclick="playFinishedVideo('${encodeURIComponent(p.url)}', '${partTitle}')" title="Preview ${escapeAttr(p.name)}">
+                                ${partIcon} Part ${idx + 1}
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        card.innerHTML = `
+            <div class="finished-info" style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span class="finished-title" style="font-size: 13.5px; font-weight: 700; color: var(--text-primary);" title="${escapeAttr(item.title)}">
+                        ${escapeHtml(item.title)}
+                    </span>
+                    <span class="badge badge-neutral">
+                        ${escapeHtml(item.folder_name)}
+                    </span>
+                    ${statusBadgeHtml}
+                    ${timeBadgeHtml}
+                </div>
+                ${partsHtml}
+            </div>
+            <div class="finished-actions" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-right: 4px;">
+                    ${item.parts.length} videos
+                </span>
+                <button class="btn btn-sm btn-secondary" onclick="openOutputDirectory('${escapeAttr(item.path)}')" title="Open folder in File Explorer">
+                    <i class="fa-solid fa-folder-open"></i> Open Folder
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFinishedVideo('${escapeAttr(item.path)}', '${escapeAttr(item.title)}', '${escapeAttr(item.folder_name)}')" title="Delete this finished video">
+                    <i class="fa-solid fa-trash-can"></i> Delete
+                </button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
 }
 
 async function deleteFinishedVideo(folderPath, videoTitle, channelName) {
@@ -1184,6 +1724,7 @@ window.deleteAllFinishedVideos = deleteAllFinishedVideos;
 window.playFinishedVideo = playFinishedVideo;
 window.escapeHtml = escapeHtml;
 window.escapeAttr = escapeAttr;
+window.escapeJs = escapeJs;
 
 /* ==========================================================================
    5. Accounts & Channels Manager (New Sections)
@@ -1300,6 +1841,7 @@ function initAccountsManager() {
         const name = document.getElementById('input-channel-name').value.trim();
         const url = document.getElementById('input-channel-url').value.trim();
         let folder = document.getElementById('input-channel-folder').value.trim();
+        const content = document.getElementById('input-channel-content')?.value.trim() || '';
         if (!folder && name) {
             folder = name;
         }
@@ -1309,7 +1851,7 @@ function initAccountsManager() {
             return;
         }
         
-        const newChan = { name, url, folder_name: folder, note: 'Custom configured' };
+        const newChan = { name, url, folder_name: folder, content, note: 'Custom configured' };
         
         if (editingChannelIdx > -1) {
             // Keep existing downloaded count if editing
@@ -1414,6 +1956,9 @@ function clearChannelForm() {
     document.getElementById('input-channel-name').value = '';
     document.getElementById('input-channel-url').value = '';
     document.getElementById('input-channel-folder').value = '';
+    if (document.getElementById('input-channel-content')) {
+        document.getElementById('input-channel-content').value = '';
+    }
 }
 
 function clearAccountForm() {
@@ -1454,6 +1999,9 @@ async function fetchAccountsData() {
         renderChannelsTable();
         renderAccountsTable();
         updateTargetChannelDropdown();
+        if (typeof populateDownloadChannelSelect === 'function') {
+            populateDownloadChannelSelect();
+        }
         
         if (shouldScan) {
             scanSourcePath(data.source_path);
@@ -1487,7 +2035,7 @@ function renderChannelsTable() {
     if (channels.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="table-empty">No YouTube channels configured.</td>
+                <td colspan="7" class="table-empty">No YouTube channels configured.</td>
             </tr>
         `;
         return;
@@ -1495,15 +2043,20 @@ function renderChannelsTable() {
     
     channels.forEach((chan, idx) => {
         const tr = document.createElement('tr');
+        const contentDisplay = chan.content 
+            ? `<span class="badge badge-neutral"><i class="fa-solid fa-tags"></i> ${escapeHtml(chan.content)}</span>`
+            : '<span class="text-muted" style="font-size: 11px; opacity: 0.6;">-</span>';
+
         tr.innerHTML = `
             <td>${idx + 1}</td>
-            <td><strong>${chan.name}</strong></td>
+            <td><strong>${escapeHtml(chan.name)}</strong></td>
             <td>
                 ${chan.url ? `<a href="${chan.url}" target="_blank" class="text-primary" style="text-decoration: none;"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Channel</a>` : '<span class="text-muted">No URL</span>'}
             </td>
-            <td><code>${chan.folder_name}</code></td>
+            <td><code>${escapeHtml(chan.folder_name)}</code></td>
+            <td>${contentDisplay}</td>
             <td style="text-align: center;">
-                <span class="badge" style="background: var(--primary); font-weight: 700; padding: 4px 8px; border-radius: var(--radius-sm);">${chan.total_downloaded || 0} clips</span>
+                <span class="badge badge-neutral">${chan.total_downloaded || 0} clips</span>
             </td>
             <td style="text-align: center;">
                 <button class="btn btn-outline btn-xs btn-edit-chan" data-index="${idx}" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;"><i class="fa-solid fa-pen"></i></button>
@@ -1559,8 +2112,8 @@ function renderAccountsTable() {
         const matchingChan = (accountsData.youtube_channels || []).find(c => c.name === acc.target_channel);
         const chanUrl = matchingChan ? matchingChan.url : '';
         const targetChannelDisplay = chanUrl
-            ? `<a href="${chanUrl}" target="_blank" class="badge" style="background: rgba(139, 92, 246, 0.1); color: var(--accent); border: 1px solid rgba(139, 92, 246, 0.2); padding: 4.5px 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; border-radius: 4px;" title="Open YouTube channel"><i class="fa-brands fa-youtube" style="color: #ef4444;"></i> ${acc.target_channel}</a>`
-            : `<span class="badge" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); padding: 4.5px 8px; border-radius: 4px;">${acc.target_channel || '-'}</span>`;
+            ? `<a href="${chanUrl}" target="_blank" class="badge badge-neutral" style="text-decoration: none;" title="Open YouTube channel"><i class="fa-brands fa-youtube text-danger"></i> ${escapeHtml(acc.target_channel)}</a>`
+            : `<span class="badge badge-neutral">${escapeHtml(acc.target_channel || '-')}</span>`;
 
         tr.innerHTML = `
             <td>${idx + 1}</td>
@@ -1636,6 +2189,9 @@ function editChannel(idx) {
     document.getElementById('input-channel-name').value = chan.name;
     document.getElementById('input-channel-url').value = chan.url || '';
     document.getElementById('input-channel-folder').value = chan.folder_name;
+    if (document.getElementById('input-channel-content')) {
+        document.getElementById('input-channel-content').value = chan.content || '';
+    }
     
     const formArea = document.getElementById('channel-form-area');
     formArea.classList.remove('hidden');
@@ -1858,7 +2414,7 @@ function renderPublishingAccountsList() {
                 <span class="pub-acc-item-name">
                     <i class="fa-brands fa-tiktok text-accent"></i> ${escapeHtml(acc.account_name)}
                 </span>
-                <span class="badge" style="font-size: 10px; font-weight: 700; background: rgba(59, 130, 246, 0.12); color: var(--primary); border: 1px solid rgba(59, 130, 246, 0.2);">
+                <span class="badge badge-neutral" style="font-size: 10px;">
                     🎯 ${escapeHtml(targetLabel)}
                 </span>
             </div>
@@ -2295,94 +2851,82 @@ async function handleBatchPostParts(clipKey, channel, title, videoPath, partsToP
     btnClose.onclick = () => modal.classList.add('hidden');
     btnFinish.onclick = () => modal.classList.add('hidden');
 
-    appendLog(`🚀 BẮT ĐẦU ĐĂNG TUẦN TỰ ${partsToPost.length} PART CHO CLIP: "${title}"`);
+    metaClipTitle.textContent = title;
+    modalTitle.textContent = `Đang Đăng đồng thời ${partsToPost.length} Tab: "${title}"`;
+
+    setStepState(stepHma, 'Đang chuẩn bị...', 'active');
+    setStepState(stepAds, 'Chờ...', '');
+    setStepState(stepUpload, 'Chờ...', '');
+    setStepState(stepDone, 'Chờ...', '');
+
+    appendLog(`🚀 BẮT ĐẦU QUY TRÌNH ĐĂNG ĐỒNG THỜI ${partsToPost.length} TAB CHO CLIP: "${title}"`);
     appendLog(`📋 Danh sách part: ${partsToPost.map(p => p.label || p.name).join(', ')}`);
+    appendLog(`✨ Tiêu đề video (Caption): "${title}" (Chỉ dùng title, không kèm part_label, nạp tức thì)`);
 
-    let successCount = 0;
+    try {
+        setTimeout(() => {
+            if (stepHma.classList.contains('active')) {
+                setStepState(stepHma, 'Đã chuyển IP', 'done');
+                setStepState(stepAds, 'Đang mở profile...', 'active');
+                appendLog(`⚡ Đang kết nối AdsPower Profile và mở ${partsToPost.length} tab mới...`);
+            }
+        }, 1500);
 
-    for (let i = 0; i < partsToPost.length; i++) {
-        const currentPart = partsToPost[i];
-        const partLabel = currentPart.label || `Part ${i + 1}`;
-        const displayUploadTitle = `${title} (${partLabel})`;
+        setTimeout(() => {
+            if (stepAds.classList.contains('active')) {
+                setStepState(stepAds, 'Đã mở Chrome', 'done');
+                setStepState(stepUpload, 'Đang tải lên...', 'active');
+                appendLog(`🌐 Đang nạp ${partsToPost.length} video vào ${partsToPost.length} tab và điền tiêu đề đồng thời...`);
+            }
+        }, 3500);
 
-        modalTitle.textContent = `[${i + 1}/${partsToPost.length}] Đang Đăng: "${displayUploadTitle}"`;
-        metaClipTitle.textContent = displayUploadTitle;
-
-        setStepState(stepHma, 'Đang chuẩn bị...', 'active');
-        setStepState(stepAds, 'Chờ...', '');
-        setStepState(stepUpload, 'Chờ...', '');
-        setStepState(stepDone, 'Chờ...', '');
-
-        appendLog(`\n--------------------------------------------------`);
-        appendLog(`▶️ [TIẾN TRÌNH ${i + 1}/${partsToPost.length}] Bắt đầu tải lên ${partLabel}...`);
-
-        try {
-            setTimeout(() => {
-                if (stepHma.classList.contains('active')) {
-                    setStepState(stepHma, 'Đã chuyển IP', 'done');
-                    setStepState(stepAds, 'Đang mở profile...', 'active');
-                }
-            }, 1500);
-
-            setTimeout(() => {
-                if (stepAds.classList.contains('active')) {
-                    setStepState(stepAds, 'Đã mở Chrome', 'done');
-                    setStepState(stepUpload, 'Đang tải lên...', 'active');
-                }
-            }, 3500);
-
-            const res = await fetch('/api/publishing/post_to_tiktok', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    account_name: activePublishingAccountName,
+        const res = await fetch('/api/publishing/post_to_tiktok', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                account_name: activePublishingAccountName,
+                clip_key: clipKey,
+                channel: channel,
+                title: title,
+                items: partsToPost.map(p => ({
                     clip_key: clipKey,
                     channel: channel,
                     title: title,
-                    video_file: currentPart.file_path || '',
-                    part_label: partLabel
-                })
-            });
+                    video_file: p.file_path || '',
+                    part_label: p.label || p.name || ''
+                }))
+            })
+        });
 
-            const data = await res.json();
+        const data = await res.json();
 
-            if (data.step_logs && Array.isArray(data.step_logs)) {
-                data.step_logs.forEach(logText => appendLog(logText));
-            }
-
-            if (data.success) {
-                successCount++;
-                setStepState(stepHma, 'Hoàn thành', 'done');
-                setStepState(stepAds, 'Hoàn thành', 'done');
-                setStepState(stepUpload, 'Đã tải lên', 'done');
-                setStepState(stepDone, 'Thành công', 'done');
-                appendLog(`✅ [${i + 1}/${partsToPost.length}] ${partLabel} ĐÃ ĐĂNG THÀNH CÔNG!`);
-
-                // Cập nhật trạng thái hiển thị
-                fetchPublishingMatrix();
-
-                // Nếu còn part tiếp theo -> Chờ 5 giây trước khi tiếp tục
-                if (i < partsToPost.length - 1) {
-                    appendLog(`⏳ Đang nghỉ 5 giây trước khi đăng Part tiếp theo...`);
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                }
-            } else {
-                setStepState(stepDone, 'Lỗi', 'error');
-                appendLog(`❌ [${i + 1}/${partsToPost.length}] Lỗi khi đăng ${partLabel}: ${data.error || 'Thất bại'}`, true);
-            }
-        } catch (err) {
-            setStepState(stepDone, 'Lỗi mạng', 'error');
-            appendLog(`❌ [${i + 1}/${partsToPost.length}] Ngoại lệ: ${err.message}`, true);
+        if (data.step_logs && Array.isArray(data.step_logs)) {
+            data.step_logs.forEach(logText => appendLog(logText));
         }
-    }
 
-    // Kết thúc toàn bộ tiến trình
-    appendLog(`\n==================================================`);
-    appendLog(`🎉 KẾT THÚC TIẾN TRÌNH: Đã đăng thành công ${successCount}/${partsToPost.length} Part!`);
-    modalTitle.textContent = `Hoàn tất đăng ${successCount}/${partsToPost.length} Part`;
-    btnFinish.disabled = false;
-    btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Đã hoàn tất - Đóng';
-    fetchPublishingMatrix();
+        if (data.success) {
+            setStepState(stepHma, 'Hoàn thành', 'done');
+            setStepState(stepAds, 'Hoàn thành', 'done');
+            setStepState(stepUpload, 'Đã tải lên', 'done');
+            setStepState(stepDone, 'Thành công', 'done');
+            appendLog(`🎉 ĐÃ HOÀN TẤT ĐĂNG ĐỒNG THỜI ${partsToPost.length} TAB CHO CLIP "${title}" THÀNH CÔNG!`);
+
+            modalTitle.textContent = `Hoàn tất đăng ${partsToPost.length} Tab thành công`;
+            btnFinish.disabled = false;
+            btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Đã hoàn tất - Đóng';
+            fetchPublishingMatrix();
+        } else {
+            setStepState(stepDone, 'Lỗi', 'error');
+            appendLog(`❌ Lỗi khi đăng đồng thời: ${data.error || 'Thất bại'}`, true);
+            btnFinish.disabled = false;
+            btnFinish.innerHTML = '<i class="fa-solid fa-xmark"></i> Đóng';
+        }
+    } catch (err) {
+        setStepState(stepDone, 'Lỗi kết nối', 'error');
+        appendLog(`❌ Lỗi ngoại lệ: ${err.message}`, true);
+        btnFinish.disabled = false;
+        btnFinish.innerHTML = '<i class="fa-solid fa-xmark"></i> Đóng';
+    }
 }
 
 // Đăng hàng loạt danh sách các Part được tích chọn trên nhiều clip
@@ -2437,89 +2981,78 @@ async function handleBatchPostGlobalParts(partsList) {
     btnClose.onclick = () => modal.classList.add('hidden');
     btnFinish.onclick = () => modal.classList.add('hidden');
 
-    appendLog(`🚀 BẮT ĐẦU ĐĂNG TUẦN TỰ ${partsList.length} PART ĐÃ CHỌN LÊN @${acc.account_name}...`);
+    metaClipTitle.textContent = `${partsList.length} Clip / Part đã chọn`;
+    modalTitle.textContent = `Đang Đăng đồng thời ${partsList.length} Tab lên @${acc.account_name}`;
 
-    let successCount = 0;
+    setStepState(stepHma, 'Đang chuẩn bị...', 'active');
+    setStepState(stepAds, 'Chờ...', '');
+    setStepState(stepUpload, 'Chờ...', '');
+    setStepState(stepDone, 'Chờ...', '');
 
-    for (let i = 0; i < partsList.length; i++) {
-        const item = partsList[i];
-        const displayUploadTitle = `${item.title} (${item.label})`;
+    appendLog(`🚀 BẮT ĐẦU ĐĂNG ĐỒNG THỜI ${partsList.length} TAB LÊN @${acc.account_name}...`);
+    appendLog(`✨ Tiêu đề video (Caption): Tự động nạp tiêu đề gốc tức thì (không kèm part_label)`);
 
-        modalTitle.textContent = `[${i + 1}/${partsList.length}] Đang Đăng: "${displayUploadTitle}"`;
-        metaClipTitle.textContent = displayUploadTitle;
+    try {
+        setTimeout(() => {
+            if (stepHma.classList.contains('active')) {
+                setStepState(stepHma, 'Đã chuyển IP', 'done');
+                setStepState(stepAds, 'Đang mở profile...', 'active');
+                appendLog(`⚡ Đang kết nối AdsPower Profile và mở ${partsList.length} tab mới...`);
+            }
+        }, 1500);
 
-        setStepState(stepHma, 'Đang chuẩn bị...', 'active');
-        setStepState(stepAds, 'Chờ...', '');
-        setStepState(stepUpload, 'Chờ...', '');
-        setStepState(stepDone, 'Chờ...', '');
+        setTimeout(() => {
+            if (stepAds.classList.contains('active')) {
+                setStepState(stepAds, 'Đã mở Chrome', 'done');
+                setStepState(stepUpload, 'Đang tải lên...', 'active');
+                appendLog(`🌐 Đang nạp ${partsList.length} video vào ${partsList.length} tab và điền tiêu đề đồng thời...`);
+            }
+        }, 3500);
 
-        appendLog(`\n--------------------------------------------------`);
-        appendLog(`▶️ [TIẾN TRÌNH ${i + 1}/${partsList.length}] Bắt đầu đăng: "${displayUploadTitle}"`);
-
-        try {
-            setTimeout(() => {
-                if (stepHma.classList.contains('active')) {
-                    setStepState(stepHma, 'Đã chuyển IP', 'done');
-                    setStepState(stepAds, 'Đang mở profile...', 'active');
-                }
-            }, 1500);
-
-            setTimeout(() => {
-                if (stepAds.classList.contains('active')) {
-                    setStepState(stepAds, 'Đã mở Chrome', 'done');
-                    setStepState(stepUpload, 'Đang tải lên...', 'active');
-                }
-            }, 3500);
-
-            const res = await fetch('/api/publishing/post_to_tiktok', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    account_name: activePublishingAccountName,
+        const res = await fetch('/api/publishing/post_to_tiktok', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                account_name: activePublishingAccountName,
+                items: partsList.map(item => ({
                     clip_key: item.clip_key,
                     channel: item.channel,
                     title: item.title,
                     video_file: item.file_path || '',
-                    part_label: item.label
-                })
-            });
+                    part_label: item.label || ''
+                }))
+            })
+        });
 
-            const data = await res.json();
+        const data = await res.json();
 
-            if (data.step_logs && Array.isArray(data.step_logs)) {
-                data.step_logs.forEach(logText => appendLog(logText));
-            }
-
-            if (data.success) {
-                successCount++;
-                setStepState(stepHma, 'Hoàn thành', 'done');
-                setStepState(stepAds, 'Hoàn thành', 'done');
-                setStepState(stepUpload, 'Đã tải lên', 'done');
-                setStepState(stepDone, 'Thành công', 'done');
-                appendLog(`✅ [${i + 1}/${partsList.length}] ${displayUploadTitle} ĐÃ ĐĂNG THÀNH CÔNG!`);
-
-                fetchPublishingMatrix();
-
-                if (i < partsList.length - 1) {
-                    appendLog(`⏳ Nghỉ 5 giây trước khi đăng Part tiếp theo...`);
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                }
-            } else {
-                setStepState(stepDone, 'Lỗi', 'error');
-                appendLog(`❌ [${i + 1}/${partsList.length}] Lỗi: ${data.error || 'Thất bại'}`, true);
-            }
-        } catch (err) {
-            setStepState(stepDone, 'Lỗi kết nối', 'error');
-            appendLog(`❌ [${i + 1}/${partsList.length}] Ngoại lệ: ${err.message}`, true);
+        if (data.step_logs && Array.isArray(data.step_logs)) {
+            data.step_logs.forEach(logText => appendLog(logText));
         }
-    }
 
-    appendLog(`\n==================================================`);
-    appendLog(`🎉 KẾT THÚC: Đã hoàn tất đăng ${successCount}/${partsList.length} Part đã chọn!`);
-    modalTitle.textContent = `Hoàn tất đăng ${successCount}/${partsList.length} Part`;
-    btnFinish.disabled = false;
-    btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Đã hoàn tất - Đóng';
-    fetchPublishingMatrix();
+        if (data.success) {
+            setStepState(stepHma, 'Hoàn thành', 'done');
+            setStepState(stepAds, 'Hoàn thành', 'done');
+            setStepState(stepUpload, 'Đã tải lên', 'done');
+            setStepState(stepDone, 'Thành công', 'done');
+            appendLog(`🎉 ĐÃ HOÀN TẤT ĐĂNG ĐỒNG THỜI ${partsList.length} TAB LÊN @${acc.account_name} THÀNH CÔNG!`);
+
+            fetchPublishingMatrix();
+            modalTitle.textContent = `Hoàn tất đăng ${partsList.length} Tab thành công`;
+            btnFinish.disabled = false;
+            btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Đã hoàn tất - Đóng';
+        } else {
+            setStepState(stepDone, 'Lỗi', 'error');
+            appendLog(`❌ Lỗi khi đăng đồng thời: ${data.error || 'Thất bại'}`, true);
+            btnFinish.disabled = false;
+            btnFinish.innerHTML = '<i class="fa-solid fa-xmark"></i> Đóng';
+        }
+    } catch (err) {
+        setStepState(stepDone, 'Lỗi kết nối', 'error');
+        appendLog(`❌ Ngoại lệ: ${err.message}`, true);
+        btnFinish.disabled = false;
+        btnFinish.innerHTML = '<i class="fa-solid fa-xmark"></i> Đóng';
+    }
 }
 
 async function handleTogglePartPost(clipKey, channel, title, partLabel, posted) {
@@ -2704,6 +3237,12 @@ function initSettingsManager() {
     const btnPickSource = document.getElementById('btn-pick-source');
     const btnPickDest = document.getElementById('btn-pick-dest');
     const btnPickHma = document.getElementById('btn-pick-hma');
+    const btnTestGemini = document.getElementById('btn-test-gemini-key');
+    const btnToggleGemini = document.getElementById('btn-toggle-gemini-key');
+    const selectGeminiModel = document.getElementById('select-gemini-model');
+    const colCustomModel = document.getElementById('col-custom-model');
+    const btnTestTelegram = document.getElementById('btn-test-telegram');
+    const btnToggleTelegramToken = document.getElementById('btn-toggle-telegram-token');
 
     if (btnSaveAll) btnSaveAll.addEventListener('click', saveAllSettings);
     if (btnSavePaths) btnSavePaths.addEventListener('click', saveAllSettings);
@@ -2712,6 +3251,32 @@ function initSettingsManager() {
     if (btnTestHmaChange) btnTestHmaChange.addEventListener('click', testHmaChangeIp);
     if (btnHmaDisconnect) btnHmaDisconnect.addEventListener('click', disconnectHma);
     if (btnAutoDetectHma) btnAutoDetectHma.addEventListener('click', autoDetectHma);
+    if (btnTestGemini) btnTestGemini.addEventListener('click', testGeminiConnection);
+    if (btnTestTelegram) btnTestTelegram.addEventListener('click', testTelegramConnection);
+    if (btnToggleGemini) {
+        btnToggleGemini.addEventListener('click', () => {
+            const input = document.getElementById('input-gemini-key');
+            if (input) {
+                input.type = (input.type === 'password') ? 'text' : 'password';
+                btnToggleGemini.innerHTML = (input.type === 'password') ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>';
+            }
+        });
+    }
+    if (btnToggleTelegramToken) {
+        btnToggleTelegramToken.addEventListener('click', () => {
+            const input = document.getElementById('input-telegram-token');
+            if (input) {
+                input.type = (input.type === 'password') ? 'text' : 'password';
+                btnToggleTelegramToken.innerHTML = (input.type === 'password') ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>';
+            }
+        });
+    }
+
+    if (selectGeminiModel && colCustomModel) {
+        selectGeminiModel.addEventListener('change', () => {
+            colCustomModel.style.display = (selectGeminiModel.value === 'custom') ? 'block' : 'none';
+        });
+    }
 
     if (btnPickSource) {
         btnPickSource.addEventListener('click', async () => {
@@ -2759,13 +3324,70 @@ async function fetchSettings() {
         if (hmaMode) hmaMode.value = data.hma?.switch_mode || 'country';
         if (hmaWait) hmaWait.value = data.hma?.wait_seconds_after_switch || 5;
 
+        // Gemini AI fields
+        const geminiKey = document.getElementById('input-gemini-key');
+        const geminiModelSelect = document.getElementById('select-gemini-model');
+        const customModelInput = document.getElementById('input-custom-gemini-model');
+        const colCustomModel = document.getElementById('col-custom-model');
+        const geminiStyle = document.getElementById('select-gemini-style');
+        const geminiBadge = document.getElementById('gemini-status-badge');
+
+        if (geminiKey) geminiKey.value = data.gemini?.api_key || '';
+        
+        const savedModel = data.gemini?.model || 'gemini-3.7-flash';
+        if (geminiModelSelect) {
+            const knownOptions = Array.from(geminiModelSelect.options).map(o => o.value);
+            if (knownOptions.includes(savedModel)) {
+                geminiModelSelect.value = savedModel;
+                if (colCustomModel) colCustomModel.style.display = 'none';
+            } else {
+                geminiModelSelect.value = 'custom';
+                if (customModelInput) customModelInput.value = savedModel;
+                if (colCustomModel) colCustomModel.style.display = 'block';
+            }
+        }
+        if (geminiStyle) geminiStyle.value = data.gemini?.style || 'viral';
+
+        if (geminiBadge) {
+            if (data.gemini?.api_key) {
+                geminiBadge.className = 'badge badge-success';
+                geminiBadge.innerHTML = `<span class="status-dot online" style="width: 6px; height: 6px;"></span> Sẵn sàng (${savedModel})`;
+            } else {
+                geminiBadge.className = 'badge badge-secondary';
+                geminiBadge.innerHTML = '<span class="status-dot offline" style="width: 6px; height: 6px;"></span> Chưa có Key';
+            }
+        }
+
+        // Telegram Notification fields
+        const tgToken = document.getElementById('input-telegram-token');
+        const tgChatId = document.getElementById('input-telegram-chat-id');
+        const tgBadge = document.getElementById('telegram-status-badge');
+        if (tgToken) tgToken.value = data.telegram?.bot_token || '';
+        if (tgChatId) tgChatId.value = data.telegram?.chat_id || '';
+        if (tgBadge) {
+            if (data.telegram?.bot_token && data.telegram?.chat_id) {
+                tgBadge.className = 'badge badge-success';
+                tgBadge.innerHTML = '<span class="status-dot online" style="width: 6px; height: 6px;"></span> Đã kết nối Bot';
+            } else {
+                tgBadge.className = 'badge badge-secondary';
+                tgBadge.innerHTML = '<span class="status-dot offline" style="width: 6px; height: 6px;"></span> Chưa cấu hình';
+            }
+        }
+
         // TikTok preferences
         const postMode = document.getElementById('select-tiktok-post-mode');
         const closeBrowser = document.getElementById('select-tiktok-close-browser');
         const timeout = document.getElementById('input-tiktok-timeout');
+        const dailyLimit = document.getElementById('input-tiktok-daily-limit');
+        const blockVnIp = document.getElementById('checkbox-block-vn-ip');
+        const stripPart = document.getElementById('checkbox-strip-part');
+
         if (postMode) postMode.value = data.tiktok_upload?.auto_submit ? 'auto_post' : 'draft';
         if (closeBrowser) closeBrowser.value = data.tiktok_upload?.close_browser_after_finish ? 'yes' : 'no';
         if (timeout) timeout.value = data.tiktok_upload?.wait_timeout || 60;
+        if (dailyLimit) dailyLimit.value = data.tiktok_upload?.max_daily_posts_per_account || 3;
+        if (blockVnIp) blockVnIp.checked = data.hma?.block_vietnam_ip !== false;
+        if (stripPart) stripPart.checked = data.tiktok_upload?.strip_part_from_caption !== false;
 
         // Tự động kiểm tra AdsPower và IP ngầm
         testAdsPowerConnection(true);
@@ -2775,7 +3397,7 @@ async function fetchSettings() {
     }
 }
 
-async function saveAllSettings() {
+async function saveAllSettings(silent = false) {
     const sourcePath = document.getElementById('source-drive-link')?.value.trim() || '';
     const destPath = document.getElementById('dest-drive-link')?.value.trim() || '';
     const adspowerUrl = document.getElementById('input-adspower-url')?.value.trim() || 'http://local.adspower.net:50325';
@@ -2783,9 +3405,23 @@ async function saveAllSettings() {
     const hmaPath = document.getElementById('input-hma-path')?.value.trim() || '';
     const hmaMode = document.getElementById('select-hma-mode')?.value || 'country';
     const hmaWait = parseInt(document.getElementById('input-hma-wait')?.value || 5);
+    const geminiKey = document.getElementById('input-gemini-key')?.value.trim() || '';
+    
+    let geminiModel = document.getElementById('select-gemini-model')?.value || 'gemini-3.7-flash';
+    if (geminiModel === 'custom') {
+        geminiModel = document.getElementById('input-custom-gemini-model')?.value.trim() || 'gemini-3.7-flash';
+    }
+    const geminiStyle = document.getElementById('select-gemini-style')?.value || 'viral';
+
+    const tgToken = document.getElementById('input-telegram-token')?.value.trim() || '';
+    const tgChatId = document.getElementById('input-telegram-chat-id')?.value.trim() || '';
+
     const postMode = document.getElementById('select-tiktok-post-mode')?.value || 'auto_post';
     const closeBrowser = document.getElementById('select-tiktok-close-browser')?.value === 'yes';
     const timeout = parseInt(document.getElementById('input-tiktok-timeout')?.value || 60);
+    const dailyLimit = parseInt(document.getElementById('input-tiktok-daily-limit')?.value || 3);
+    const blockVnIp = document.getElementById('checkbox-block-vn-ip')?.checked !== false;
+    const stripPart = document.getElementById('checkbox-strip-part')?.checked !== false;
 
     const payload = {
         adspower: {
@@ -2796,12 +3432,26 @@ async function saveAllSettings() {
             cli_path: hmaPath,
             enabled: true,
             switch_mode: hmaMode,
-            wait_seconds_after_switch: hmaWait
+            wait_seconds_after_switch: hmaWait,
+            block_vietnam_ip: blockVnIp,
+            require_foreign_ip: true
+        },
+        gemini: {
+            api_key: geminiKey,
+            model: geminiModel,
+            style: geminiStyle
+        },
+        telegram: {
+            bot_token: tgToken,
+            chat_id: tgChatId,
+            enabled: true
         },
         tiktok_upload: {
             auto_submit: (postMode === 'auto_post'),
             close_browser_after_finish: closeBrowser,
-            wait_timeout: timeout
+            wait_timeout: timeout,
+            max_daily_posts_per_account: dailyLimit,
+            strip_part_from_caption: stripPart
         }
     };
 
@@ -2822,12 +3472,117 @@ async function saveAllSettings() {
 
         const data = await res.json();
         if (data.success) {
-            alert('🎉 Đã lưu toàn bộ cấu hình Settings & Workspaces thành công!');
+            if (!silent) alert('🎉 Đã lưu toàn bộ cấu hình Settings & Workspaces thành công!');
         } else {
-            alert('Lỗi khi lưu cài đặt!');
+            if (!silent) alert('Lỗi khi lưu cài đặt!');
         }
     } catch (err) {
-        alert('Lỗi kết nối khi lưu cài đặt: ' + err.message);
+        if (!silent) alert('Lỗi kết nối khi lưu cài đặt: ' + err.message);
+    }
+}
+
+async function testTelegramConnection() {
+    const token = document.getElementById('input-telegram-token')?.value.trim() || '';
+    const chatId = document.getElementById('input-telegram-chat-id')?.value.trim() || '';
+    const resultSpan = document.getElementById('telegram-test-result');
+    const badge = document.getElementById('telegram-status-badge');
+
+    if (!token || !chatId) {
+        alert('Vui lòng nhập đầy đủ Telegram Bot Token và Chat ID trước khi test!');
+        return;
+    }
+
+    if (resultSpan) {
+        resultSpan.style.color = 'var(--text-secondary)';
+        resultSpan.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi tin nhắn test đến Telegram...';
+    }
+
+    try {
+        const res = await fetch('/api/telegram/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bot_token: token, chat_id: chatId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (resultSpan) {
+                resultSpan.style.color = '#22c55e';
+                resultSpan.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + data.message;
+            }
+            if (badge) {
+                badge.className = 'badge badge-success';
+                badge.innerHTML = '<span class="status-dot online" style="width: 6px; height: 6px;"></span> Đã kết nối Bot';
+            }
+            saveAllSettings(true);
+        } else {
+            if (resultSpan) {
+                resultSpan.style.color = '#ef4444';
+                resultSpan.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ' + data.message;
+            }
+            if (badge) {
+                badge.className = 'badge badge-danger';
+                badge.innerHTML = '<span class="status-dot offline" style="width: 6px; height: 6px;"></span> Lỗi kết nối';
+            }
+        }
+    } catch (err) {
+        if (resultSpan) {
+            resultSpan.style.color = '#ef4444';
+            resultSpan.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Lỗi kết nối: ' + err.message;
+        }
+    }
+}
+
+async function testGeminiConnection() {
+    const key = document.getElementById('input-gemini-key')?.value.trim() || '';
+    let model = document.getElementById('select-gemini-model')?.value || 'gemini-3.7-flash';
+    if (model === 'custom') {
+        model = document.getElementById('input-custom-gemini-model')?.value.trim() || 'gemini-3.7-flash';
+    }
+    const resultSpan = document.getElementById('gemini-test-result');
+    const badge = document.getElementById('gemini-status-badge');
+
+    if (!key) {
+        alert('Vui lòng dán Google Gemini API Key vào ô nhập trước khi test!');
+        return;
+    }
+
+    if (resultSpan) {
+        resultSpan.style.color = 'var(--text-secondary)';
+        resultSpan.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra kết nối với gói [${model}]...`;
+    }
+
+    try {
+        const res = await fetch('/api/ai/test_key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: key, model: model })
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (resultSpan) {
+                resultSpan.style.color = '#22c55e';
+                resultSpan.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + data.message;
+            }
+            if (badge) {
+                badge.className = 'badge badge-success';
+                badge.innerHTML = `<span class="status-dot online" style="width: 6px; height: 6px;"></span> Sẵn sàng (${model})`;
+            }
+            saveAllSettings(true);
+        } else {
+            if (resultSpan) {
+                resultSpan.style.color = '#ef4444';
+                resultSpan.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ' + data.message;
+            }
+            if (badge) {
+                badge.className = 'badge badge-danger';
+                badge.innerHTML = '<span class="status-dot offline" style="width: 6px; height: 6px;"></span> Key không hợp lệ';
+            }
+        }
+    } catch (err) {
+        if (resultSpan) {
+            resultSpan.style.color = '#ef4444';
+            resultSpan.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Lỗi kết nối: ' + err.message;
+        }
     }
 }
 
@@ -3197,369 +3952,8 @@ window.checkHmaIp = checkHmaIp;
 
 
 /* ==========================================================================
-   8. TikTok Mexico Trend & Viral Discovery Engine (Radar MX)
+   Utility Helpers
    ========================================================================== */
-
-let currentMexicoNiche = 'all';
-let currentMexicoPeriod = 7;
-let mexicoClockInterval = null;
-
-function initMexicoTrendRadar() {
-    const refreshBtn = document.getElementById('btn-refresh-mexico-trends');
-    const nicheSelect = document.getElementById('mx-niche-select');
-    const periodBtns = document.querySelectorAll('.mx-period-btn');
-    const generateHookBtn = document.getElementById('btn-generate-mx-hooks');
-    const copyGenTagsBtn = document.getElementById('btn-copy-generated-tags');
-    const hookTopicInput = document.getElementById('mx-hook-topic-input');
-
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', () => loadMexicoTrends());
-    }
-
-    if (nicheSelect) {
-        nicheSelect.addEventListener('change', (e) => {
-            currentMexicoNiche = e.target.value;
-            loadMexicoTrends();
-        });
-    }
-
-    if (periodBtns) {
-        periodBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                periodBtns.forEach(b => {
-                    b.classList.remove('btn-primary');
-                    b.classList.add('btn-outline');
-                });
-                btn.classList.remove('btn-outline');
-                btn.classList.add('btn-primary');
-                currentMexicoPeriod = parseInt(btn.dataset.period || '7');
-                loadMexicoTrends();
-            });
-        });
-    }
-
-    if (generateHookBtn) {
-        generateHookBtn.addEventListener('click', handleGenerateMexicoHooks);
-    }
-
-    if (hookTopicInput) {
-        hookTopicInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') handleGenerateMexicoHooks();
-        });
-    }
-
-    if (copyGenTagsBtn) {
-        copyGenTagsBtn.addEventListener('click', () => {
-            const tagsText = document.getElementById('mx-generated-tags-text')?.innerText || '';
-            if (tagsText) {
-                copyTextToClipboard(tagsText, 'Đã copy bộ 4-Tier Hashtags!');
-            }
-        });
-    }
-
-    // Start Mexico City Clock updater
-    updateMexicoTimeDisplay();
-    if (!mexicoClockInterval) {
-        mexicoClockInterval = setInterval(updateMexicoTimeDisplay, 30000);
-    }
-}
-
-async function updateMexicoTimeDisplay() {
-    try {
-        const res = await fetch('/api/mexico_golden_hours');
-        if (res.ok) {
-            const data = await res.json();
-            const clockEl = document.getElementById('mx-clock-display');
-            const goldenBadge = document.getElementById('mx-golden-status-badge');
-            const goldenText = document.getElementById('mx-golden-text');
-
-            if (clockEl) clockEl.innerText = `${data.current_time_str} (${data.current_date_str})`;
-            
-            if (goldenBadge && goldenText) {
-                if (data.is_golden_time) {
-                    goldenBadge.style.background = 'rgba(46, 213, 115, 0.15)';
-                    goldenBadge.style.color = '#2ed573';
-                    goldenBadge.style.borderColor = 'rgba(46, 213, 115, 0.4)';
-                    goldenText.innerText = `🔥 Giờ Vàng Đăng Bài: ${data.next_slot}`;
-                } else {
-                    goldenBadge.style.background = 'rgba(255, 171, 0, 0.15)';
-                    goldenBadge.style.color = '#ffab00';
-                    goldenBadge.style.borderColor = 'rgba(255, 171, 0, 0.4)';
-                    goldenText.innerText = `⏳ Ca tiếp theo: ${data.next_slot}`;
-                }
-            }
-        }
-    } catch (e) {
-        console.warn('Lỗi cập nhật giờ Mexico:', e);
-    }
-}
-
-async function loadMexicoTrends() {
-    const tbody = document.getElementById('mx-hashtags-table-body');
-    const countBadge = document.getElementById('mx-hashtag-count-badge');
-    const refreshBtn = document.getElementById('btn-refresh-mexico-trends');
-
-    if (tbody) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: #ff4757; margin-bottom: 10px; display: block;"></i>
-                    Đang quét dữ liệu xu hướng TikTok Mexico thời gian thực...
-                </td>
-            </tr>
-        `;
-    }
-
-    if (refreshBtn) refreshBtn.classList.add('loading');
-
-    try {
-        const url = `/api/mexico_trends?niche=${encodeURIComponent(currentMexicoNiche)}&period=${currentMexicoPeriod}`;
-        const res = await fetch(url);
-        const report = await res.json();
-
-        if (countBadge) {
-            countBadge.innerText = `${report.total_hashtags_found || 0} hashtags`;
-        }
-
-        renderMexicoHashtags(report.hashtags || []);
-        renderPackagedTopics(report.packaged_hot_topics || []);
-        renderTrendingSounds(report.trending_sounds || []);
-        updateMexicoTimeDisplay();
-
-    } catch (err) {
-        console.error('Lỗi khi tải xu hướng Mexico:', err);
-        if (tbody) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" style="text-align: center; padding: 30px; color: var(--danger);">
-                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 22px; margin-bottom: 8px; display: block;"></i>
-                        Không thể kết nối đến dữ liệu xu hướng. Vui lòng thử lại!
-                    </td>
-                </tr>
-            `;
-        }
-    } finally {
-        if (refreshBtn) refreshBtn.classList.remove('loading');
-    }
-}
-
-function renderMexicoHashtags(hashtags) {
-    const tbody = document.getElementById('mx-hashtags-table-body');
-    if (!tbody) return;
-
-    if (!hashtags || hashtags.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
-                    Không tìm thấy hashtag nào cho bộ lọc này.
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    const rowsHtml = hashtags.map((item, idx) => {
-        let rankBadge = `<span style="font-weight: 800; color: var(--text-muted);">${item.rank || idx + 1}</span>`;
-        if (item.rank === 1) rankBadge = `<span style="background: #ffd700; color: #000; font-weight: 800; padding: 2px 8px; border-radius: 6px; font-size: 11px;">🥇 #1</span>`;
-        else if (item.rank === 2) rankBadge = `<span style="background: #e0e0e0; color: #000; font-weight: 800; padding: 2px 8px; border-radius: 6px; font-size: 11px;">🥈 #2</span>`;
-        else if (item.rank === 3) rankBadge = `<span style="background: #cd7f32; color: #fff; font-weight: 800; padding: 2px 8px; border-radius: 6px; font-size: 11px;">🥉 #3</span>`;
-
-        const viewsFormatted = formatViewsCount(item.views || 0);
-        const growth = item.growth_pct || 0;
-        const growthColor = growth >= 100 ? '#ff4757' : (growth >= 50 ? '#2ed573' : 'var(--text-primary)');
-        const viralScore = item.viral_score || 85.0;
-
-        // Build 4-tier copy string
-        const copyTagStr = `#parati #mexico #${item.hashtag} #${item.niche || 'tendencia'}`;
-
-        return `
-            <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;">
-                <td style="padding: 12px 14px; text-align: center;">${rankBadge}</td>
-                <td style="padding: 12px 14px;">
-                    <div style="font-weight: 800; font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-                        <span style="color: #ff4757;">#</span>${item.hashtag}
-                    </div>
-                    <span class="badge" style="font-size: 10px; padding: 1px 6px; background: var(--bg-hover); color: var(--text-muted); margin-top: 2px; display: inline-block;">
-                        ${item.niche || 'chisme'}
-                    </span>
-                </td>
-                <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: var(--text-primary);">
-                    ${viewsFormatted}
-                </td>
-                <td style="padding: 12px 14px; text-align: right; font-weight: 800; color: ${growthColor};">
-                    +${growth}%
-                </td>
-                <td style="padding: 12px 14px; text-align: center;">
-                    <span style="background: rgba(255, 71, 87, 0.12); color: #ff4757; border: 1px solid rgba(255, 71, 87, 0.3); font-weight: 800; font-size: 11.5px; padding: 3px 8px; border-radius: 12px; display: inline-block;">
-                        ${viralScore} 🔥
-                    </span>
-                </td>
-                <td style="padding: 12px 14px; text-align: center;">
-                    <div style="display: flex; gap: 6px; justify-content: center;">
-                        <button class="btn btn-xs btn-outline" onclick="copyTextToClipboard('${copyTagStr}', 'Đã copy 4-Tier Hashtags của #${item.hashtag}!')" title="Copy bộ 4-Tier Hashtags">
-                            <i class="fa-regular fa-copy"></i> Tags
-                        </button>
-                        <button class="btn btn-xs btn-outline-primary" onclick="useTopicForHookGeneration('${item.hashtag}', '${item.niche}')" title="Sinh Hook mở đầu kịch bản">
-                            <i class="fa-solid fa-bolt"></i> Hook
-                        </button>
-                        <a href="${item.url || `https://www.tiktok.com/tag/${item.hashtag}`}" target="_blank" class="btn btn-xs btn-outline" title="Mở trên TikTok">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                        </a>
-                    </div>
-                </td>
-            </tr>
-        `;
-    }).join('');
-
-    tbody.innerHTML = rowsHtml;
-}
-
-function renderPackagedTopics(topics) {
-    const container = document.getElementById('mx-packaged-topics-container');
-    if (!container) return;
-
-    if (!topics || topics.length === 0) {
-        container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">Chưa có gói chủ đề nào được tạo.</div>`;
-        return;
-    }
-
-    const cardsHtml = topics.slice(0, 4).map(t => {
-        const hooksList = (t.sample_hooks_es_mx || []).map(h => 
-            `<li style="margin-bottom: 4px; cursor: pointer;" onclick="copyTextToClipboard('${h.replace(/'/g, "\\'")}', 'Đã copy câu Hook!')" title="Click để copy câu Hook này">
-                <i class="fa-regular fa-comment-dots text-primary"></i> <em>"${h}"</em>
-            </li>`
-        ).join('');
-
-        return `
-            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <h4 style="margin: 0; font-size: 14px; font-weight: 800; color: var(--text-primary);">${t.title}</h4>
-                            <span class="badge" style="background: rgba(46, 213, 115, 0.15); color: #2ed573; font-weight: 800; font-size: 11px;">Score: ${t.viral_score}</span>
-                        </div>
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
-                            <i class="fa-solid fa-clock"></i> Khung giờ đăng tối ưu: <strong>${t.recommended_post_hour}</strong>
-                        </div>
-                    </div>
-                    <button class="btn btn-xs btn-outline-success" onclick="copyTextToClipboard('${(t.copy_hashtags || '').replace(/'/g, "\\'")}', 'Đã copy toàn bộ Hashtags!')">
-                        <i class="fa-regular fa-copy"></i> Copy Toàn Bộ Hashtags
-                    </button>
-                </div>
-
-                <div style="background: var(--bg-hover); border-radius: 6px; padding: 8px 12px; font-size: 12px; margin-bottom: 8px;">
-                    <span style="font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 10px;">Bộ Hashtag 4 tầng:</span>
-                    <div style="color: #ff4757; font-weight: 700; margin-top: 2px;">${t.copy_hashtags}</div>
-                </div>
-
-                <div style="font-size: 12px; color: var(--text-secondary);">
-                    <span style="font-weight: 700; color: var(--text-muted); font-size: 10.5px; text-transform: uppercase;">Mẫu Hook 3s Giữ Chân (Click để copy):</span>
-                    <ul style="margin: 4px 0 0 0; padding-left: 18px; color: var(--text-primary); line-height: 1.5;">
-                        ${hooksList}
-                    </ul>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    container.innerHTML = cardsHtml;
-}
-
-function renderTrendingSounds(sounds) {
-    const container = document.getElementById('mx-sounds-container');
-    if (!container) return;
-
-    if (!sounds || sounds.length === 0) {
-        container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 15px;">Không có dữ liệu âm thanh.</div>`;
-        return;
-    }
-
-    const soundsHtml = sounds.map((s, idx) => {
-        return `
-            <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px;">
-                <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-                    <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(46, 213, 115, 0.15); color: #2ed573; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0;">
-                        ${idx + 1}
-                    </div>
-                    <div style="min-width: 0;">
-                        <div style="font-size: 12.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            ${s.title}
-                        </div>
-                        <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            ${s.author} • ${formatViewsCount(s.usage_count || 0)} videos
-                        </div>
-                    </div>
-                </div>
-                <div style="text-align: right; flex-shrink: 0; padding-left: 8px;">
-                    <span style="font-size: 11px; font-weight: 800; color: #2ed573;">+${s.growth_pct}%</span>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    container.innerHTML = soundsHtml;
-}
-
-async function handleGenerateMexicoHooks() {
-    const topicInput = document.getElementById('mx-hook-topic-input');
-    const nicheSelect = document.getElementById('mx-hook-niche-select');
-    const hooksBox = document.getElementById('mx-generated-hooks-box');
-    const tagsBox = document.getElementById('mx-generated-tags-text');
-    const btn = document.getElementById('btn-generate-mx-hooks');
-
-    const topic = topicInput?.value.trim() || 'este secreto viral';
-    const niche = nicheSelect?.value || 'chisme';
-
-    if (btn) btn.classList.add('loading');
-
-    try {
-        const res = await fetch('/api/mexico_generate_hooks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic, niche })
-        });
-        const data = await res.json();
-
-        if (hooksBox && data.hooks) {
-            const hookItems = data.hooks.map(h => `
-                <div class="hook-item-box" onclick="copyTextToClipboard('${h.replace(/'/g, "\\'")}', 'Đã copy câu hook!')" style="background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: var(--text-primary); cursor: pointer; transition: all 0.2s;" title="Nhấn để copy câu hook">
-                    <em>"${h}"</em>
-                    <span style="float: right; color: var(--primary); font-size: 11px;"><i class="fa-regular fa-copy"></i></span>
-                </div>
-            `).join('');
-
-            hooksBox.innerHTML = `
-                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
-                    Gợi ý câu mở đầu 3s (Nhấn để Copy):
-                </div>
-                ${hookItems}
-            `;
-        }
-
-        if (tagsBox && data.hashtag_bundle) {
-            tagsBox.innerText = data.hashtag_bundle.copy_ready_text || '';
-        }
-
-    } catch (err) {
-        console.error('Lỗi khi sinh hook Mexico:', err);
-    } finally {
-        if (btn) btn.classList.remove('loading');
-    }
-}
-
-function useTopicForHookGeneration(hashtag, niche) {
-    const topicInput = document.getElementById('mx-hook-topic-input');
-    const nicheSelect = document.getElementById('mx-hook-niche-select');
-    
-    if (topicInput) topicInput.value = hashtag;
-    if (nicheSelect && niche) nicheSelect.value = niche;
-
-    handleGenerateMexicoHooks();
-
-    // Scroll nhẹ đến box Hook Generator
-    document.getElementById('mx-hook-topic-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
 function copyTextToClipboard(text, successMsg = 'Đã copy vào bộ nhớ tạm!') {
     if (!text) return;
     if (navigator.clipboard && window.isSecureContext) {
@@ -3621,24 +4015,6 @@ function showToast(message) {
     }, 2400);
 }
 
-function formatViewsCount(num) {
-    if (num >= 1000000000) {
-        return (num / 1000000000).toFixed(1) + 'B';
-    }
-    if (num >= 1000000) {
-        return (num / 1000000).toFixed(1) + 'M';
-    }
-    if (num >= 1000) {
-        return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-}
-
-// Bind to window for HTML inline access
-window.initMexicoTrendRadar = initMexicoTrendRadar;
-window.loadMexicoTrends = loadMexicoTrends;
-window.handleGenerateMexicoHooks = handleGenerateMexicoHooks;
-window.useTopicForHookGeneration = useTopicForHookGeneration;
 window.copyTextToClipboard = copyTextToClipboard;
 
 /* ==========================================================================
@@ -3646,7 +4022,9 @@ window.copyTextToClipboard = copyTextToClipboard;
    ========================================================================== */
 let isAutopilotRunning = false;
 let autopilotCancelRequested = false;
-let pendingQueueCache = [];
+let pendingQueueRawCache = [];
+let pendingQueueFilteredCache = [];
+let selectedAutopilotAccounts = null; // null = all selected, or Set of account names
 
 function initAutoPilotHub() {
     const btnOpenModal = document.getElementById('btn-open-autopilot-modal');
@@ -3663,6 +4041,28 @@ function initAutoPilotHub() {
     const btnStopPage = document.getElementById('btn-page-stop-autopilot');
     const btnRefreshPage = document.getElementById('btn-page-refresh-queue');
     const btnOpenN8nPage = document.getElementById('btn-page-open-n8n');
+
+    // Account Selector Buttons (Page & Modal)
+    const btnPageAccSelectAll = document.getElementById('btn-page-acc-select-all');
+    const btnPageAccDeselectAll = document.getElementById('btn-page-acc-deselect-all');
+    const btnModalAccSelectAll = document.getElementById('btn-modal-acc-select-all');
+    const btnModalAccDeselectAll = document.getElementById('btn-modal-acc-deselect-all');
+
+    const handleSelectAll = () => {
+        const allAccs = Array.from(new Set(pendingQueueRawCache.map(i => i.account_name)));
+        selectedAutopilotAccounts = new Set(allAccs);
+        renderAutopilotUI();
+    };
+
+    const handleDeselectAll = () => {
+        selectedAutopilotAccounts = new Set();
+        renderAutopilotUI();
+    };
+
+    if (btnPageAccSelectAll) btnPageAccSelectAll.addEventListener('click', handleSelectAll);
+    if (btnPageAccDeselectAll) btnPageAccDeselectAll.addEventListener('click', handleDeselectAll);
+    if (btnModalAccSelectAll) btnModalAccSelectAll.addEventListener('click', handleSelectAll);
+    if (btnModalAccDeselectAll) btnModalAccDeselectAll.addEventListener('click', handleDeselectAll);
 
     // Header Button -> Open Modal
     if (btnOpenModal && modal) {
@@ -3701,6 +4101,31 @@ function initAutoPilotHub() {
     if (btnRefreshQueue) btnRefreshQueue.addEventListener('click', loadAutopilotQueue);
     if (btnRefreshPage) btnRefreshPage.addEventListener('click', loadAutopilotQueue);
 
+    // Sync History with Queue
+    const btnSyncHistoryPage = document.getElementById('btn-page-sync-history');
+    if (btnSyncHistoryPage) {
+        btnSyncHistoryPage.addEventListener('click', async () => {
+            const oldHtml = btnSyncHistoryPage.innerHTML;
+            btnSyncHistoryPage.disabled = true;
+            btnSyncHistoryPage.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-primary"></i> Đang đồng bộ...';
+            try {
+                const res = await fetch('/api/publishing/sync_history', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`🎉 ${data.message || 'Đã đồng bộ lịch sử đăng thành công!'}`);
+                    await loadAutopilotQueue();
+                } else {
+                    showToast(`❌ Không thể đồng bộ: ${data.error || 'Lỗi không xác định'}`);
+                }
+            } catch (err) {
+                showToast(`❌ Lỗi kết nối: ${err.message}`);
+            } finally {
+                btnSyncHistoryPage.disabled = false;
+                btnSyncHistoryPage.innerHTML = oldHtml;
+            }
+        });
+    }
+
     // Open n8n Dashboard
     const openN8nHandler = () => window.open('http://localhost:5678', '_blank');
     if (btnOpenN8nModal) btnOpenN8nModal.addEventListener('click', openN8nHandler);
@@ -3731,71 +4156,267 @@ async function loadAutopilotQueue() {
         const res = await fetch('/api/n8n/pending_clips?only_current_target=true');
         const data = await res.json();
         if (data.success) {
-            pendingQueueCache = data.items || [];
-            const total = pendingQueueCache.length;
-
-            // Unique accounts
-            const uniqueAccs = new Set(pendingQueueCache.map(i => i.account_name));
-
-            // Update Counts
-            if (queueCountPage) queueCountPage.textContent = `${total} Clip`;
-            if (accountsCountPage) accountsCountPage.textContent = `${uniqueAccs.size} Acc`;
-
-            if (queueBadgeModal) {
-                queueBadgeModal.textContent = `${total} clip sẵn sàng`;
-                queueBadgeModal.className = total > 0 ? 'badge badge-primary' : 'badge badge-secondary';
-            }
-
-            // Populate Modal Preview
-            if (queuePreviewModal) {
-                if (total === 0) {
-                    queuePreviewModal.innerHTML = '<div style="color: var(--text-secondary); padding: 8px; text-align: center;"><i class="fa-solid fa-circle-check text-success"></i> Tuyệt vời! Tất cả video đã được đăng tải hoặc không có clip nào chờ đăng.</div>';
-                } else {
-                    queuePreviewModal.innerHTML = pendingQueueCache.map((item, idx) => `
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.08); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
-                                <span style="font-weight: 700; color: var(--primary); font-size: 11px;">#${idx+1} [${escapeHtml(item.channel || '')}]</span>
-                                <strong style="font-size: 12px; margin-left: 4px;">${escapeHtml(item.title || '')}</strong>
-                                ${item.part_label ? `<span class="badge badge-info" style="font-size: 10px; margin-left: 4px;">${escapeHtml(item.part_label)}</span>` : ''}
-                            </div>
-                            <div style="font-size: 11px; color: var(--text-secondary);">
-                                👤 @<strong>${escapeHtml(item.account_name || '')}</strong> (IP: ${escapeHtml(item.target_ip || 'US')})
-                            </div>
-                        </div>
-                    `).join('');
+            pendingQueueRawCache = data.items || [];
+            
+            // Lấy danh sách tất cả tài khoản
+            const allAccs = Array.from(new Set(pendingQueueRawCache.map(i => i.account_name)));
+            
+            // Nếu lần đầu tải, mặc định chọn tất cả
+            if (selectedAutopilotAccounts === null) {
+                selectedAutopilotAccounts = new Set(allAccs);
+            } else {
+                // Giữ lại các account hợp lệ
+                const validSet = new Set();
+                for (const acc of selectedAutopilotAccounts) {
+                    if (allAccs.includes(acc)) validSet.add(acc);
+                }
+                // Nếu chưa chọn nick nào mới, add các nick mới
+                for (const acc of allAccs) {
+                    if (!selectedAutopilotAccounts.has(acc) && selectedAutopilotAccounts.size === 0) {
+                        // Do nothing if user intentionally unselected all
+                    } else if (!selectedAutopilotAccounts.has(acc) && validSet.size > 0) {
+                        // Keep user selection
+                    }
                 }
             }
 
-            // Populate Full Page Table
-            if (tableBodyPage) {
-                if (total === 0) {
-                    tableBodyPage.innerHTML = '<tr><td colspan="5" class="table-empty"><i class="fa-solid fa-circle-check text-success"></i> Tuyệt vời! Tất cả video đã được đăng tải hoặc không có clip nào chờ đăng.</td></tr>';
-                } else {
-                    tableBodyPage.innerHTML = pendingQueueCache.map((item, idx) => `
-                        <tr>
-                            <td style="text-align: center; font-weight: 700;">${idx+1}</td>
-                            <td>
-                                <div style="font-size: 11px; color: var(--primary); font-weight: 700;">${escapeHtml(item.channel || '')}</div>
-                                <div style="font-weight: 700; font-size: 13px;">${escapeHtml(item.title || '')}</div>
-                            </td>
-                            <td>
-                                ${item.part_label ? `<span class="badge badge-info">${escapeHtml(item.part_label)}</span>` : '<span class="text-muted">Full</span>'}
-                            </td>
-                            <td>
-                                <span style="font-weight: 800; color: var(--accent);">@${escapeHtml(item.account_name || '')}</span>
-                            </td>
-                            <td style="text-align: center;">
-                                <span class="badge badge-primary">${escapeHtml(item.target_ip || 'US')}</span>
-                            </td>
-                        </tr>
-                    `).join('');
-                }
-            }
+            renderAutopilotUI();
         }
     } catch (err) {
         if (queueBadgeModal) queueBadgeModal.textContent = 'Lỗi quét';
         if (queuePreviewModal) queuePreviewModal.innerHTML = `<div style="color: #ef4444; padding: 8px;">Lỗi kết nối: ${err.message}</div>`;
         if (tableBodyPage) tableBodyPage.innerHTML = `<tr><td colspan="5" style="color: #ef4444; text-align: center;">Lỗi kết nối: ${err.message}</td></tr>`;
+    }
+}
+
+function renderAutopilotUI() {
+    const queueBadgeModal = document.getElementById('autopilot-queue-badge');
+    const queuePreviewModal = document.getElementById('autopilot-queue-preview');
+    const queueCountPage = document.getElementById('tab-autopilot-queue-count');
+    const accountsCountPage = document.getElementById('tab-autopilot-accounts-count');
+    const tableBodyPage = document.getElementById('tab-autopilot-table-body');
+    const pageAccBadge = document.getElementById('autopilot-selected-acc-badge');
+    const modalAccBadge = document.getElementById('autopilot-modal-selected-acc-badge');
+    const pageAccList = document.getElementById('autopilot-page-accounts-list');
+    const modalAccList = document.getElementById('autopilot-modal-accounts-list');
+
+    // Thống kê tài khoản và clip từ toàn bộ danh sách tài khoản đã cấu hình
+    const registeredAccs = accountsData.tiktok_accounts || [];
+    const accStats = {};
+    
+    // Khởi tạo tất cả tài khoản đã cấu hình
+    registeredAccs.forEach(a => {
+        const name = a.account_name;
+        if (name) {
+            accStats[name] = { 
+                name: name, 
+                target_channel: a.target_channel || '', 
+                target_ip: a.build_up_ip || a.original_ip || 'US', 
+                count: 0 
+            };
+        }
+    });
+
+    // Đếm số clip chờ đăng thực tế
+    for (const item of pendingQueueRawCache) {
+        const acc = item.account_name;
+        if (!accStats[acc]) {
+            accStats[acc] = { name: acc, target_channel: item.channel || '', target_ip: item.target_ip || 'US', count: 0 };
+        }
+        accStats[acc].count++;
+    }
+
+    const allAccs = Object.keys(accStats);
+    const activeAccs = allAccs.filter(a => accStats[a].count > 0);
+    const completedAccs = allAccs.filter(a => accStats[a].count === 0);
+
+    if (selectedAutopilotAccounts === null) {
+        selectedAutopilotAccounts = new Set(activeAccs);
+    }
+
+    // 1. Render Account Chips (Bao gồm cả tài khoản có clip và tài khoản đã hoàn thành)
+    const renderChips = (container) => {
+        if (!container) return;
+        if (allAccs.length === 0) {
+            container.innerHTML = '<span style="font-size: 11px; color: var(--text-secondary);">Không có tài khoản nào được cấu hình.</span>';
+            return;
+        }
+
+        let html = '';
+        
+        // Nhóm có clip chờ đăng
+        if (activeAccs.length > 0) {
+            html += activeAccs.map(acc => {
+                const isSelected = selectedAutopilotAccounts.has(acc);
+                const info = accStats[acc];
+                return `
+                    <button type="button" class="btn btn-xs ${isSelected ? 'btn-primary' : 'btn-outline'}" 
+                            data-autopilot-acc="${escapeHtml(acc)}" 
+                            style="display: inline-flex; align-items: center; gap: 5px; font-weight: 700; border-radius: 6px; padding: 4px 10px; cursor: pointer; transition: all 0.15s ease;">
+                        <i class="fa-solid ${isSelected ? 'fa-square-check text-success' : 'fa-square'}" style="font-size: 12px;"></i>
+                        <span>@${escapeHtml(acc)}</span>
+                        ${info.target_channel ? `<span style="font-size: 10px; opacity: 0.75;">(${escapeHtml(info.target_channel)})</span>` : ''}
+                        <span class="badge ${isSelected ? 'badge-info' : 'badge-secondary'}" style="font-size: 10px; padding: 1px 5px;">${info.count} clip</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        // Nhóm đã đăng xong toàn bộ clip
+        if (completedAccs.length > 0) {
+            html += completedAccs.map(acc => {
+                const info = accStats[acc];
+                return `
+                    <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; opacity: 0.55; background: rgba(255,255,255,0.04); border: 1px dashed var(--border-color); border-radius: 6px; padding: 4px 8px;">
+                        <i class="fa-solid fa-circle-check text-success" style="font-size: 11px;"></i>
+                        <span>@${escapeHtml(acc)}</span>
+                        ${info.target_channel ? `<span style="font-size: 10px;">(${escapeHtml(info.target_channel)})</span>` : ''}
+                        <span class="badge badge-secondary" style="font-size: 9.5px; padding: 1px 4px;">Đã xong</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        container.innerHTML = html;
+
+        // Attach click listeners to active chips
+        container.querySelectorAll('[data-autopilot-acc]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const acc = btn.getAttribute('data-autopilot-acc');
+                if (selectedAutopilotAccounts.has(acc)) {
+                    selectedAutopilotAccounts.delete(acc);
+                } else {
+                    selectedAutopilotAccounts.add(acc);
+                }
+                renderAutopilotUI();
+            });
+        });
+    };
+
+    renderChips(pageAccList);
+    renderChips(modalAccList);
+
+    // Update account badge text
+    const accBadgeText = `${selectedAutopilotAccounts.size}/${allAccs.length} tài khoản (${activeAccs.length} có clip)`;
+    if (pageAccBadge) pageAccBadge.textContent = accBadgeText;
+    if (modalAccBadge) modalAccBadge.textContent = accBadgeText;
+
+    // 2. Filter queue by selected accounts
+    pendingQueueFilteredCache = pendingQueueRawCache.filter(i => selectedAutopilotAccounts.has(i.account_name));
+    const total = pendingQueueFilteredCache.length;
+
+    // Update Counts
+    if (queueCountPage) queueCountPage.textContent = `${total} Clip`;
+    if (accountsCountPage) accountsCountPage.textContent = `${selectedAutopilotAccounts.size} Acc`;
+
+    if (queueBadgeModal) {
+        queueBadgeModal.textContent = `${total} clip sẵn sàng`;
+        queueBadgeModal.className = total > 0 ? 'badge badge-primary' : 'badge badge-secondary';
+    }
+
+    // Populate Modal Preview
+    if (queuePreviewModal) {
+        if (total === 0) {
+            queuePreviewModal.innerHTML = '<div style="color: var(--text-secondary); padding: 8px; text-align: center;"><i class="fa-solid fa-circle-check text-success"></i> Không có clip nào cho các tài khoản được chọn (hoặc bạn chưa chọn tài khoản nào).</div>';
+        } else {
+            queuePreviewModal.innerHTML = pendingQueueFilteredCache.map((item, idx) => `
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.08); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
+                        <span style="font-weight: 700; color: var(--primary); font-size: 11px;">#${idx+1} [${escapeHtml(item.channel || '')}]</span>
+                        <strong style="font-size: 12px; margin-left: 4px;">${escapeHtml(item.title || '')}</strong>
+                        ${item.part_label ? `<span class="badge badge-info" style="font-size: 10px; margin-left: 4px;">${escapeHtml(item.part_label)}</span>` : ''}
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-secondary);">
+                        👤 @<strong>${escapeHtml(item.account_name || '')}</strong> (IP: ${escapeHtml(item.target_ip || 'US')})
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    // Populate Full Page Table
+    if (tableBodyPage) {
+        if (total === 0) {
+            tableBodyPage.innerHTML = '<tr><td colspan="6" class="table-empty"><i class="fa-solid fa-circle-check text-success"></i> Không có clip nào cho các tài khoản được chọn (hoặc bạn chưa chọn tài khoản nào).</td></tr>';
+        } else {
+            tableBodyPage.innerHTML = pendingQueueFilteredCache.map((item, idx) => `
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">${idx+1}</td>
+                    <td>
+                        <div style="font-size: 11px; color: var(--primary); font-weight: 700;">${escapeHtml(item.channel || '')}</div>
+                        <div style="font-weight: 700; font-size: 13px;">${escapeHtml(item.title || '')}</div>
+                    </td>
+                    <td>
+                        ${item.part_label ? `<span class="badge badge-info">${escapeHtml(item.part_label)}</span>` : '<span class="text-muted">Full</span>'}
+                    </td>
+                    <td>
+                        <span style="font-weight: 800; color: var(--accent);">@${escapeHtml(item.account_name || '')}</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="badge badge-primary">${escapeHtml(item.target_ip || 'US')}</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <button type="button" class="btn btn-xs btn-success btn-mark-queue-posted"
+                                data-acc="${escapeHtml(item.account_name || '')}"
+                                data-key="${escapeHtml(item.clip_key || '')}"
+                                data-chan="${escapeHtml(item.channel || '')}"
+                                data-title="${escapeHtml(item.title || '')}"
+                                data-part="${escapeHtml(item.part_label || '')}"
+                                title="Đánh dấu đã đăng & ẩn khỏi hàng đợi"
+                                style="font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                            <i class="fa-solid fa-check"></i> Đã đăng
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Gắn sự kiện cho nút "Đã đăng"
+            tableBodyPage.querySelectorAll('.btn-mark-queue-posted').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const acc = btn.getAttribute('data-acc');
+                    const key = btn.getAttribute('data-key');
+                    const chan = btn.getAttribute('data-chan');
+                    const title = btn.getAttribute('data-title');
+                    const part = btn.getAttribute('data-part');
+
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+                    try {
+                        const res = await fetch('/api/publishing/toggle_post', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                account_name: acc,
+                                clip_key: key,
+                                channel: chan,
+                                title: title,
+                                posted: true,
+                                part_label: part || null
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            // Xóa clip khỏi danh sách hàng đợi ngay lập tức
+                            pendingQueueRawCache = pendingQueueRawCache.filter(i => 
+                                !(i.account_name === acc && i.channel === chan && i.title === title && (i.part_label || '') === (part || ''))
+                            );
+                            renderAutopilotUI();
+                            showToast(`✅ Đã đánh dấu @${acc}: '${title}' (${part || 'Full'}) là ĐÃ ĐĂNG!`);
+                        } else {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã đăng';
+                            showToast(`❌ Lỗi: ${data.error || 'Không thể lưu trạng thái'}`);
+                        }
+                    } catch (err) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã đăng';
+                        showToast(`❌ Lỗi kết nối: ${err.message}`);
+                    }
+                });
+            });
+        }
     }
 }
 
@@ -3822,12 +4443,13 @@ function appendAutopilotLog(msg, type = 'info') {
 }
 
 async function startAutopilotPipeline() {
-    if (pendingQueueCache.length === 0) {
+    if (pendingQueueRawCache.length === 0) {
         await loadAutopilotQueue();
-        if (pendingQueueCache.length === 0) {
-            alert('Không có clip nào trong hàng đợi chờ xuất bản!');
-            return;
-        }
+    }
+    
+    if (!pendingQueueFilteredCache || pendingQueueFilteredCache.length === 0) {
+        alert('⚠️ Vui lòng chọn ít nhất 1 tài khoản có clip chờ xuất bản!');
+        return;
     }
 
     const optShutdown = (document.getElementById('autopilot-opt-shutdown')?.checked) ||
@@ -3859,21 +4481,38 @@ async function startAutopilotPipeline() {
     if (logsModal) logsModal.innerHTML = '';
     if (logsPage) logsPage.innerHTML = '';
 
-    appendAutopilotLog(`🚀 Bắt đầu quy trình Auto-Pilot Pipeline (${pendingQueueCache.length} clip)...`, 'info');
+    // Nhóm các clip theo từng tài khoản
+    const accountsGroupMap = new Map();
+    for (const item of pendingQueueFilteredCache) {
+        if (!accountsGroupMap.has(item.account_name)) {
+            accountsGroupMap.set(item.account_name, []);
+        }
+        accountsGroupMap.get(item.account_name).push(item);
+    }
 
-    const total = pendingQueueCache.length;
+    const accountList = Array.from(accountsGroupMap.keys());
+    const totalAccounts = accountList.length;
+
+    appendAutopilotLog(`🚀 Bắt đầu quy trình Auto-Pilot Multi-Tab (${totalAccounts} tài khoản đã chọn - Mở 1 Chrome 3 tab/nick)...`, 'info');
+
     let successCount = 0;
     let failCount = 0;
+    const completedSummary = {}; // acc_name -> { channel, count, today_total, clips: [] }
 
-    for (let i = 0; i < total; i++) {
+    for (let accIdx = 0; accIdx < totalAccounts; accIdx++) {
         if (autopilotCancelRequested) {
             appendAutopilotLog('⚠️ Tiến trình đã bị người dùng dừng lại!', 'warn');
             break;
         }
 
-        const item = pendingQueueCache[i];
-        const clipTitle = `${item.title} ${item.part_label ? `(${item.part_label})` : ''}`.trim();
-        const percent = Math.round((i / total) * 100);
+        const accName = accountList[accIdx];
+        const accClips = accountsGroupMap.get(accName) || [];
+        // Lấy tối đa 3 clip cho tài khoản này để đăng 1 lượt trên 3 tab
+        const batchClips = accClips.slice(0, 3);
+
+        if (batchClips.length === 0) continue;
+
+        const percent = Math.round((accIdx / totalAccounts) * 100);
 
         // Update progress UI on both Modal & Page
         const progressBars = [document.getElementById('autopilot-progress-bar'), document.getElementById('tab-autopilot-progress-bar')];
@@ -3882,44 +4521,96 @@ async function startAutopilotPipeline() {
 
         progressBars.forEach(b => { if (b) b.style.width = `${percent}%`; });
         percentTexts.forEach(p => { if (p) p.textContent = `${percent}%`; });
-        currentTasks.forEach(t => { if (t) t.textContent = `[${i+1}/${total}] Đang đăng: ${clipTitle} (@${item.account_name})`; });
+        currentTasks.forEach(t => { if (t) t.textContent = `[${accIdx+1}/${totalAccounts}] @${accName}: Đăng đồng thời ${batchClips.length} clip (3 tab)`; });
 
-        appendAutopilotLog(`▶️ [${i+1}/${total}] Chuẩn bị đăng: "${clipTitle}" cho tài khoản @${item.account_name}`, 'info');
+        appendAutopilotLog(`▶️ [Tài khoản ${accIdx+1}/${totalAccounts}] Khởi chạy AdsPower Chrome cho @${accName} (mở ${batchClips.length} tab)...`, 'info');
+        batchClips.forEach((c, cIdx) => {
+            appendAutopilotLog(`   📑 [Tab ${cIdx+1}] Clip: "${c.title}" [${c.channel}]`, 'info');
+        });
 
         try {
             const payload = {
-                account_name: item.account_name,
-                clip_key: item.clip_key,
-                channel: item.channel,
-                title: item.title,
-                video_file: item.video_file,
-                part_label: item.part_label,
+                account_name: accName,
+                channel: batchClips[0].channel,
+                items: batchClips.map(c => ({
+                    clip_key: c.clip_key,
+                    channel: c.channel,
+                    title: c.title,
+                    video_file: c.video_file,
+                    part_label: c.part_label
+                })),
                 auto_submit: true
             };
 
-            appendAutopilotLog(`   ⚡ Đang kết nối AdsPower & TikTok Studio...`, 'info');
-            const res = await fetch('/api/publishing/post_to_tiktok', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            appendAutopilotLog(`   ⚡ Đang nạp ${batchClips.length} video, điền caption và bấm Đăng đồng thời...`, 'info');
+            let data = null;
+            try {
+                const res = await fetch('/api/publishing/post_to_tiktok', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                data = await res.json();
+            } catch (fetchErr) {
+                // Nếu bị rớt socket tạm thời do mạng hoặc chuyển VPN, thăm dò backend xem tiến trình có đang chạy ngầm không
+                appendAutopilotLog(`   ⚠️ Mạng kết nối gián đoạn (${fetchErr.message}), đang theo dõi tiến trình thực tế từ máy chủ...`, 'warn');
+                await new Promise(r => setTimeout(r, 4000));
+                
+                // Polling kiểm tra xem server có đang xử lý xong tài khoản này không
+                let isFinished = false;
+                for (let poll = 0; poll < 20; poll++) {
+                    try {
+                        const checkRes = await fetch('/api/progress');
+                        const checkData = await checkRes.json();
+                        const logs = checkData.logs || [];
+                        const recent = logs.slice(-12).join(' ');
+                        if (recent.includes(`@${accName}`) && (recent.includes('ĐÃ ĐĂNG VIDEO THÀNH CÔNG') || recent.includes('HOÀN TẤT ĐĂNG') || recent.includes('Thành công 100%') || recent.includes('toàn bộ 3 video thành công'))) {
+                            data = { success: true, count: batchClips.length };
+                            isFinished = true;
+                            break;
+                        } else if (recent.includes(`@${accName}`) && (recent.includes('LỖI ĐĂNG VIDEO') || recent.includes('LỖI ADSPOWER'))) {
+                            data = { success: false, error: 'Phát hiện lỗi xuất bản từ nhật ký máy chủ' };
+                            isFinished = true;
+                            break;
+                        }
+                    } catch (e) {}
+                    await new Promise(r => setTimeout(r, 3000));
+                }
+                if (!isFinished && !data) {
+                    throw fetchErr;
+                }
+            }
 
-            const data = await res.json();
             if (data.success) {
-                successCount++;
-                appendAutopilotLog(`   🎉 ĐĂNG THÀNH CÔNG: "${clipTitle}"!`, 'success');
+                const postedNum = data.count || batchClips.length;
+                successCount += postedNum;
+                appendAutopilotLog(`   🎉 ĐĂNG THÀNH CÔNG ĐỒNG THỜI ${postedNum} CLIP TRÊN ${postedNum} TAB CHO @${accName}!`, 'success');
+
+                // Ghi nhận vào báo cáo
+                if (!completedSummary[accName]) {
+                    completedSummary[accName] = { channel: batchClips[0].channel || '', count: 0, today_total: 0, clips: [] };
+                }
+                completedSummary[accName].count += postedNum;
+                completedSummary[accName].clips.push(...batchClips.map(c => c.title));
+                completedSummary[accName].today_total = data.today_posted_count || completedSummary[accName].count;
+
+                appendAutopilotLog(`   🔒 Đã tự động đóng Chrome @${accName}.`, 'info');
             } else {
-                failCount++;
-                appendAutopilotLog(`   ❌ Thất bại: ${data.error || 'Lỗi không xác định'}`, 'error');
+                if (data.daily_quota_reached) {
+                    appendAutopilotLog(`   🎯 Tài khoản @${accName} đã đủ hạn mức 3/3 clip hôm nay -> Đã bỏ qua an toàn!`, 'warn');
+                } else {
+                    failCount += batchClips.length;
+                    appendAutopilotLog(`   ❌ Thất bại @${accName}: ${data.error || 'Lỗi không xác định'}`, 'error');
+                }
             }
         } catch (err) {
-            failCount++;
-            appendAutopilotLog(`   ❌ Lỗi kết nối: ${err.message}`, 'error');
+            failCount += batchClips.length;
+            appendAutopilotLog(`   ❌ Lỗi kết nối @${accName}: ${err.message}`, 'error');
         }
 
-        // Nghỉ ngắn 4 giây giữa các clip
-        if (i < total - 1 && !autopilotCancelRequested) {
-            appendAutopilotLog('   ⏳ Chờ 4 giây trước clip tiếp theo...', 'info');
+        // Nghỉ ngắn 4 giây giữa các tài khoản để đảm bảo AdsPower chuyển profile sạch sẽ
+        if (accIdx < totalAccounts - 1 && !autopilotCancelRequested) {
+            appendAutopilotLog('   ⏳ Chờ 4 giây trước khi mở tài khoản tiếp theo...', 'info');
             await new Promise(r => setTimeout(r, 4000));
         }
     }
@@ -3937,6 +4628,39 @@ async function startAutopilotPipeline() {
     if (statusBadgePage) {
         statusBadgePage.textContent = 'Đã hoàn thành';
         statusBadgePage.className = 'badge badge-success';
+    }
+
+    // 📢 GỬI BÁO CÁO TỔNG KẾT CHI TIẾT VỀ TELEGRAM
+    const postedAccNames = Object.keys(completedSummary);
+    if (postedAccNames.length > 0 || successCount > 0) {
+        let summaryLines = [];
+        for (const acc of postedAccNames) {
+            const info = completedSummary[acc];
+            summaryLines.push(`• 👤 <b>@${acc}</b> (+${info.count} clip mới | Tổng hôm nay: <code>${info.today_total}/3</code>)\n  📺 <b>Kênh:</b> <code>${info.channel}</code>`);
+        }
+
+        const telegramReport = 
+            `📊 <b>[TikTok Studio Pro]</b>\n` +
+            `🎉 <b>BÁO CÁO TỔNG KẾT XUẤT BẢN VIDEO HÔM NAY</b>\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `✅ <b>Tổng số video vừa đăng:</b> ${successCount} clip\n` +
+            (failCount > 0 ? `⚠️ <b>Thất bại:</b> ${failCount} clip\n` : '') +
+            `\n📋 <b>Chi tiết theo từng tài khoản & kênh:</b>\n` +
+            summaryLines.join('\n\n') + `\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `⏰ <b>Thời gian hoàn tất:</b> ${new Date().toLocaleString('vi-VN')}\n` +
+            `🛡️ <i>Đã mở 3 tab đồng thời và tự động đóng trình duyệt an toàn cho từng nick!</i>`;
+
+        try {
+            await fetch('/api/telegram/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: telegramReport })
+            });
+            appendAutopilotLog('📢 Đã gửi báo cáo tổng kết chi tiết về Telegram của bạn!', 'success');
+        } catch (e) {
+            console.error('Error sending Telegram summary report:', e);
+        }
     }
 
     // Nếu chọn tự động tắt máy
@@ -3980,6 +4704,983 @@ window.initAutoPilotHub = initAutoPilotHub;
 window.loadAutopilotQueue = loadAutopilotQueue;
 window.startAutopilotPipeline = startAutopilotPipeline;
 window.stopAutopilotPipeline = stopAutopilotPipeline;
+
+
+/* ==========================================================================
+   Download Video Pipeline (YouTube Videos & Shorts Scanner & Downloader)
+   ========================================================================== */
+
+let dlScannedData = {
+    videos: [],
+    shorts: [],
+    channel_name: '',
+    channel_url: ''
+};
+let dlActiveMediaTab = 'videos'; // 'videos' or 'shorts'
+let dlSelectedItems = new Map(); // id -> item object
+let dlIsScanning = false;
+let dlPollInterval = null;
+let dlWidgetIsExpanded = false;
+
+function initDownloadVideoPipeline() {
+    const channelSelect = document.getElementById('dl-channel-select');
+    const customUrlInput = document.getElementById('dl-custom-url-input');
+    const minViewsSelect = document.getElementById('dl-min-views-select');
+    const maxDurationSelect = document.getElementById('dl-max-duration-select');
+    const btnScan = document.getElementById('btn-dl-scan-channel');
+    const btnRefreshScan = document.getElementById('dl-btn-refresh-scan');
+    const searchInput = document.getElementById('dl-search-keyword');
+    const tabBtnVideos = document.getElementById('dl-tab-btn-videos');
+    const tabBtnShorts = document.getElementById('dl-tab-btn-shorts');
+    const selectAllCheckbox = document.getElementById('dl-select-all-visible');
+    const btnClearSelection = document.getElementById('dl-btn-clear-selection');
+    const btnBatchStart = document.getElementById('btn-dl-batch-start');
+    const btnOpenSourceDir = document.getElementById('btn-dl-open-source-dir');
+
+    // 1. Channel select change
+    if (channelSelect) {
+        channelSelect.addEventListener('change', (e) => {
+            const selectedVal = e.target.value;
+            if (!selectedVal) {
+                if (customUrlInput) customUrlInput.value = '';
+                return;
+            }
+            const chan = (accountsData.youtube_channels || []).find(c => c.name === selectedVal || c.url === selectedVal);
+            if (chan) {
+                if (customUrlInput) customUrlInput.value = chan.url || '';
+                const targetFolderLabel = document.getElementById('dl-target-folder-label');
+                if (targetFolderLabel) {
+                    targetFolderLabel.textContent = `input_sources/${chan.folder_name || chan.name}/`;
+                }
+                // Auto scan channel when selected
+                scanYouTubeChannelMedia();
+            }
+        });
+    }
+
+    // 2. Scan button click
+    if (btnScan) {
+        btnScan.addEventListener('click', (e) => {
+            e.preventDefault();
+            scanYouTubeChannelMedia();
+        });
+    }
+    if (btnRefreshScan) {
+        btnRefreshScan.addEventListener('click', (e) => {
+            e.preventDefault();
+            scanYouTubeChannelMedia(true);
+        });
+    }
+
+    // 3. Filter change events
+    if (minViewsSelect) {
+        minViewsSelect.addEventListener('change', () => {
+            renderDownloadMediaCards();
+        });
+    }
+    if (maxDurationSelect) {
+        maxDurationSelect.addEventListener('change', () => {
+            renderDownloadMediaCards();
+        });
+    }
+
+    // 4. Keyword search input
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            renderDownloadMediaCards();
+        });
+    }
+
+    // 5. Media Tab Switching (Videos vs Shorts)
+    if (tabBtnVideos) {
+        tabBtnVideos.addEventListener('click', () => {
+            switchDownloadMediaTab('videos');
+        });
+    }
+    if (tabBtnShorts) {
+        tabBtnShorts.addEventListener('click', () => {
+            switchDownloadMediaTab('shorts');
+        });
+    }
+
+    // 6. Select All Visible
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const checked = e.target.checked;
+            const currentList = getFilteredMediaList();
+            const autoDownload = document.getElementById('dl-toggle-auto-download')?.checked ?? true;
+
+            currentList.forEach(item => {
+                if (checked) {
+                    dlSelectedItems.set(item.id, item);
+                } else {
+                    dlSelectedItems.delete(item.id);
+                }
+            });
+            updateDownloadSelectionUI();
+            renderDownloadMediaCards();
+
+            // If auto-download is enabled and user checked "Select All"
+            if (checked && autoDownload && currentList.length > 0) {
+                const unDownloaded = currentList.filter(it => !it.is_downloaded && it.status !== 'downloading' && it.status !== 'queued');
+                if (unDownloaded.length > 0) {
+                    triggerBatchDownload(unDownloaded);
+                }
+            }
+        });
+    }
+
+    // 7. Clear selection
+    if (btnClearSelection) {
+        btnClearSelection.addEventListener('click', () => {
+            dlSelectedItems.clear();
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
+            updateDownloadSelectionUI();
+            renderDownloadMediaCards();
+        });
+    }
+
+    // 8. Batch Download button
+    if (btnBatchStart) {
+        btnBatchStart.addEventListener('click', () => {
+            const selectedArray = Array.from(dlSelectedItems.values());
+            if (selectedArray.length === 0) {
+                alert('Vui lòng tích chọn ít nhất 1 video để tải!');
+                return;
+            }
+            triggerBatchDownload(selectedArray);
+        });
+    }
+
+    // 9. Open Source Directory
+    if (btnOpenSourceDir) {
+        btnOpenSourceDir.addEventListener('click', async () => {
+            const chanName = document.getElementById('dl-channel-select')?.value || '';
+            const chan = (accountsData.youtube_channels || []).find(c => c.name === chanName);
+            const folderName = chan ? (chan.folder_name || chan.name) : '';
+            const baseSrc = accountsData.source_path || '';
+            const targetPath = (baseSrc && folderName) ? `${baseSrc}/${folderName}` : (baseSrc || './input_sources');
+
+            try {
+                await fetch('/api/open_folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: targetPath })
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        });
+    }
+
+    // 10. Init Floating Bottom-Right Download Widget
+    initFloatingDownloadWidget();
+
+    // Populate channels dropdown initially
+    populateDownloadChannelSelect();
+    
+    // Start global queue polling
+    startDownloadQueuePolling();
+}
+
+function initFloatingDownloadWidget() {
+    const miniPill = document.getElementById('dl-widget-minimized');
+    const expandedCard = document.getElementById('dl-widget-expanded');
+    const btnMinimize = document.getElementById('btn-dl-widget-minimize');
+    const btnClear = document.getElementById('btn-dl-widget-clear');
+    const btnOpenFolder = document.getElementById('btn-dl-widget-open-folder');
+
+    if (miniPill) {
+        miniPill.addEventListener('click', () => {
+            dlWidgetIsExpanded = true;
+            miniPill.classList.add('hidden');
+            expandedCard?.classList.remove('hidden');
+        });
+    }
+
+    if (btnMinimize) {
+        btnMinimize.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dlWidgetIsExpanded = false;
+            expandedCard?.classList.add('hidden');
+            miniPill?.classList.remove('hidden');
+        });
+    }
+
+    if (btnClear) {
+        btnClear.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                await fetch('/api/youtube/clear_completed_queue', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}'
+                });
+            } catch (err) {
+                console.error('Error clearing queue:', err);
+            }
+        });
+    }
+
+    if (btnOpenFolder) {
+        btnOpenFolder.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const baseSrc = accountsData.source_path || './input_sources';
+            try {
+                await fetch('/api/open_folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: baseSrc })
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        });
+    }
+}
+
+function populateDownloadChannelSelect() {
+    const channelSelect = document.getElementById('dl-channel-select');
+    if (!channelSelect) return;
+
+    const currentVal = channelSelect.value;
+    channelSelect.innerHTML = '<option value="">-- Chọn kênh YouTube đã lưu --</option>';
+
+    const channels = accountsData.youtube_channels || [];
+    channels.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.name;
+        opt.textContent = `${c.name} (${c.folder_name || c.name}) - ${c.total_downloaded || 0} clips`;
+        channelSelect.appendChild(opt);
+    });
+
+    if (currentVal && channels.some(c => c.name === currentVal)) {
+        channelSelect.value = currentVal;
+    } else if (channels.length > 0 && !channelSelect.value) {
+        channelSelect.value = channels[0].name;
+        const customUrlInput = document.getElementById('dl-custom-url-input');
+        if (customUrlInput) customUrlInput.value = channels[0].url || '';
+        const targetFolderLabel = document.getElementById('dl-target-folder-label');
+        if (targetFolderLabel) {
+            targetFolderLabel.textContent = `input_sources/${channels[0].folder_name || channels[0].name}/`;
+        }
+    }
+}
+
+function switchDownloadMediaTab(tabType) {
+    dlActiveMediaTab = tabType;
+    const tabBtnVideos = document.getElementById('dl-tab-btn-videos');
+    const tabBtnShorts = document.getElementById('dl-tab-btn-shorts');
+    const containerVideos = document.getElementById('dl-container-videos');
+    const containerShorts = document.getElementById('dl-container-shorts');
+
+    if (tabType === 'videos') {
+        tabBtnVideos?.classList.add('active');
+        tabBtnShorts?.classList.remove('active');
+        containerVideos?.classList.remove('hidden');
+        containerShorts?.classList.add('hidden');
+    } else {
+        tabBtnVideos?.classList.remove('active');
+        tabBtnShorts?.classList.add('active');
+        containerVideos?.classList.add('hidden');
+        containerShorts?.classList.remove('hidden');
+    }
+
+    renderDownloadMediaCards();
+}
+
+async function scanYouTubeChannelMedia(forceRefresh = false) {
+    const customUrlInput = document.getElementById('dl-custom-url-input');
+    const channelSelect = document.getElementById('dl-channel-select');
+    const minViewsSelect = document.getElementById('dl-min-views-select');
+    const maxDurationSelect = document.getElementById('dl-max-duration-select');
+
+    let channelUrl = customUrlInput?.value.trim() || '';
+    const channelName = channelSelect?.value || '';
+
+    if (!channelUrl && channelName) {
+        const chan = (accountsData.youtube_channels || []).find(c => c.name === channelName);
+        if (chan) channelUrl = chan.url || '';
+    }
+
+    if (!channelUrl) {
+        alert('Vui lòng chọn kênh hoặc nhập URL / @Handle kênh YouTube!');
+        return;
+    }
+
+    const minViews = parseInt(minViewsSelect?.value || '0', 10);
+    const maxDuration = parseInt(maxDurationSelect?.value || '0', 10);
+
+    const gridVideos = document.getElementById('dl-grid-videos');
+    const gridShorts = document.getElementById('dl-grid-shorts');
+
+    const loadingHtml = `
+        <div class="dl-empty-state" style="grid-column: 1 / -1;">
+            <i class="fa-solid fa-circle-notch fa-spin text-danger" style="font-size: 44px; margin-bottom: 14px; color: #ef4444;"></i>
+            <h3>Đang quét dữ liệu từ YouTube...</h3>
+            <p>Hệ thống đang trích xuất đồng thời danh sách Video dài và Shorts theo thời gian thực. Vui lòng chờ vài giây...</p>
+        </div>
+    `;
+
+    if (gridVideos) gridVideos.innerHTML = loadingHtml;
+    if (gridShorts) gridShorts.innerHTML = loadingHtml;
+
+    dlIsScanning = true;
+    const btnScan = document.getElementById('btn-dl-scan-channel');
+    if (btnScan) {
+        btnScan.disabled = true;
+        btnScan.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang Quét...';
+    }
+
+    try {
+        const srcPath = accountsData.source_path || '';
+        const destPath = accountsData.dest_path || '';
+        const refreshParam = forceRefresh ? '&refresh=1' : '';
+        const queryUrl = `/api/youtube/scan_channel_media?url=${encodeURIComponent(channelUrl)}&name=${encodeURIComponent(channelName)}&min_views=${minViews}&max_duration=${maxDuration}&source=${encodeURIComponent(srcPath)}&dest=${encodeURIComponent(destPath)}${refreshParam}`;
+        
+        const res = await fetch(queryUrl);
+        const data = await res.json();
+
+        if (data.success) {
+            dlScannedData = {
+                videos: data.videos || [],
+                shorts: data.shorts || [],
+                channel_name: data.channel_name || channelName,
+                channel_url: data.channel_url || channelUrl
+            };
+
+            const countVideosBadge = document.getElementById('dl-count-videos-badge');
+            const countShortsBadge = document.getElementById('dl-count-shorts-badge');
+            if (countVideosBadge) countVideosBadge.textContent = dlScannedData.videos.length;
+            if (countShortsBadge) countShortsBadge.textContent = dlScannedData.shorts.length;
+
+            renderDownloadMediaCards();
+        } else {
+            const errorHtml = `
+                <div class="dl-empty-state" style="grid-column: 1 / -1; border-color: rgba(239, 68, 68, 0.4);">
+                    <i class="fa-solid fa-triangle-exclamation text-danger" style="font-size: 44px; margin-bottom: 14px; color: #ef4444;"></i>
+                    <h3 style="color: #ef4444;">Không thể quét kênh YouTube</h3>
+                    <p>${data.error || 'Vui lòng kiểm tra lại URL kênh YouTube hoặc kết nối mạng của bạn.'}</p>
+                </div>
+            `;
+            if (gridVideos) gridVideos.innerHTML = errorHtml;
+            if (gridShorts) gridShorts.innerHTML = errorHtml;
+        }
+    } catch (err) {
+        console.error('Error scanning channel:', err);
+    } finally {
+        dlIsScanning = false;
+        if (btnScan) {
+            btnScan.disabled = false;
+            btnScan.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Quét Kênh YouTube';
+        }
+    }
+}
+
+function getFilteredMediaList() {
+    const rawList = dlActiveMediaTab === 'videos' ? dlScannedData.videos : dlScannedData.shorts;
+    const searchKeyword = (document.getElementById('dl-search-keyword')?.value || '').toLowerCase().trim();
+    const minViews = parseInt(document.getElementById('dl-min-views-select')?.value || '0', 10);
+    const maxDuration = parseInt(document.getElementById('dl-max-duration-select')?.value || '0', 10);
+
+    return rawList.filter(item => {
+        if (searchKeyword && !item.title.toLowerCase().includes(searchKeyword)) {
+            return false;
+        }
+        if (minViews > 0 && item.views < minViews) {
+            return false;
+        }
+        if (dlActiveMediaTab === 'videos' && maxDuration > 0 && item.duration > maxDuration) {
+            return false;
+        }
+        return true;
+    });
+}
+
+function renderDownloadMediaCards() {
+    const container = dlActiveMediaTab === 'videos' 
+        ? document.getElementById('dl-grid-videos') 
+        : document.getElementById('dl-grid-shorts');
+    if (!container) return;
+
+    const list = getFilteredMediaList();
+
+    if (list.length === 0) {
+        container.innerHTML = `
+            <div class="dl-empty-state">
+                <i class="fa-solid fa-magnifying-glass" style="font-size: 44px; color: var(--text-muted); margin-bottom: 12px;"></i>
+                <h3>Không tìm thấy ${dlActiveMediaTab === 'videos' ? 'video' : 'shorts'} nào phù hợp</h3>
+                <p>Thử thay đổi bộ lọc lượt xem, thời lượng hoặc từ khóa tìm kiếm.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = '';
+
+    list.forEach(item => {
+        const isSelected = dlSelectedItems.has(item.id);
+        const card = document.createElement('div');
+        card.className = `dl-video-card ${isSelected ? 'is-selected' : ''} ${item.is_downloaded ? 'is-downloaded' : ''}`;
+        card.dataset.id = item.id;
+        card.dataset.url = item.url;
+
+        const isShort = item.is_short;
+        const thumbAspectClass = isShort ? 'short-aspect' : '';
+
+        let statusBadgeHtml = '';
+        if (item.status === 'downloading') {
+            statusBadgeHtml = `<span class="dl-card-status-badge downloading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải...</span>`;
+        } else if (item.status === 'queued') {
+            statusBadgeHtml = `<span class="dl-card-status-badge" style="background: rgba(148, 163, 184, 0.15); color: var(--text-secondary);"><i class="fa-solid fa-clock"></i> Chờ tải...</span>`;
+        } else if (item.is_downloaded || item.status === 'downloaded') {
+            statusBadgeHtml = `<span class="dl-card-status-badge downloaded"><i class="fa-solid fa-circle-check"></i> Đã có trong kho</span>`;
+        } else {
+            statusBadgeHtml = `<span class="dl-card-status-badge ready"><i class="fa-solid fa-cloud-arrow-down"></i> Sẵn sàng tải</span>`;
+        }
+
+        card.innerHTML = `
+            <div class="dl-card-thumb-wrap ${thumbAspectClass}">
+                <img src="${item.thumbnail}" class="dl-card-thumb" alt="${item.title}" loading="lazy" onerror="this.src='https://i.ytimg.com/vi/${item.id}/hqdefault.jpg'">
+                
+                <label class="dl-card-checkbox-overlay" title="Tích chọn video">
+                    <input type="checkbox" class="dl-card-checkbox" ${isSelected ? 'checked' : ''}>
+                </label>
+
+                <div class="dl-card-duration-badge">
+                    <i class="fa-solid ${isShort ? 'fa-bolt' : 'fa-clock'}"></i>
+                    <span>${item.formatted_duration || '0:00'}</span>
+                </div>
+            </div>
+
+            <div class="dl-card-body">
+                <h4 class="dl-card-title" title="${item.title}">${item.title}</h4>
+
+                <div class="dl-card-meta">
+                    <div class="dl-views-pill" title="${item.views.toLocaleString()} views">
+                        <i class="fa-solid fa-fire"></i>
+                        <span>${item.formatted_views || '0 views'}</span>
+                    </div>
+                    ${statusBadgeHtml}
+                </div>
+            </div>
+
+            <div class="dl-card-progress ${item.status === 'downloading' ? '' : 'hidden'}">
+                <div class="dl-card-progress-bar" style="width: ${item.progress_percent || 0}%;"></div>
+            </div>
+
+            <div class="dl-card-footer">
+                <button type="button" class="btn btn-xs ${item.is_downloaded ? 'btn-secondary' : 'btn-primary'} btn-dl-single" style="font-weight: 700;">
+                    <i class="fa-solid ${item.is_downloaded ? 'fa-arrows-rotate' : 'fa-cloud-arrow-down'}"></i> 
+                    <span>${item.is_downloaded ? 'Tải Lại' : 'Tải Xuống'}</span>
+                </button>
+                <a href="${item.url}" target="_blank" class="btn btn-xs btn-outline" title="Mở video trên YouTube" style="display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fa-brands fa-youtube text-danger"></i> YouTube
+                </a>
+            </div>
+        `;
+
+        // Checkbox event listener (AUTO DOWNLOAD QUEUE TRIGGER)
+        const checkbox = card.querySelector('.dl-card-checkbox');
+        checkbox.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            if (isChecked) {
+                dlSelectedItems.set(item.id, item);
+                card.classList.add('is-selected');
+
+                // Check if auto-download toggle is active
+                const autoDownload = document.getElementById('dl-toggle-auto-download')?.checked ?? true;
+                if (autoDownload && !item.is_downloaded && item.status !== 'downloading' && item.status !== 'queued') {
+                    triggerSingleVideoDownload(item, card);
+                }
+            } else {
+                dlSelectedItems.delete(item.id);
+                card.classList.remove('is-selected');
+            }
+            updateDownloadSelectionUI();
+        });
+
+        // Single download button click
+        const btnSingle = card.querySelector('.btn-dl-single');
+        btnSingle.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            triggerSingleVideoDownload(item, card);
+        });
+
+        container.appendChild(card);
+    });
+
+    updateDownloadSelectionUI();
+}
+
+function updateDownloadSelectionUI() {
+    const counter = document.getElementById('dl-selected-counter');
+    const btnBatchCount = document.getElementById('dl-btn-batch-count');
+    const count = dlSelectedItems.size;
+
+    if (counter) counter.textContent = count;
+    if (btnBatchCount) btnBatchCount.textContent = count;
+}
+
+async function triggerSingleVideoDownload(item, cardEl) {
+    if (!item || !item.url) return;
+
+    item.status = 'queued';
+    item.progress_percent = 0;
+    
+    // Update card UI immediately to Queued state
+    if (cardEl) {
+        const statusBadge = cardEl.querySelector('.dl-card-status-badge');
+        if (statusBadge) {
+            statusBadge.className = 'dl-card-status-badge';
+            statusBadge.style.background = 'rgba(148, 163, 184, 0.15)';
+            statusBadge.style.color = 'var(--text-secondary)';
+            statusBadge.innerHTML = '<i class="fa-solid fa-clock"></i> Chờ tải...';
+        }
+    }
+
+    const payload = {
+        url: item.url,
+        title: item.title,
+        channel: item.channel || dlScannedData.channel_name || 'Downloads',
+        is_short: item.is_short,
+        thumbnail: item.thumbnail || '',
+        source_dir: accountsData.source_path || ''
+    };
+
+    try {
+        const res = await fetch('/api/youtube/download_item', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        await res.json();
+    } catch (e) {
+        console.error('Error adding to download queue:', e);
+    }
+}
+
+async function triggerBatchDownload(items) {
+    if (!items || items.length === 0) return;
+
+    const payload = {
+        items: items.map(item => ({
+            url: item.url,
+            title: item.title,
+            channel: item.channel || dlScannedData.channel_name || 'Downloads',
+            is_short: item.is_short,
+            thumbnail: item.thumbnail || ''
+        })),
+        source_dir: accountsData.source_path || ''
+    };
+
+    // Mark all as queued in UI
+    items.forEach(it => {
+        it.status = 'queued';
+        it.progress_percent = 0;
+    });
+    renderDownloadMediaCards();
+
+    try {
+        const res = await fetch('/api/youtube/download_batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        await res.json();
+    } catch (e) {
+        console.error('Error starting batch download:', e);
+    }
+}
+
+function startDownloadQueuePolling() {
+    if (dlPollInterval) return;
+
+    dlPollInterval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/youtube/download_queue');
+            const data = await res.json();
+            const tasks = data.tasks || [];
+            const activeCount = data.active_count || 0;
+            const queuedCount = data.queued_count || 0;
+            const completedCount = data.completed_count || 0;
+            const totalRemaining = activeCount + queuedCount;
+
+            const floatingWidget = document.getElementById('floating-download-widget');
+            const miniPill = document.getElementById('dl-widget-minimized');
+            const expandedCard = document.getElementById('dl-widget-expanded');
+            const miniTitle = document.getElementById('dl-widget-mini-title');
+            const miniStatus = document.getElementById('dl-widget-mini-status');
+            const activeBadge = document.getElementById('dl-widget-active-badge');
+            const queueList = document.getElementById('dl-widget-queue-list');
+            const footerSummary = document.getElementById('dl-widget-footer-summary');
+
+            if (tasks.length > 0) {
+                if (floatingWidget) floatingWidget.classList.remove('hidden');
+
+                // Active downloading task (if any)
+                const currentTask = tasks.find(t => t.status === 'downloading' || t.status === 'processing');
+                
+                if (miniTitle) {
+                    miniTitle.textContent = currentTask ? currentTask.title : (totalRemaining > 0 ? 'Đang chuẩn bị tải...' : 'Tải hoàn tất!');
+                }
+                if (miniStatus) {
+                    if (currentTask) {
+                        miniStatus.textContent = `Đang tải: ${currentTask.progress_percent || 0}% (${currentTask.speed_str || ''}) | Còn ${queuedCount} clip`;
+                    } else if (totalRemaining > 0) {
+                        miniStatus.textContent = `${queuedCount} clip đang chờ trong hàng đợi...`;
+                    } else {
+                        miniStatus.textContent = `Đã hoàn tất ${completedCount} clip`;
+                    }
+                }
+                if (activeBadge) {
+                    activeBadge.textContent = `${totalRemaining} clip`;
+                    if (totalRemaining > 0) {
+                        activeBadge.className = 'badge-count';
+                        activeBadge.style.background = 'linear-gradient(135deg, #ef4444, #f97316)';
+                    } else {
+                        activeBadge.className = 'badge-count badge-success';
+                        activeBadge.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                    }
+                }
+                if (footerSummary) {
+                    footerSummary.textContent = `${completedCount} hoàn tất | ${queuedCount} chờ tải`;
+                }
+
+                // Render list in expanded panel
+                if (queueList) {
+                    queueList.innerHTML = tasks.map((t, idx) => {
+                        const isDownloading = t.status === 'downloading' || t.status === 'processing';
+                        const isQueued = t.status === 'queued';
+                        const isCompleted = t.status === 'completed';
+                        const isError = t.status === 'error';
+
+                        let statusBadge = '';
+                        let itemClass = '';
+                        if (isDownloading) {
+                            itemClass = 'is-downloading';
+                            statusBadge = `<span style="color: #f97316; font-size: 11px; font-weight: 700;"><i class="fa-solid fa-circle-notch fa-spin"></i> ${t.progress_percent || 0}% (${t.speed_str || ''})</span>`;
+                        } else if (isQueued) {
+                            statusBadge = `<span style="color: var(--text-muted); font-size: 11px; font-weight: 600;"><i class="fa-solid fa-clock"></i> Chờ tải (#${idx + 1})</span>`;
+                        } else if (isCompleted) {
+                            itemClass = 'is-completed';
+                            statusBadge = `<span style="color: #22c55e; font-size: 11px; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> Đã xong (${t.size_mb || 0} MB)</span>`;
+                        } else if (isError) {
+                            statusBadge = `<span style="color: #ef4444; font-size: 11px; font-weight: 700;"><i class="fa-solid fa-circle-xmark"></i> Lỗi tải</span>`;
+                        }
+
+                        return `
+                            <div class="dl-widget-item ${itemClass}">
+                                <div class="dl-widget-item-top">
+                                    <span class="dl-widget-item-title" title="${t.title}">
+                                        ${t.is_short ? '<i class="fa-solid fa-bolt" style="color: #f59e0b;"></i> ' : '<i class="fa-solid fa-video" style="color: #3b82f6;"></i> '}${t.title}
+                                    </span>
+                                    <span class="dl-widget-item-channel">${t.channel || 'Video'}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                                    ${statusBadge}
+                                    <span style="font-size: 10px; color: var(--text-muted);">${t.eta_str && isDownloading ? `còn ~${t.eta_str}` : ''}</span>
+                                </div>
+                                ${isDownloading ? `
+                                    <div class="dl-card-progress" style="margin-top: 4px; border-radius: 4px; overflow: hidden; height: 4px;">
+                                        <div class="dl-card-progress-bar" style="width: ${t.progress_percent || 0}%;"></div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // Update cards status in active list on the page if visible
+                tasks.forEach(t => {
+                    const card = document.querySelector(`.dl-video-card[data-url="${t.url}"]`);
+                    if (card) {
+                        const statusBadge = card.querySelector('.dl-card-status-badge');
+                        const progressBar = card.querySelector('.dl-card-progress');
+                        const progressBarFill = card.querySelector('.dl-card-progress-bar');
+
+                        if (t.status === 'completed') {
+                            card.classList.add('is-downloaded');
+                            if (statusBadge) {
+                                statusBadge.className = 'dl-card-status-badge downloaded';
+                                statusBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Đã có trong kho';
+                            }
+                            if (progressBar) progressBar.classList.add('hidden');
+                        } else if (t.status === 'downloading' || t.status === 'processing') {
+                            if (statusBadge) {
+                                statusBadge.className = 'dl-card-status-badge downloading';
+                                statusBadge.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${t.progress_percent || 0}% (${t.speed_str || ''})`;
+                            }
+                            if (progressBar) progressBar.classList.remove('hidden');
+                            if (progressBarFill) progressBarFill.style.width = `${t.progress_percent || 0}%`;
+                        } else if (t.status === 'queued') {
+                            if (statusBadge) {
+                                statusBadge.className = 'dl-card-status-badge';
+                                statusBadge.style.background = 'rgba(148, 163, 184, 0.15)';
+                                statusBadge.style.color = 'var(--text-secondary)';
+                                statusBadge.innerHTML = '<i class="fa-solid fa-clock"></i> Chờ tải...';
+                            }
+                        }
+                    }
+                });
+            } else {
+                if (floatingWidget) floatingWidget.classList.add('hidden');
+            }
+        } catch (e) {
+            console.error('Error polling queue:', e);
+        }
+    }, 1200);
+}
+
+function onDownloadTabActivated() {
+    populateDownloadChannelSelect();
+    const chanSelect = document.getElementById('dl-channel-select');
+    if (chanSelect && chanSelect.value && (!dlScannedData.videos.length && !dlScannedData.shorts.length)) {
+        scanYouTubeChannelMedia();
+    }
+}
+
+window.initDownloadVideoPipeline = initDownloadVideoPipeline;
+window.populateDownloadChannelSelect = populateDownloadChannelSelect;
+window.scanYouTubeChannelMedia = scanYouTubeChannelMedia;
+window.switchDownloadMediaTab = switchDownloadMediaTab;
+window.onDownloadTabActivated = onDownloadTabActivated;
+window.initFloatingDownloadWidget = initFloatingDownloadWidget;
+
+/* ==========================================================================
+   TIKTOK CREATOR ANALYTICS & DASHBOARD ENGINE
+   ========================================================================== */
+let analyticsPollingInterval = null;
+
+async function loadAnalyticsData() {
+    try {
+        const res = await fetch('/api/analytics/data');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.success) {
+            renderAnalyticsDashboard(json.data, json.current_ip);
+        }
+    } catch (e) {
+        console.error('Error loading analytics:', e);
+    }
+}
+
+function renderAnalyticsDashboard(data, ipInfo) {
+    // 1. Cập nhật IP Safety Badge
+    const ipBadge = document.getElementById('analytics-ip-badge');
+    const ipText = document.getElementById('analytics-ip-text');
+    if (ipBadge && ipText && ipInfo) {
+        if (ipInfo.is_vn) {
+            ipBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+            ipBadge.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+            ipBadge.style.color = '#ef4444';
+            ipText.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span> ⚠️ IP: ${ipInfo.ip} (${ipInfo.country}) - <b style="color:#ff4d4f">CẢNH BÁO IP VN!</b>`;
+        } else {
+            ipBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+            ipBadge.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+            ipBadge.style.color = '#10b981';
+            ipText.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span> 🛡️ IP: ${ipInfo.ip} (${ipInfo.country}) - <b>Clean Non-VN IP</b>`;
+        }
+    }
+
+    // 2. Cập nhật các thẻ KPI tổng quan
+    const overall = (data && data.overall) || {};
+    const totalViewsEl = document.getElementById('kpi-total-views');
+    const totalFollowersEl = document.getElementById('kpi-total-followers');
+    const totalLikesEl = document.getElementById('kpi-total-likes');
+    const totalCommentsEl = document.getElementById('kpi-total-comments');
+    const avgCompletionEl = document.getElementById('kpi-avg-completion');
+
+    if (totalViewsEl) totalViewsEl.textContent = (overall.total_views || 0).toLocaleString();
+    if (totalFollowersEl) totalFollowersEl.textContent = (overall.total_followers || 0).toLocaleString();
+    if (totalLikesEl) totalLikesEl.textContent = (overall.total_likes || 0).toLocaleString();
+    if (totalCommentsEl) totalCommentsEl.textContent = (overall.total_comments || 0).toLocaleString();
+    if (avgCompletionEl) avgCompletionEl.textContent = overall.avg_completion_rate || '0%';
+
+    // 3. Cập nhật bảng chi tiết từng kênh TikTok
+    const tbody = document.getElementById('analytics-table-body');
+    if (!tbody) return;
+
+    const accountsObj = (data && data.accounts) || {};
+    const accountsList = (accountsData && accountsData.tiktok_accounts) || [];
+    
+    if (accountsList.length === 0 && Object.keys(accountsObj).length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="table-empty"><i class="fa-brands fa-tiktok"></i> Chưa có tài khoản TikTok nào được cấu hình trong hệ thống.</td></tr>`;
+        return;
+    }
+
+    let rowsHtml = '';
+    let idx = 1;
+
+    accountsList.forEach(acc => {
+        const accKey = String(acc.id || acc.adspower_id || acc.channel_name);
+        const stat = accountsObj[accKey] || {};
+        const isSuccess = stat.success === true;
+        const channelName = acc.channel_name || acc.name || 'TikTok Channel';
+        const accountHandle = acc.account_name || acc.name || '@channel';
+        const adspowerProfile = acc.adspower_id || acc.serial_number || 'N/A';
+        
+        const views = isSuccess ? (stat.video_views_7d || 0).toLocaleString() : '--';
+        const followers = isSuccess ? (stat.followers_total || 0).toLocaleString() : '--';
+        const likes = isSuccess ? (stat.likes_total || 0).toLocaleString() : '--';
+        const comments = isSuccess ? (stat.comments_total || 0).toLocaleString() : '--';
+        const completionRate = isSuccess ? (stat.avg_completion_rate || '--') : '--';
+        const lastUpdated = stat.last_updated || (stat.last_attempt ? `<span style="color:#ef4444">${stat.last_attempt} (Lỗi)</span>` : '<span style="color:var(--text-muted)">Chưa thu thập</span>');
+        
+        const proxyLoc = acc.build_up_ip || acc.original_ip || 'Non-VN';
+
+        rowsHtml += `
+            <tr>
+                <td style="text-align: center; color: var(--text-muted);">${idx++}</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #00f2fe, #4facfe); display: flex; align-items: center; justify-content: center; color: #000; font-weight: 700; font-size: 14px;">
+                            ${channelName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-primary);">${channelName}</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">${accountHandle.startsWith('@') ? accountHandle : '@' + accountHandle}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); font-size: 11px; padding: 4px 8px; border-radius: 4px;">
+                        <i class="fa-solid fa-window-maximize" style="color:#00f2fe"></i> ${adspowerProfile} (${proxyLoc})
+                    </span>
+                </td>
+                <td style="text-align: right; font-weight: 700; color: #00f2fe;">${followers}</td>
+                <td style="text-align: right; font-weight: 700; color: #10b981;">${views}</td>
+                <td style="text-align: right; font-weight: 600; color: #ff0050;">${likes}</td>
+                <td style="text-align: right; font-weight: 600; color: #f59e0b;">${comments}</td>
+                <td style="text-align: center;">
+                    <span style="display: inline-block; padding: 2px 8px; border-radius: 12px; font-weight: 700; font-size: 11px; background: rgba(0, 242, 254, 0.1); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.3);">
+                        ${completionRate}
+                    </span>
+                </td>
+                <td style="text-align: center; font-size: 11px;">${lastUpdated}</td>
+                <td style="text-align: center;">
+                    <button class="btn btn-sm" onclick="triggerSingleCollectAnalytics('${acc.id || acc.adspower_id || acc.channel_name}')" style="padding: 4px 10px; font-size: 11px; border-radius: 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-primary); transition: var(--transition);">
+                        <i class="fa-solid fa-arrows-rotate"></i> Sync
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = rowsHtml;
+}
+
+async function triggerCollectAnalytics() {
+    const btn = document.getElementById('btn-collect-analytics');
+    const progressBox = document.getElementById('analytics-collect-progress');
+    const logBox = document.getElementById('analytics-live-log');
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Collecting...</span>';
+    }
+    if (progressBox) progressBox.style.display = 'block';
+    if (logBox) logBox.innerHTML = '<div style="color: #00f2fe;">[Bắt đầu] Đang kết nối AdsPower API và kiểm tra IP an toàn...</div>';
+
+    try {
+        const res = await fetch('/api/analytics/collect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}'
+        });
+        const json = await res.json();
+        if (!json.success) {
+            alert('⚠️ ' + (json.error || 'Không thể bắt đầu thu thập'));
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> <span>Collect Data</span>';
+            }
+            if (progressBox) progressBox.style.display = 'none';
+            return;
+        }
+
+        startAnalyticsPolling();
+
+    } catch (e) {
+        console.error(e);
+        alert('Lỗi kết nối máy chủ!');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> <span>Collect Data</span>';
+        }
+    }
+}
+
+async function triggerSingleCollectAnalytics(accId) {
+    try {
+        const res = await fetch('/api/analytics/collect_single', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ account_id: accId })
+        });
+        const json = await res.json();
+        if (json.success) {
+            const progressBox = document.getElementById('analytics-collect-progress');
+            if (progressBox) progressBox.style.display = 'block';
+            startAnalyticsPolling();
+        } else {
+            alert('⚠️ ' + (json.error || 'Lỗi'));
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function startAnalyticsPolling() {
+    if (analyticsPollingInterval) clearInterval(analyticsPollingInterval);
+    const progressBox = document.getElementById('analytics-collect-progress');
+    const logBox = document.getElementById('analytics-live-log');
+    const btn = document.getElementById('btn-collect-analytics');
+
+    analyticsPollingInterval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/analytics/status');
+            if (!res.ok) return;
+            const statusJson = await res.json();
+            
+            if (logBox && statusJson.progress_log) {
+                logBox.innerHTML = statusJson.progress_log.map(l => `<div>${l}</div>`).join('');
+                logBox.scrollTop = logBox.scrollHeight;
+            }
+
+            if (!statusJson.is_collecting) {
+                clearInterval(analyticsPollingInterval);
+                analyticsPollingInterval = null;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> <span>Collect Data</span>';
+                }
+                setTimeout(() => {
+                    if (progressBox) progressBox.style.display = 'none';
+                }, 4000);
+                loadAnalyticsData();
+            }
+        } catch (e) {
+            console.error('Polling error:', e);
+        }
+    }, 1500);
+}
+
+function initTikTokAnalyticsEngine() {
+    const btnCollect = document.getElementById('btn-collect-analytics');
+    if (btnCollect) {
+        btnCollect.addEventListener('click', triggerCollectAnalytics);
+    }
+    loadAnalyticsData();
+}
+
+window.triggerSingleCollectAnalytics = triggerSingleCollectAnalytics;
+window.triggerCollectAnalytics = triggerCollectAnalytics;
+window.loadAnalyticsData = loadAnalyticsData;
+window.initTikTokAnalyticsEngine = initTikTokAnalyticsEngine;
+
+
 
 
 

@@ -1,5 +1,11 @@
 """Service Layer: Video Engine, Drive Manager, and Automation Adapters."""
-from src.services.video_engine import get_video_duration, process_video_custom, split_video_custom
+from src.services.video_engine import (
+    get_video_duration, process_video_custom, split_video_custom,
+    detect_video_highlights, process_and_split_video,
+    transcribe_video_audio, find_subtitle_for_video, parse_vtt_or_srt,
+    translate_segments, create_dubbed_audio_track, mix_original_and_dubbed_audio,
+    generate_ass_subtitles, get_ffmpeg_subtitles_filter
+)
 from src.services.drive_service import (
     scan_source_directory, scan_finished_results, load_history, save_history,
     delete_finished_result, delete_all_finished_results,
@@ -17,6 +23,10 @@ from src.services.tiktok_uploader import upload_video_to_tiktok_cdp
 
 __all__ = [
     "get_video_duration", "process_video_custom", "split_video_custom",
+    "detect_video_highlights", "process_and_split_video",
+    "transcribe_video_audio", "find_subtitle_for_video", "parse_vtt_or_srt",
+    "translate_segments", "create_dubbed_audio_track", "mix_original_and_dubbed_audio",
+    "generate_ass_subtitles", "get_ffmpeg_subtitles_filter",
     "scan_source_directory", "scan_finished_results", "load_history", "save_history",
     "delete_finished_result", "delete_all_finished_results",
     "get_publishing_matrix", "toggle_publishing_clip_status", "change_account_target_channel", "batch_toggle_publishing_clips",

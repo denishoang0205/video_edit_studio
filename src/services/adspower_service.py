@@ -9,13 +9,19 @@ DEFAULT_ADSPOWER_URL = "http://local.adspower.net:50325"
 def get_default_adspower_config():
     try:
         import os
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        sett_file = os.path.join(base_dir, "settings.json")
-        if os.path.exists(sett_file):
-            with open(sett_file, "r", encoding="utf-8") as f:
-                st = json.load(f)
-                ads = st.get("adspower", {})
-                return ads.get("api_url", DEFAULT_ADSPOWER_URL), ads.get("api_key", "")
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        cand_files = [
+            os.path.join(base_dir, "data", "settings.json"),
+            os.path.join(base_dir, "settings.json"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
+        ]
+        for sett_file in cand_files:
+            if os.path.exists(sett_file):
+                with open(sett_file, "r", encoding="utf-8") as f:
+                    st = json.load(f)
+                    ads = st.get("adspower", {})
+                    if ads.get("api_key") or ads.get("api_url"):
+                        return ads.get("api_url", DEFAULT_ADSPOWER_URL), ads.get("api_key", "")
     except Exception:
         pass
     return DEFAULT_ADSPOWER_URL, ""
@@ -141,10 +147,10 @@ def resolve_profile_identifier(profile_identifier, api_url=DEFAULT_ADSPOWER_URL,
                 
     return ident
 
-def start_adspower_browser(profile_identifier, api_url=DEFAULT_ADSPOWER_URL, api_key="", open_tabs=1):
+def start_adspower_browser(profile_identifier, api_url=DEFAULT_ADSPOWER_URL, api_key="", open_tabs=1, headless=False):
     """
     Khởi chạy trình duyệt AdsPower tương ứng với Profile ID, Serial Number hoặc Profile Name
-    Trả về WebSocket Puppeteer/Playwright CDP Endpoint và debug_port
+    Hỗ trợ chế độ headless (chạy ngầm không hiện cửa sổ) để lấy dữ liệu siêu tốc.
     """
     if not profile_identifier:
         return {"success": False, "error": "Chưa chọn Profile ID / Serial Number của AdsPower"}
@@ -156,6 +162,9 @@ def start_adspower_browser(profile_identifier, api_url=DEFAULT_ADSPOWER_URL, api
     resolved_id = resolve_profile_identifier(raw_ident, api_url, api_key)
     
     query = {"open_tabs": open_tabs}
+    if headless:
+        query["headless"] = "1"
+        
     if resolved_id.isdigit() and len(resolved_id) <= 6:
         query["serial_number"] = resolved_id
     else:

@@ -3,87 +3,127 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit studio - designed by Huy</title>
+    <title>cris. studio - Video Automation Platform</title>
+    <link rel="icon" type="image/png" href="favicon.png">
     <!-- Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Montserrat:wght@600;700;800&family=Be+Vietnam+Pro:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=35">
+    <link rel="stylesheet" href="style.css?v=48">
 </head>
 <body class="theme-system">
-    <div class="app-layout">
-        <!-- Top Navbar -->
-        <header class="top-navbar">
-            <div class="brand">
-                <div class="brand-icon">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+    <div class="app-shell">
+        <!-- 1. Left Vertical Sidebar -->
+        <aside class="app-sidebar">
+            <!-- Brand Logo: cris. studio -->
+            <div class="sidebar-brand">
+                <div class="brand-logo-container">
+                    <img src="brand_logo_dark.png" alt="cris. studio" class="brand-logo-img logo-for-dark">
+                    <img src="brand_logo_light.png" alt="cris. studio" class="brand-logo-img logo-for-light">
                 </div>
-                <div>
-                    <h1 class="brand-title">Edit studio <span style="font-size: 10px; background: var(--primary); color: white; padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 6px;">v2.6</span></h1>
-                    <p class="brand-subtitle">designed by Huy</p>
-                </div>
+                <div class="brand-since-text">since 2026</div>
             </div>
 
-            <!-- Header Right Group: Navigation & Actions on the Right -->
-            <div class="header-right-group">
-                <!-- Tab Navigation Links -->
-                <nav class="tab-navigation">
-                    <button class="tab-link tab-link-autopilot" data-tab="tab-autopilot" id="tab-btn-autopilot" style="background: linear-gradient(135deg, #6366f1, #d946ef); color: white; font-weight: 800; border-radius: 6px; box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4);">
-                        <i class="fa-solid fa-rocket"></i> Auto-Pilot Pipeline
+            <!-- Vertical Navigation Menu -->
+            <nav class="sidebar-nav">
+                <!-- Group 1: Overview -->
+                <div class="nav-section">
+                    <button class="tab-link active" data-tab="tab-dashboard" id="tab-btn-dashboard">
+                        <i class="fa-solid fa-chart-pie nav-icon text-primary"></i>
+                        <span class="nav-text">Dashboard</span>
                     </button>
-                    <button class="tab-link active" data-tab="tab-config">
-                        <i class="fa-solid fa-sliders"></i> Settings (AdsPower & HMA)
-                    </button>
-                    <button class="tab-link" data-tab="tab-channels">
-                        <i class="fa-solid fa-square-rss"></i> YouTube Channels
-                    </button>
-                    <button class="tab-link" data-tab="tab-tiktok">
-                        <i class="fa-brands fa-tiktok"></i> TikTok Accounts
-                    </button>
+                </div>
 
-                    <button class="tab-link" data-tab="tab-publishing">
-                        <i class="fa-solid fa-paper-plane"></i> Posting Tracker
-                    </button>
-                    <button class="tab-link" data-tab="tab-dashboard">
-                        <i class="fa-solid fa-chart-pie"></i> Analytics Dashboard
-                    </button>
-                    <button class="tab-link" data-tab="tab-studio">
-                        <i class="fa-solid fa-clapperboard"></i> Editor Studio
-                    </button>
-                    <button class="tab-link" data-tab="tab-outputs">
-                        <i class="fa-solid fa-circle-check"></i> Finished Library
-                    </button>
-                    <button class="tab-link" data-tab="tab-mexico-trends">
-                        <i class="fa-solid fa-fire text-danger" style="color: #ff4757;"></i> Mexico Trends (MX)
-                    </button>
-                </nav>
+                <!-- Divider 1 -->
+                <div class="sidebar-divider"></div>
 
-                <div class="header-actions">
-                    <!-- Nút Kích Hoạt Pipeline All-in-One -->
-                    <button class="btn btn-autopilot" id="btn-open-autopilot-modal" style="background: linear-gradient(135deg, #6366f1, #d946ef); color: white; border: none; font-weight: 800; border-radius: 8px; padding: 7px 14px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35); font-size: 13px; transition: transform 0.15s ease;" title="Mở Trung Tâm Tự Động Hóa Pipeline (n8n / Nightly Scheduler)">
-                        <i class="fa-solid fa-rocket"></i> Kích Hoạt Pipeline
+                <!-- Group 2: Core Video Studio -->
+                <div class="nav-section">
+                    <button class="tab-link" data-tab="tab-download" id="tab-btn-download">
+                        <i class="fa-solid fa-cloud-arrow-down nav-icon text-danger"></i>
+                        <span class="nav-text">Download Video</span>
                     </button>
+                    <button class="tab-link" data-tab="tab-studio" id="tab-btn-studio">
+                        <i class="fa-solid fa-clapperboard nav-icon text-primary"></i>
+                        <span class="nav-text">Editor Studio</span>
+                    </button>
+                    <button class="tab-link" data-tab="tab-outputs" id="tab-btn-outputs">
+                        <i class="fa-solid fa-circle-check nav-icon text-success"></i>
+                        <span class="nav-text">Finished Library</span>
+                    </button>
+                </div>
 
-                    <!-- Dark/Light Theme Toggle -->
-                    <button class="btn-theme-toggle" id="theme-toggle" title="Toggle Light/Dark Mode">
-                        <i class="fa-solid fa-circle-half-stroke"></i>
+                <!-- Divider 2 -->
+                <div class="sidebar-divider"></div>
+
+                <!-- Group 3: Automation & Tracking -->
+                <div class="nav-section">
+                    <button class="tab-link tab-link-autopilot" data-tab="tab-autopilot" id="tab-btn-autopilot">
+                        <i class="fa-solid fa-rocket nav-icon"></i>
+                        <span class="nav-text">Automation Pipeline</span>
+                        <span class="nav-badge-pill">AI</span>
                     </button>
-                    
+                    <button class="tab-link" data-tab="tab-publishing" id="tab-btn-publishing">
+                        <i class="fa-solid fa-paper-plane nav-icon text-accent"></i>
+                        <span class="nav-text">Posting Tracker</span>
+                    </button>
+                </div>
+
+                <!-- Divider 3 -->
+                <div class="sidebar-divider"></div>
+
+                <!-- Group 4: Accounts & Settings -->
+                <div class="nav-section">
+                    <button class="tab-link" data-tab="tab-tiktok" id="tab-btn-tiktok">
+                        <i class="fa-brands fa-tiktok nav-icon text-pink"></i>
+                        <span class="nav-text">Account Management</span>
+                    </button>
+                    <button class="tab-link" data-tab="tab-channels" id="tab-btn-channels">
+                        <i class="fa-solid fa-square-rss nav-icon text-warning"></i>
+                        <span class="nav-text">YouTube Channels</span>
+                    </button>
+                    <button class="tab-link" data-tab="tab-config" id="tab-btn-config">
+                        <i class="fa-solid fa-sliders nav-icon text-secondary"></i>
+                        <span class="nav-text">Settings</span>
+                    </button>
+                </div>
+            </nav>
+
+            <!-- Sidebar Footer Controls -->
+            <div class="sidebar-footer">
+                <button class="btn btn-autopilot-sidebar" id="btn-open-autopilot-modal" title="Open Automation Pipeline Hub (n8n / Nightly Scheduler)">
+                    <i class="fa-solid fa-bolt-lightning"></i> Launch Pipeline
+                </button>
+            </div>
+        </aside>
+
+        <!-- 2. Main Content Workspace -->
+        <main class="app-main-content">
+            <!-- Top App Bar -->
+            <header class="main-top-bar">
+                <div class="page-title-area">
+                    <h2 id="current-tab-title">Dashboard</h2>
+                    <span class="page-subtitle" id="current-tab-subtitle">System overview, downloaded video statistics, and video editing progress</span>
+                </div>
+                <div class="main-top-actions">
                     <div class="status-badge" id="system-status">
                         <span class="status-dot online"></span>
                         <span id="status-text">Ready</span>
                     </div>
-                    
-                    <button class="btn btn-outline btn-sm" id="btn-refresh-data" title="Refresh data">
-                        <i class="fa-solid fa-arrows-rotate"></i> Reload
+                    <button class="btn-theme-toggle" id="theme-toggle" title="Toggle Light/Dark Mode">
+                        <i class="fa-solid fa-circle-half-stroke"></i>
+                    </button>
+                    <button class="btn-icon-xs" id="btn-refresh-data" title="Refresh Data">
+                        <i class="fa-solid fa-arrows-rotate"></i>
                     </button>
                 </div>
-            </div>
-        </header>
+            </header>
 
-        <!-- Tab 0: Configuration (Source, Destination, AdsPower & HMA VPN Settings) -->
-        <div id="tab-config" class="tab-content active">
+            <!-- Scrollable Workspace for Active Tab -->
+            <div class="tab-contents-container">
+                <!-- Tab 0: Configuration (Source, Destination, AdsPower & HMA VPN Settings) -->
+                <div id="tab-config" class="tab-content">
             <!-- 1. Workspace Folders Panel -->
             <section class="panel config-panel">
                 <div class="panel-header">
@@ -114,7 +154,7 @@
                         </div>
                         <div class="input-icon-wrapper" style="width: 100%; position: relative;">
                             <i class="fa-solid fa-folder-open"></i>
-                            <input type="text" id="source-drive-link" placeholder="e.g. c:\Users\bao huy\Documents\Tiktok builder" value="" style="width: 100%; padding-right: 40px;">
+                            <input type="text" id="source-drive-link" placeholder="e.g. D:\input_sources or C:\Videos\Source" value="" style="width: 100%; padding-right: 40px;">
                             <button type="button" class="btn-picker" id="btn-pick-source" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 15px; display: flex; align-items: center;" title="Select local directory">
                                 <i class="fa-solid fa-folder-tree"></i>
                             </button>
@@ -244,18 +284,151 @@
                 </section>
             </div>
 
-            <!-- 4. TikTok Auto-Posting Preferences Panel -->
+            <!-- 4. Google Gemini AI Engine Settings Panel -->
+            <section class="panel config-panel" style="margin-top: 16px;">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-wand-magic-sparkles text-primary"></i>
+                        <h3>4. AI Auto-Caption & Viral Hashtags Engine (Sinh Tiêu Đề & Hashtags)</h3>
+                    </div>
+                    <span class="badge badge-secondary" id="gemini-status-badge">
+                        <span class="status-dot online" style="width: 6px; height: 6px;"></span> Sẵn sàng (Built-in)
+                    </span>
+                </div>
+                <div class="panel-body-config" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                    <div class="form-row">
+                        <div class="form-col" style="flex: 2;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label class="sub-label">
+                                    <i class="fa-solid fa-key"></i> AI API Key (Tùy chọn)
+                                </label>
+                                <span style="font-size: 11px; color: var(--text-secondary);">
+                                    Hỗ trợ Groq (gsk_...), OpenAI (sk-...), Gemini (AIzaSy...) hoặc <strong>để trống</strong>
+                                </span>
+                            </div>
+                            <div style="position: relative; width: 100%;">
+                                <input type="password" id="input-gemini-key" class="form-input" placeholder="Để trống nếu dùng Built-in (không cần key) hoặc dán Key (gsk_... / sk-... / AIzaSy...)" style="width: 100%; padding-right: 40px;">
+                                <button type="button" id="btn-toggle-gemini-key" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer;" title="Hiện / Ẩn Key">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                            <span style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: block;">
+                                💡 <strong>Khuyên dùng:</strong> Nếu bạn không có API Key, hãy <strong>để trống ô này</strong>. Hệ thống sẽ tự động dùng <strong>Bộ Sinh Thông Minh Tích Hợp (Built-in NLP)</strong> chuẩn xác 100% cho từng game/thể loại!
+                            </span>
+                        </div>
+
+                        <div class="form-col" style="flex: 1; min-width: 220px;">
+                            <label class="sub-label">
+                                <i class="fa-solid fa-microchip"></i> Động Cơ AI (Engine)
+                            </label>
+                            <select id="select-gemini-model" class="form-select">
+                                <option value="gemini-3.6-flash" selected>⚡ Google Gemini 3.6 Flash (Chính thức - Khuyên dùng)</option>
+                                <option value="gemini-3-flash-preview">🚀 Google Gemini 3 Flash Preview</option>
+                                <option value="gemini-3.5-flash">✨ Google Gemini 3.5 Flash</option>
+                                <option value="builtin">🧠 Built-in Smart Engine (Tự động - Không cần Key)</option>
+                                <option value="groq-llama">⚡ Groq AI (Llama 3.3 - Key gsk_...)</option>
+                                <option value="custom">✏️ Tùy biến Model ID khác...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Custom Model ID (ẩn/hiện) & Phong cách sinh nội dung -->
+                    <div class="form-row" style="align-items: flex-start;">
+                        <div class="form-col" id="col-custom-model" style="display: none; flex: 1;">
+                            <label class="sub-label">Tên Model ID Tùy Chỉnh</label>
+                            <input type="text" id="input-custom-gemini-model" class="form-input" placeholder="e.g. llama-3.3-70b-versatile, gpt-4o-mini...">
+                        </div>
+
+                        <div class="form-col" style="flex: 1;">
+                            <label class="sub-label">
+                                <i class="fa-solid fa-palette"></i> Phong cách Caption & Hashtags
+                            </label>
+                            <select id="select-gemini-style" class="form-select">
+                                <option value="viral" selected>🔥 Triệu View & Giật Gân (Clickbait, Hype, Tò mò)</option>
+                                <option value="humor">😂 Hài Hước & Gen Z (Meme, Dí dỏm, Tương tác)</option>
+                                <option value="storytelling">📖 Kể Chuyện & Kịch Tính (Drama, Cuốn hút)</option>
+                                <option value="educational">🧠 Kiến Thức & Bài Học (Tips, Facts, Giá trị)</option>
+                                <option value="affiliate">🛍️ Bán Hàng & Affiliate (Kêu gọi hành động khéo léo)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-top: 4px;">
+                        <button type="button" class="btn btn-secondary btn-sm" id="btn-test-gemini-key">
+                            <i class="fa-solid fa-bolt"></i> Test Kết Nối Gói AI
+                        </button>
+                        <span id="gemini-test-result" style="font-size: 12px; font-weight: 600;"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. Telegram Notification Bot Settings Panel -->
+            <section class="panel config-panel" style="margin-top: 16px;">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-brands fa-telegram text-primary"></i>
+                        <h3>5. Telegram Notification Bot (Nhận Báo Cáo Xuất Bản Tự Động)</h3>
+                    </div>
+                    <span class="badge badge-secondary" id="telegram-status-badge">
+                        <span class="status-dot offline" style="width: 6px; height: 6px;"></span> Chưa cấu hình
+                    </span>
+                </div>
+                <div class="panel-body-config" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                    <div class="form-row">
+                        <div class="form-col" style="flex: 2;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label class="sub-label">
+                                    <i class="fa-solid fa-robot"></i> Telegram Bot Token
+                                </label>
+                                <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" style="font-size: 11px; color: var(--primary); text-decoration: underline;">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Tạo Bot mới qua @BotFather
+                                </a>
+                            </div>
+                            <div style="position: relative; width: 100%;">
+                                <input type="password" id="input-telegram-token" class="form-input" placeholder="e.g. 8862905925:AAE7b5oOqce_..." style="width: 100%; padding-right: 40px;">
+                                <button type="button" id="btn-toggle-telegram-token" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer;" title="Hiện / Ẩn Token">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                            <span style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: block;">
+                                🔒 <strong>Bảo mật:</strong> Token được lưu cục bộ trong <code>data/settings.json</code> và <strong>tự động bị chặn bởi .gitignore</strong>, an toàn 100% khi push code lên GitHub.
+                            </span>
+                        </div>
+
+                        <div class="form-col" style="flex: 1; min-width: 200px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label class="sub-label">
+                                    <i class="fa-solid fa-id-badge"></i> Telegram Chat ID
+                                </label>
+                                <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" style="font-size: 11px; color: var(--primary); text-decoration: underline;">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Lấy Chat ID qua @userinfobot
+                                </a>
+                            </div>
+                            <input type="text" id="input-telegram-chat-id" class="form-input" placeholder="e.g. 6661216386">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; align-items: center; justify-content: flex-start; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" id="btn-test-telegram">
+                            <i class="fa-solid fa-paper-plane"></i> Gửi Tin Nhắn Test Telegram
+                        </button>
+                        <span id="telegram-test-result" style="font-size: 12px; font-weight: 600;"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. TikTok Auto-Posting Preferences Panel -->
             <section class="panel config-panel" style="margin-top: 16px;">
                 <div class="panel-header">
                     <div class="panel-title-group">
                         <i class="fa-brands fa-tiktok text-accent"></i>
-                        <h3>4. TikTok Posting Automation Preferences</h3>
+                        <h3>6. TikTok Posting Automation Preferences & Quy Tắc An Toàn</h3>
                     </div>
                     <button class="btn btn-hero btn-sm" id="btn-save-all-settings">
                         <i class="fa-solid fa-floppy-disk"></i> LƯU TOÀN BỘ CÀI ĐẶT (SAVE ALL SETTINGS)
                     </button>
                 </div>
-                <div class="panel-body-config" style="padding: 20px;">
+                <div class="panel-body-config" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
                     <div class="form-row">
                         <div class="form-col">
                             <label class="sub-label">Chế độ Đăng Video lên TikTok</label>
@@ -267,14 +440,29 @@
                         <div class="form-col">
                             <label class="sub-label">Trình duyệt sau khi hoàn thành</label>
                             <select id="select-tiktok-close-browser" class="form-select">
+                                <option value="yes" selected>Tự động đóng trình duyệt AdsPower (Khuyên dùng)</option>
                                 <option value="no">Giữ trình duyệt AdsPower mở để quan sát</option>
-                                <option value="yes">Tự động đóng trình duyệt AdsPower</option>
                             </select>
                         </div>
                         <div class="form-col" style="max-width: 150px;">
-                            <label class="sub-label">Thời gian chờ tối đa</label>
-                            <input type="number" id="input-tiktok-timeout" class="form-input" min="30" max="300" value="60" style="text-align: center;">
+                            <label class="sub-label">Hạn mức / ngày / Acc</label>
+                            <input type="number" id="input-tiktok-daily-limit" class="form-input" min="1" max="30" value="3" style="text-align: center;" title="Giới hạn tối đa clip đăng mỗi ngày cho 1 tài khoản (Mặc định: 3 clip)">
                         </div>
+                        <div class="form-col" style="max-width: 130px;">
+                            <label class="sub-label">Timeout (giây)</label>
+                            <input type="number" id="input-tiktok-timeout" class="form-input" min="30" max="600" value="240" style="text-align: center;" title="Thời gian tối đa chờ video tải lên TikTok (Khuyên dùng: 240s)">
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="background: rgba(0,0,0,0.04); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; gap: 20px; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600;">
+                            <input type="checkbox" id="checkbox-block-vn-ip" checked style="accent-color: var(--primary); width: 16px; height: 16px;">
+                            🛡️ <span>Chặn đăng nếu phát hiện IP Việt Nam (Pre-flight IP Gate)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600;">
+                            <input type="checkbox" id="checkbox-strip-part" checked style="accent-color: var(--accent); width: 16px; height: 16px;">
+                            🏷️ <span>Tự động loại bỏ chữ 'Part / Phần' khỏi Tiêu đề & Caption</span>
+                        </label>
                     </div>
                 </div>
             </section>
@@ -310,6 +498,10 @@
                             <label class="sub-label">Corresponding Source Folder</label>
                             <input type="text" id="input-channel-folder" class="form-input" placeholder="e.g. SoyPato (must match local source directory folder name)">
                         </div>
+                        <div class="form-col">
+                            <label class="sub-label">Content / Chủ Đề Kênh</label>
+                            <input type="text" id="input-channel-content" class="form-input" placeholder="e.g. Roblox, Minecraft, Free Fire, Review...">
+                        </div>
                     </div>
                     <div class="form-row" style="margin-top: 12px; justify-content: flex-end;">
                         <button class="btn btn-secondary btn-sm" id="btn-cancel-channel">Cancel</button>
@@ -322,18 +514,19 @@
                     <table class="dashboard-table">
                         <thead>
                             <tr>
-                                <th width="60">No.</th>
+                                <th width="50">No.</th>
                                 <th>YouTube Channel Name</th>
                                 <th>Channel URL</th>
                                 <th>Source Folder Name</th>
-                                <th style="text-align: center;">Clips Downloaded</th>
-                                <th width="120" style="text-align: center;">Actions</th>
+                                <th>Content / Chủ đề</th>
+                                <th style="text-align: center; width: 140px;">Clips Downloaded</th>
+                                <th width="110" style="text-align: center;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="channels-table-body">
                             <!-- Loaded dynamically via JS -->
                             <tr>
-                                <td colspan="6" class="table-empty">
+                                <td colspan="7" class="table-empty">
                                     <i class="fa-solid fa-circle-notch fa-spin"></i> Loading channel data...
                                 </td>
                             </tr>
@@ -341,6 +534,185 @@
                     </table>
                 </div>
             </section>
+        </div>
+
+        <!-- Tab 0.15: YouTube Media Downloader Pipeline (Videos & Shorts) -->
+        <div id="tab-download" class="tab-content">
+            <!-- Header Hero Banner -->
+            <section class="panel" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <div style="width: 48px; height: 48px; border-radius: 10px; background: var(--bg-input); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--text-primary); font-size: 22px;">
+                            <i class="fa-solid fa-cloud-arrow-down"></i>
+                        </div>
+                        <div>
+                            <h2 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--text-primary);">Download Video Pipeline</h2>
+                            <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">Scan and download YouTube videos/shorts from target channels, filter by views/duration, and download to source directory.</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" class="btn btn-outline" id="btn-dl-open-source-dir" title="Open source directory in File Explorer">
+                            <i class="fa-solid fa-folder-open"></i> Open Source Folder
+                        </button>
+                        <button type="button" class="btn btn-primary" id="btn-dl-batch-start" style="font-weight: 800; padding: 9px 18px; font-size: 13px; cursor: pointer;">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Download Selected (<span id="dl-btn-batch-count">0</span>)
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Channel Filter & Search Panel -->
+            <section class="panel config-panel" style="margin-bottom: 16px;">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-brands fa-youtube text-danger" style="color: #ef4444;"></i>
+                        <h3>1. Bộ Lọc Kênh & Tiêu Chí Video Mục Tiêu</h3>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button class="btn btn-primary btn-sm" id="btn-dl-scan-channel" style="background: #ef4444; border-color: #ef4444;">
+                            <i class="fa-solid fa-magnifying-glass"></i> Quét Kênh YouTube
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-body-config" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+                    <!-- Row 1: Channel Select, Custom URL, Min Views, Max Duration -->
+                    <div class="form-row" style="display: grid; grid-template-columns: 1.2fr 1.5fr 1fr 1fr; gap: 14px;">
+                        <div class="form-col">
+                            <label class="sub-label"><i class="fa-solid fa-square-rss"></i> Chọn Kênh YouTube Mục Tiêu</label>
+                            <select id="dl-channel-select" class="form-select">
+                                <option value="">-- Chọn kênh YouTube đã lưu --</option>
+                                <!-- Loaded dynamically via JS -->
+                            </select>
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label"><i class="fa-solid fa-link"></i> Hoặc Nhập URL / @Handle Kênh</label>
+                            <div class="input-icon-wrapper" style="width: 100%;">
+                                <i class="fa-brands fa-youtube"></i>
+                                <input type="text" id="dl-custom-url-input" class="form-input" placeholder="e.g. https://youtube.com/@SoyPato hoặc @SoyPato">
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label"><i class="fa-solid fa-fire"></i> Lượt Xem Tối Thiểu (Views)</label>
+                            <select id="dl-min-views-select" class="form-select">
+                                <option value="0">Tất cả lượt xem (0+)</option>
+                                <option value="100000">🔥 Từ 100K views trở lên</option>
+                                <option value="500000">🔥 Từ 500K views trở lên</option>
+                                <option value="1000000" selected>🚀 Từ 1M views trở lên (Chuẩn)</option>
+                                <option value="2000000">⚡ Từ 2M views trở lên</option>
+                                <option value="5000000">🌟 Từ 5M views trở lên</option>
+                            </select>
+                        </div>
+                        <div class="form-col">
+                            <label class="sub-label"><i class="fa-solid fa-clock"></i> Thời Lượng Tối Đa (Video dài)</label>
+                            <select id="dl-max-duration-select" class="form-select">
+                                <option value="0">Tất cả thời lượng</option>
+                                <option value="600">Dưới 10 phút (<= 600s)</option>
+                                <option value="1200" selected>Dưới 20 phút (<= 1200s)</option>
+                                <option value="1800">Dưới 30 phút (<= 1800s)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Search Title keyword & Auto Download Trigger Toggle -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                        <div style="flex: 1; max-width: 480px; position: relative;">
+                            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
+                            <input type="text" id="dl-search-keyword" class="form-input" placeholder="Tìm kiếm nhanh tiêu đề video trong danh sách..." style="padding-left: 36px; width: 100%;">
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 18px;">
+                            <!-- Auto Download Toggle on Check -->
+                            <label class="toggle-card" style="padding: 6px 14px; margin: 0; background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.3);">
+                                <input type="checkbox" id="dl-toggle-auto-download" checked>
+                                <span class="toggle-slider"></span>
+                                <div class="toggle-info">
+                                    <strong style="color: #ef4444; font-size: 13px;"><i class="fa-solid fa-bolt"></i> Tự Động Kích Hoạt Tải Khi Tích Chọn</strong>
+                                    <span style="font-size: 11px;">Tích chọn video nào ➔ Pipeline tải ngay video đó về máy</span>
+                                </div>
+                            </label>
+
+                            <div style="font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-folder-tree text-primary"></i> 
+                                <span>Thư mục đích: <strong id="dl-target-folder-label" style="color: var(--text-primary);">input_sources/</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Segmented Media Switcher & Action Toolbar -->
+            <div class="dl-toolbar-panel" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 16px;">
+                <!-- Segmented Media Switcher (Video dài vs Shorts) -->
+                <div class="dl-segmented-control" style="display: inline-flex; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 4px; gap: 4px; box-shadow: var(--shadow-card);">
+                    <button type="button" class="dl-tab-btn active" id="dl-tab-btn-videos" data-media="videos" style="display: flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 8px; border: none; font-weight: 700; font-size: 13px; cursor: pointer; transition: var(--transition);">
+                        <i class="fa-solid fa-video"></i> 
+                        <span>Video Dài (Regular Videos)</span>
+                        <span class="badge-count" id="dl-count-videos-badge" style="background: #3b82f6; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">0</span>
+                    </button>
+                    <button type="button" class="dl-tab-btn" id="dl-tab-btn-shorts" data-media="shorts" style="display: flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 8px; border: none; font-weight: 700; font-size: 13px; cursor: pointer; transition: var(--transition);">
+                        <i class="fa-solid fa-bolt" style="color: #f59e0b;"></i> 
+                        <span>YouTube Shorts (Video Ngắn)</span>
+                        <span class="badge-count" id="dl-count-shorts-badge" style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">0</span>
+                    </button>
+                </div>
+
+                <!-- Selection & Quick Actions -->
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <label class="dl-checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-size: 13px; font-weight: 600;">
+                        <input type="checkbox" id="dl-select-all-visible" style="width: 16px; height: 16px; cursor: pointer; accent-color: #ef4444;">
+                        <span>Chọn tất cả</span>
+                    </label>
+                    <span style="color: var(--border-color);">|</span>
+                    <span style="font-size: 13px; color: var(--text-secondary);">
+                        Đã chọn: <strong id="dl-selected-counter" style="color: #ef4444;">0</strong> clip
+                    </span>
+                    <button type="button" class="btn btn-xs btn-outline" id="dl-btn-clear-selection">
+                        <i class="fa-solid fa-xmark"></i> Bỏ chọn
+                    </button>
+                    <button type="button" class="btn btn-xs btn-outline" id="dl-btn-refresh-scan">
+                        <i class="fa-solid fa-arrows-rotate"></i> Quét lại
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. Videos Container (Regular Videos) -->
+            <div id="dl-container-videos" class="dl-media-container active">
+                <div id="dl-grid-videos" class="dl-video-cards-grid">
+                    <!-- Loaded dynamically via JS -->
+                    <div class="dl-empty-state">
+                        <i class="fa-brands fa-youtube" style="font-size: 48px; color: var(--text-muted); margin-bottom: 12px;"></i>
+                        <h3>Chưa có dữ liệu video</h3>
+                        <p>Vui lòng chọn kênh YouTube và bấm <strong>"Quét Kênh YouTube"</strong> để tải danh sách video dài và shorts.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Shorts Container (YouTube Shorts) -->
+            <div id="dl-container-shorts" class="dl-media-container hidden">
+                <div id="dl-grid-shorts" class="dl-video-cards-grid">
+                    <!-- Loaded dynamically via JS -->
+                    <div class="dl-empty-state">
+                        <i class="fa-solid fa-bolt" style="font-size: 48px; color: var(--text-muted); margin-bottom: 12px;"></i>
+                        <h3>Chưa có dữ liệu Shorts</h3>
+                        <p>Vui lòng chọn kênh YouTube và bấm <strong>"Quét Kênh YouTube"</strong> để tải danh sách Shorts.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Real-Time Download Status Panel -->
+            <div id="dl-download-queue-panel" class="panel hidden" style="margin-top: 20px; border: 1px solid rgba(59, 130, 246, 0.3); background: var(--bg-card);">
+                <div class="panel-header" style="background: rgba(59, 130, 246, 0.08);">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-cloud-arrow-down text-primary"></i>
+                        <h3>Tiến Độ Tải Video Nguồn Real-time (Active Downloads)</h3>
+                    </div>
+                    <span id="dl-active-tasks-badge" class="badge-count" style="background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">0 đang tải</span>
+                </div>
+                <div id="dl-queue-items-list" style="padding: 16px; display: flex; flex-direction: column; gap: 10px; max-height: 280px; overflow-y: auto;">
+                    <!-- Real-time download task progress cards -->
+                </div>
+            </div>
         </div>
 
         <!-- Tab 0.2: TikTok Accounts Manager -->
@@ -509,18 +881,18 @@
                 <!-- Right Main Content: Active Account Details & Clips Feed -->
                 <main class="panel pub-main-panel">
                     <!-- Banner Auto-Pilot Pipeline -->
-                    <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(217, 70, 239, 0.15)); border: 1px solid rgba(99, 102, 241, 0.35); padding: 12px 18px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                    <div style="background: var(--bg-input); border: 1px solid var(--border-color); padding: 12px 18px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                         <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 38px; height: 38px; border-radius: 8px; background: linear-gradient(135deg, #6366f1, #d946ef); display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.4);">
-                                <i class="fa-solid fa-rocket" style="font-size: 18px;"></i>
+                            <div style="width: 38px; height: 38px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--text-primary);">
+                                <i class="fa-solid fa-rocket" style="font-size: 16px;"></i>
                             </div>
                             <div>
-                                <h4 style="margin: 0; font-size: 14px; font-weight: 800;">🚀 Auto-Pilot Pipeline (Đăng Tự Động Hàng Loạt)</h4>
-                                <span style="font-size: 12px; color: var(--text-secondary);">Tự động đăng toàn bộ clip chờ đăng ➔ Đổi IP HMA ➔ AdsPower ➔ TikTok ➔ Telegram</span>
+                                <h4 style="margin: 0; font-size: 13.5px; font-weight: 800;">Automation Pipeline</h4>
+                                <span style="font-size: 12px; color: var(--text-secondary);">Auto-publish pending clips ➔ HMA IP Switch ➔ AdsPower ➔ TikTok ➔ Telegram</span>
                             </div>
                         </div>
-                        <button type="button" class="btn btn-primary btn-sm" id="btn-banner-open-autopilot" style="background: linear-gradient(135deg, #6366f1, #d946ef); border: none; font-weight: 800; padding: 7px 16px; border-radius: 8px; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); cursor: pointer;">
-                            <i class="fa-solid fa-bolt"></i> Kích Hoạt Pipeline Ngay
+                        <button type="button" class="btn btn-primary btn-sm" id="btn-banner-open-autopilot" style="font-weight: 800; padding: 7px 16px; border-radius: 8px; cursor: pointer;">
+                            <i class="fa-solid fa-bolt"></i> Launch Pipeline
                         </button>
                     </div>
 
@@ -601,180 +973,325 @@
         </div>
 
         <!-- Tab 1: Dashboard & Statistics -->
-        <div id="tab-dashboard" class="tab-content">
-            <!-- Overall Stats Summary -->
-            <section class="stats-summary-grid">
-                <div class="stats-card glow-primary">
-                    <div class="stats-card-left">
-                        <span class="stats-label">Total Channels (Folders)</span>
-                        <h2 id="summary-total-folders">0</h2>
-                    </div>
-                    <div class="stats-card-icon bg-primary-soft">
-                        <i class="fa-solid fa-users"></i>
-                    </div>
+        <div id="tab-dashboard" class="tab-content active">
+            <!-- Dashboard Sub-tabs Navigation Bar -->
+            <div class="dashboard-subtabs-nav">
+                <div class="subtabs-pill-group">
+                    <button type="button" class="subtab-pill active" id="btn-subtab-webapp" data-subtab="subtab-webapp">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <span>WebApp Overview</span>
+                    </button>
+                    <button type="button" class="subtab-pill" id="btn-subtab-tiktok" data-subtab="subtab-tiktok">
+                        <i class="fa-brands fa-tiktok"></i>
+                        <span>TikTok Analytics</span>
+                    </button>
                 </div>
+            </div>
 
-                <div class="stats-card glow-accent">
-                    <div class="stats-card-left">
-                        <span class="stats-label">Total Scanned Videos</span>
-                        <h2 id="summary-total-videos">0</h2>
-                    </div>
-                    <div class="stats-card-icon bg-accent-soft">
-                        <i class="fa-solid fa-film"></i>
-                    </div>
-                </div>
-
-                <div class="stats-card glow-success">
-                    <div class="stats-card-left">
-                        <span class="stats-label">Edited Videos</span>
-                        <h2 id="summary-edited-videos">0</h2>
-                    </div>
-                    <div class="stats-card-icon bg-success-soft">
-                        <i class="fa-solid fa-circle-check"></i>
-                    </div>
-                </div>
-
-                <div class="stats-card glow-warning">
-                    <div class="stats-card-left">
-                        <span class="stats-label">Unedited Videos</span>
-                        <h2 id="summary-unedited-videos">0</h2>
-                    </div>
-                    <div class="stats-card-icon bg-warning-soft">
-                        <i class="fa-solid fa-circle-play"></i>
-                    </div>
-                </div>
-
-                <div class="stats-card progress-circle-card">
-                    <div class="progress-info-group">
-                        <span class="stats-label">Completion Rate</span>
-                        <h2 id="summary-completion-rate">0%</h2>
-                    </div>
-                    <div class="completion-bar-track">
-                        <div class="completion-bar-fill" id="summary-completion-bar" style="width: 0%;"></div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Channels Detail Table / Grid -->
-            <section class="panel dashboard-detail-panel">
-                <div class="panel-header">
-                    <div class="panel-title-group">
-                        <i class="fa-solid fa-chart-line text-primary"></i>
-                        <h3>Progress Statistics by YouTube Channel (Folder)</h3>
-                    </div>
-                    <!-- Table Filtering Toolbar -->
-                    <div class="table-filter-toolbar">
-                        <div class="search-box-wrapper">
-                            <i class="fa-solid fa-filter"></i>
-                            <select id="select-folder-filter" class="form-select select-filter">
-                                <option value="all">All Folders</option>
-                                <!-- Rendered dynamically via JS -->
-                            </select>
+            <!-- Subtab 1: WebApp Overview (Video Processing & YouTube Channels) -->
+            <div id="subtab-webapp" class="dashboard-subtab-view active">
+                <!-- Overall Stats Summary Cards -->
+                <section class="stats-summary-grid">
+                    <div class="stats-card glow-primary">
+                        <div class="stats-card-left">
+                            <span class="stats-label">Total Channels</span>
+                            <h2 id="summary-total-folders">0</h2>
                         </div>
-                    </div>
-                </div>
-
-                <div class="table-scroll-area">
-                    <table class="dashboard-table">
-                        <thead>
-                            <tr>
-                                <th width="60">No.</th>
-                                <th>Channel Name (Folder)</th>
-                                <th width="150" style="text-align: center;">Total Videos</th>
-                                <th width="150" style="text-align: center;">Edited</th>
-                                <th width="150" style="text-align: center;">Unedited</th>
-                                <th width="280">Progress</th>
-                                <th width="150" style="text-align: center;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dashboard-table-body">
-                            <tr>
-                                <td colspan="7" class="table-empty">
-                                    <i class="fa-solid fa-folder-tree"></i> Please scan the source folder to display statistics.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        </div>
-
-        <!-- Tab 2: Studio Video Explorer & Editor -->
-        <div id="tab-studio" class="tab-content">
-            <div class="studio-layout-grid">
-                <!-- Column Left: Video Tree -->
-                <section class="panel video-explorer-panel" id="video-explorer-panel">
-                    <div class="panel-header">
-                        <div class="panel-title-group">
-                            <i class="fa-solid fa-folder-tree text-primary"></i>
-                            <h3>1. Video Explorer</h3>
-                            <span class="badge badge-info" id="explorer-total-badge" style="font-size: 10px; margin-left: 4px;">0 Video</span>
-                        </div>
-                        <div class="panel-header-actions">
-                            <button type="button" class="btn-icon-xs" id="btn-toggle-all-folders" title="Mở rộng / Thu gọn tất cả thư mục">
-                                <i class="fa-solid fa-layer-group"></i>
-                            </button>
-                            <button type="button" class="btn-icon-xs" id="btn-collapse-explorer-panel" title="Thu nhỏ / Mở rộng khung Video Explorer">
-                                <i class="fa-solid fa-chevron-up" id="icon-collapse-explorer"></i>
-                            </button>
+                        <div class="stats-card-icon bg-primary-soft">
+                            <i class="fa-solid fa-users"></i>
                         </div>
                     </div>
 
-                    <div class="explorer-body" id="explorer-body">
-                        <div class="explorer-toolbar">
-                            <!-- Search box -->
-                            <div class="explorer-search-wrapper">
-                                <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                                <input type="text" id="input-explorer-search" class="explorer-search-input" placeholder="🔍 Tìm kiếm video hoặc kênh..." autocomplete="off">
-                                <button type="button" id="btn-clear-explorer-search" class="btn-clear-search hidden" title="Xóa tìm kiếm">&times;</button>
-                            </div>
-
-                            <!-- Actions & Filters -->
-                            <div class="explorer-actions-row">
-                                <div class="batch-select-all">
-                                    <label class="custom-checkbox">
-                                        <input type="checkbox" id="chk-select-all">
-                                        <span class="checkmark"></span>
-                                        <span class="label-text">Chọn video chưa edit</span>
-                                    </label>
-                                </div>
-                                <div class="filter-group">
-                                    <button type="button" class="filter-btn active" data-filter="all">Tất cả</button>
-                                    <button type="button" class="filter-btn" data-filter="unedited">Chưa edit</button>
-                                    <button type="button" class="filter-btn" data-filter="edited">Đã edit</button>
-                                </div>
-                            </div>
+                    <div class="stats-card glow-accent">
+                        <div class="stats-card-left">
+                            <span class="stats-label">Total Scanned Videos</span>
+                            <h2 id="summary-total-videos">0</h2>
                         </div>
-
-                        <div class="video-tree-container" id="video-tree-container">
-                            <div class="empty-state">
-                                <i class="fa-solid fa-folder-open"></i>
-                                <p>Nhập đường dẫn Google Drive/Thư mục nguồn và bấm <strong>"Quét dữ liệu nguồn"</strong>.</p>
-                            </div>
+                        <div class="stats-card-icon bg-accent-soft">
+                            <i class="fa-solid fa-film"></i>
                         </div>
-                        
-                        <!-- Resize Handle Bar -->
-                        <div class="explorer-resize-handle" id="explorer-resize-handle" title="Kéo lên / xuống để thay đổi chiều cao danh sách">
-                            <div class="resize-grip"></div>
+                    </div>
+
+                    <div class="stats-card glow-success">
+                        <div class="stats-card-left">
+                            <span class="stats-label">Edited Videos</span>
+                            <h2 id="summary-edited-videos">0</h2>
+                        </div>
+                        <div class="stats-card-icon bg-success-soft">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                    </div>
+
+                    <div class="stats-card glow-warning">
+                        <div class="stats-card-left">
+                            <span class="stats-label">Unedited Videos</span>
+                            <h2 id="summary-unedited-videos">0</h2>
+                        </div>
+                        <div class="stats-card-icon bg-warning-soft">
+                            <i class="fa-solid fa-circle-play"></i>
+                        </div>
+                    </div>
+
+                    <div class="stats-card progress-circle-card">
+                        <div class="progress-info-group">
+                            <span class="stats-label">Completion Rate</span>
+                            <h2 id="summary-completion-rate">0%</h2>
+                        </div>
+                        <div class="completion-bar-track">
+                            <div class="completion-bar-fill" id="summary-completion-bar" style="width: 0%;"></div>
                         </div>
                     </div>
                 </section>
 
-                <!-- Column Center: Editing Configurations -->
-                <section class="panel studio-controls-panel">
+                <!-- Channels Detail Table / Grid -->
+                <section class="panel dashboard-detail-panel" style="margin-top: 20px;">
                     <div class="panel-header">
                         <div class="panel-title-group">
-                            <i class="fa-solid fa-sliders text-accent"></i>
-                            <h3>2. Control Panel</h3>
+                            <i class="fa-solid fa-chart-line text-primary"></i>
+                            <h3>Progress Statistics by YouTube Channel</h3>
                         </div>
-                        <span class="badge badge-accent">Auto-GPU Enabled</span>
+                        <!-- Table Filtering Toolbar -->
+                        <div class="table-filter-toolbar">
+                            <div class="search-box-wrapper">
+                                <i class="fa-solid fa-filter"></i>
+                                <select id="select-folder-filter" class="form-select select-filter">
+                                    <option value="all">All Folders</option>
+                                    <!-- Rendered dynamically via JS -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-scroll-area">
+                        <table class="dashboard-table">
+                            <thead>
+                                <tr>
+                                    <th width="60">No.</th>
+                                    <th>Channel Name</th>
+                                    <th width="150" style="text-align: center;">Total Videos</th>
+                                    <th width="150" style="text-align: center;">Edited</th>
+                                    <th width="150" style="text-align: center;">Unedited</th>
+                                    <th width="280">Progress</th>
+                                    <th width="150" style="text-align: center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboard-table-body">
+                                <tr>
+                                    <td colspan="7" class="table-empty">
+                                        <i class="fa-solid fa-folder-tree"></i> Please scan the source folder to display statistics.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Subtab 2: TikTok Analytics (Channel Analytics Matrix & KPIs) -->
+            <div id="subtab-tiktok" class="dashboard-subtab-view" style="display: none;">
+                <!-- TikTok Channel Analytics & Performance Hub -->
+                <section class="panel analytics-hub-panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                        <div class="panel-title-group">
+                            <i class="fa-brands fa-tiktok text-accent" style="font-size: 22px;"></i>
+                            <div>
+                                <h3 style="margin: 0; font-size: 18px; font-weight: 700;">TikTok Channel Analytics Matrix</h3>
+                                <span style="font-size: 12px; color: var(--text-muted);">Tự động bóc tách Views, Followers, Tim, Comment & Tỉ lệ người xem hoàn thành video</span>
+                            </div>
+                        </div>
+
+                        <!-- Actions & IP Safety Indicator -->
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <div id="analytics-ip-badge" class="ip-safety-badge" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; background: var(--bg-badge); border: 1px solid var(--border-color);">
+                                <span class="pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #00f2fe; display: inline-block;"></span>
+                                <span id="analytics-ip-text">Đang kiểm tra IP...</span>
+                            </div>
+
+                            <button id="btn-collect-analytics" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 20px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                                <i class="fa-solid fa-cloud-arrow-down"></i>
+                                <span>Collect Data</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 5 Key TikTok KPIs Cards -->
+                    <div class="analytics-kpi-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 18px 0;">
+                        <div class="stats-card glow-accent" style="padding: 14px 16px;">
+                            <div class="stats-card-left">
+                                <span class="stats-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Video Views (7D)</span>
+                                <h2 id="kpi-total-views" style="margin: 4px 0 0 0; font-size: 22px; color: var(--text-primary);">0</h2>
+                            </div>
+                            <div class="stats-card-icon bg-accent-soft">
+                                <i class="fa-solid fa-eye text-accent"></i>
+                            </div>
+                        </div>
+
+                        <div class="stats-card glow-primary" style="padding: 14px 16px;">
+                            <div class="stats-card-left">
+                                <span class="stats-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Total Followers</span>
+                                <h2 id="kpi-total-followers" style="margin: 4px 0 0 0; font-size: 22px; color: var(--text-primary);">0</h2>
+                            </div>
+                            <div class="stats-card-icon bg-primary-soft">
+                                <i class="fa-solid fa-user-plus text-primary"></i>
+                            </div>
+                        </div>
+
+                        <div class="stats-card glow-success" style="padding: 14px 16px;">
+                            <div class="stats-card-left">
+                                <span class="stats-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Total Likes (Tim)</span>
+                                <h2 id="kpi-total-likes" style="margin: 4px 0 0 0; font-size: 22px; color: var(--text-primary);">0</h2>
+                            </div>
+                            <div class="stats-card-icon" style="background: rgba(255, 0, 80, 0.15);">
+                                <i class="fa-solid fa-heart" style="color: #ff0050;"></i>
+                            </div>
+                        </div>
+
+                        <div class="stats-card glow-warning" style="padding: 14px 16px;">
+                            <div class="stats-card-left">
+                                <span class="stats-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Total Comments</span>
+                                <h2 id="kpi-total-comments" style="margin: 4px 0 0 0; font-size: 22px; color: var(--text-primary);">0</h2>
+                            </div>
+                            <div class="stats-card-icon bg-warning-soft">
+                                <i class="fa-solid fa-comments text-warning"></i>
+                            </div>
+                        </div>
+
+                        <div class="stats-card" style="padding: 14px 16px; border-left: 4px solid #00f2fe; background: var(--bg-card);">
+                            <div class="stats-card-left">
+                                <span class="stats-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Avg Completion Rate</span>
+                                <h2 id="kpi-avg-completion" style="margin: 4px 0 0 0; font-size: 22px; color: #00f2fe;">0%</h2>
+                            </div>
+                            <div class="stats-card-icon" style="background: rgba(0, 242, 254, 0.1);">
+                                <i class="fa-solid fa-chart-pie" style="color: #00f2fe;"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Progress Log -->
+                    <div id="analytics-collect-progress" style="display: none; margin-bottom: 16px; padding: 12px 16px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="font-weight: 600; font-size: 13px; color: var(--primary);"><i class="fa-solid fa-spinner fa-spin"></i> Đang mở AdsPower và bóc tách dữ liệu kênh...</span>
+                            <span id="analytics-progress-status" style="font-size: 12px; color: var(--text-muted);">Vui lòng giữ AdsPower hoạt động</span>
+                        </div>
+                        <div id="analytics-live-log" style="font-family: monospace; font-size: 12px; color: var(--text-secondary); max-height: 90px; overflow-y: auto; line-height: 1.5;"></div>
+                    </div>
+
+                    <!-- Detailed TikTok Accounts Analytics Table -->
+                    <div class="table-scroll-area">
+                        <table class="dashboard-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">No.</th>
+                                    <th>Kênh TikTok / Account</th>
+                                    <th width="150">AdsPower Profile</th>
+                                    <th width="120" style="text-align: right;">Followers</th>
+                                    <th width="120" style="text-align: right;">Views (7D)</th>
+                                    <th width="110" style="text-align: right;">Likes (Tim)</th>
+                                    <th width="110" style="text-align: right;">Comments</th>
+                                    <th width="140" style="text-align: center;">Tỉ lệ Xem Hết (%)</th>
+                                    <th width="150" style="text-align: center;">Lần Cập Nhật</th>
+                                    <th width="100" style="text-align: center;">Thao Tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analytics-table-body">
+                                <tr>
+                                    <td colspan="10" class="table-empty">
+                                        <i class="fa-brands fa-tiktok"></i> Nhấn nút "Collect Data" để tải dữ liệu phân tích các kênh TikTok.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Tab 2: Studio Video Explorer & Editor -->
+        <div id="tab-studio" class="tab-content">
+            <!-- Row Top: Live Canvas Preview (Left) & Control Panel (Right) -->
+            <div class="studio-top-workspace">
+                <!-- Top-Left: Live Preview Mockup (Nằm bên trái để vừa chỉnh vừa nhìn trực quan) -->
+                <section class="panel preview-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-group">
+                            <i class="fa-solid fa-eye text-primary"></i>
+                            <h3>Live Canvas Preview</h3>
+                        </div>
+                        <div class="preview-header-tags">
+                            <span class="preview-ratio-tag" id="preview-ratio-label">3:4 Canvas</span>
+                        </div>
+                    </div>
+
+                    <div class="preview-canvas-wrapper">
+                        <div class="mockup-canvas ratio-3-4-canvas" id="mockup-canvas">
+                            <div class="canvas-bg-blur" id="canvas-bg-blur"></div>
+                            <div class="canvas-fg-video" id="canvas-fg-video">
+                                <div class="video-placeholder-content">
+                                    <div class="pulse-play-ring">
+                                        <i class="fa-solid fa-film"></i>
+                                    </div>
+                                    <span class="canvas-center-badge">Raw Video Centered</span>
+                                    <div class="canvas-effect-indicators">
+                                        <span class="canvas-pill-indicator hidden" id="canvas-flip-indicator"><i class="fa-solid fa-arrows-left-right"></i> Flip-X</span>
+                                        <span class="canvas-pill-indicator" id="canvas-hdr-indicator"><i class="fa-solid fa-sun"></i> HDR Color</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="canvas-banner banner-white-rounded" id="canvas-banner">
+                                <span id="canvas-banner-text">AYUDÉ A EXTRAÑOS A LLEGAR A LAS 500 NOCHES</span>
+                            </div>
+                            <div class="canvas-split-tag" id="canvas-split-tag">
+                                <i class="fa-solid fa-bolt"></i>
+                                <span id="canvas-split-tag-text">Auto Climax 45s</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="preview-footer-tips">
+                        <div class="preview-tip-item">
+                            <i class="fa-solid fa-circle-info text-primary"></i>
+                            <span>Phản hồi thời gian thực: Tỉ lệ, Blur, Lật hình & Banner.</span>
+                        </div>
+                        <div class="preview-active-badges">
+                            <span class="badge-mini badge-blur-status"><i class="fa-solid fa-droplet"></i> Blur BG Active</span>
+                            <span class="badge-mini badge-gpu-status"><i class="fa-solid fa-microchip"></i> NVENC HW Ready</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Top-Right: Editing Configurations (Control Panel - Nằm bên phải) -->
+                <section class="panel studio-controls-panel">
+                    <div class="panel-header studio-controls-header">
+                        <div class="panel-title-group">
+                            <div class="panel-title-icon-badge">
+                                <i class="fa-solid fa-sliders"></i>
+                            </div>
+                            <div>
+                                <h3>Control Panel (Cấu hình Render)</h3>
+                                <span class="sub-text-hint">Thiết lập thông số trước khi chọn video bên dưới</span>
+                            </div>
+                        </div>
+                        <div class="control-header-actions">
+                            <span class="badge-gpu-chip"><i class="fa-solid fa-microchip"></i> Auto-GPU</span>
+                            <div class="selected-summary-pill" id="selected-summary-pill-container" title="Số video đã chọn để render">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>Selected: <strong id="selected-count-badge">0</strong> vids</span>
+                            </div>
+                            <button class="btn-header-start" id="btn-start-processing" title="Bắt đầu xuất hàng loạt video đã chọn">
+                                <i class="fa-solid fa-bolt"></i> START BATCH PROCESS
+                            </button>
+                            <button class="btn-header-stop hidden" id="btn-stop-processing">
+                                <i class="fa-solid fa-stop"></i> Abort Processing
+                            </button>
+                        </div>
                     </div>
 
                     <div class="controls-scroll-area">
-                        <!-- 1. Aspect ratio -->
+                        <!-- Step 1: Aspect ratio -->
                         <div class="control-box">
                             <label class="control-label">
-                                <i class="fa-solid fa-crop-simple"></i> Aspect Ratio
+                                <span class="control-step-badge">1</span>
+                                <i class="fa-solid fa-crop-simple"></i> Aspect Ratio (Tỉ lệ khung hình)
                             </label>
                             <div class="ratio-selector-grid">
                                 <label class="ratio-card active">
@@ -810,10 +1327,11 @@
                             </div>
                         </div>
 
-                        <!-- 2. Effects -->
+                        <!-- Step 2: Effects -->
                         <div class="control-box">
                             <label class="control-label">
-                                <i class="fa-solid fa-wand-magic"></i> Video Effects & BG Settings
+                                <span class="control-step-badge">2</span>
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Video Effects & BG Settings (Hiệu ứng Video)
                             </label>
                             <div class="options-grid">
                                 <label class="toggle-card">
@@ -821,32 +1339,33 @@
                                     <span class="toggle-slider"></span>
                                     <div class="toggle-info">
                                         <strong>Double-layer Blur Background</strong>
-                                        <span>Blurs background and retains crisp foreground center</span>
+                                        <span>Làm mờ nền hai lớp, giữ video chính giữa</span>
                                     </div>
                                 </label>
                                 <label class="toggle-card">
                                     <input type="checkbox" id="effect-hflip">
                                     <span class="toggle-slider"></span>
                                     <div class="toggle-info">
-                                        <strong>Horizontal Flip</strong>
-                                        <span>Flips video horizontally to bypass AI copyright algorithms</span>
+                                        <strong>Horizontal Flip (Lật video gương)</strong>
+                                        <span>Lật ngang video tránh trùng lặp bản quyền</span>
                                     </div>
                                 </label>
                                 <label class="toggle-card">
                                     <input type="checkbox" id="effect-color-boost" checked>
                                     <span class="toggle-slider"></span>
                                     <div class="toggle-info">
-                                        <strong>Color & Contrast Boost</strong>
-                                        <span>Enhances colors and increases video sharpness</span>
+                                        <strong>Color & Contrast Boost (HDR Boost)</strong>
+                                        <span>Tăng độ sắc nét & rực rỡ màu sắc video</span>
                                     </div>
                                 </label>
                             </div>
                         </div>
 
-                        <!-- 3. Text & Banner Box style -->
+                        <!-- Step 3: Text & Banner Box style -->
                         <div class="control-box">
                             <label class="control-label">
-                                <i class="fa-solid fa-font"></i> Banner Template & Typography
+                                <span class="control-step-badge">3</span>
+                                <i class="fa-solid fa-font"></i> Banner Template & Typography (Khung & Phông chữ)
                             </label>
                             
                             <div class="form-row">
@@ -868,15 +1387,12 @@
                                         <option value="BeVietnamPro-Bold">Be Vietnam Pro Bold</option>
                                     </select>
                                 </div>
-                            </div>
-
-                            <div class="form-row">
                                 <div class="form-col">
                                     <label class="sub-label">Banner Position</label>
                                     <select id="banner-position" class="form-select">
-                                        <option value="top">Top</option>
-                                        <option value="center">Center</option>
-                                        <option value="bottom">Bottom</option>
+                                        <option value="top">Top (Trên cùng)</option>
+                                        <option value="center">Center (Chính giữa)</option>
+                                        <option value="bottom">Bottom (Dưới cùng)</option>
                                     </select>
                                 </div>
                                 <div class="form-col">
@@ -889,82 +1405,166 @@
                             </div>
 
                             <div class="form-group" style="margin-top: 10px;">
-                                <label class="sub-label">Sample Title (Live Preview):</label>
+                                <label class="sub-label">Sample Title (Live Preview - Click video dưới để tự điền):</label>
                                 <input type="text" id="preview-text-input" class="form-input" value="AYUDÉ A EXTRAÑOS A LLEGAR A LAS 500 NOCHES">
                             </div>
                         </div>
 
-                        <!-- 4. Split video -->
+                        <!-- Step 4: Split video -->
                         <div class="control-box">
                             <label class="control-label">
-                                <i class="fa-solid fa-scissors"></i> Video Split Rules
+                                <span class="control-step-badge">4</span>
+                                <i class="fa-solid fa-scissors"></i> Video Split Rules (Quy tắc cắt Video)
                             </label>
                             <div class="form-row">
                                 <div class="form-col">
-                                    <label class="sub-label">Split Mode</label>
+                                    <label class="sub-label">Split Mode (Chế độ cắt)</label>
                                     <select id="split-mode" class="form-select">
-                                        <option value="auto">Auto Split by Duration (3 / 6 parts)</option>
-                                        <option value="fixed-3">Fixed 3 Parts (Part 1-3)</option>
-                                        <option value="fixed-6">Fixed 6 Parts (Part 1-6)</option>
-                                        <option value="no-split">No Split (Export Full Video Only)</option>
+                                        <optgroup label="⏱️ Cắt video theo từng phút (Duration-based)">
+                                            <option value="every-1m">⏱️ Cắt mỗi phần 1 Phút (60 giây / 1m) liên tiếp</option>
+                                            <option value="every-2m">⏱️ Cắt mỗi phần 2 Phút (120 giây / 2m) liên tiếp</option>
+                                            <option value="every-3m">⏱️ Cắt mỗi phần 3 Phút (180 giây / 3m) liên tiếp</option>
+                                        </optgroup>
+                                        <optgroup label="⚡ AI Quét Phân Đoạn Cao Trào (Climax Highlights)">
+                                            <option value="ai-highlight-30-45s" selected>🔥 AI Cao Trào 30s – 45s (Chuẩn TikTok Viral) [Khuyên dùng]</option>
+                                            <option value="ai-highlight-45-60s">⚡ AI Cao Trào 45s – 60s (1 Phút / Cao trào dài)</option>
+                                            <option value="ai-highlight-25-30s">⚡ AI Cao Trào 25s – 30s (Hook ngắn siêu kịch tính)</option>
+                                        </optgroup>
+                                        <optgroup label="✂️ Chia đều trọn vẹn nội dung (Equal Parts - Chuẩn gốc)">
+                                            <option value="auto">✂️ Auto Chia Đều (&lt;12p chia 3 part, &ge;12p chia 6 part)</option>
+                                            <option value="fixed-3">✂️ Fixed 3 Parts (Chia đều 3 phần trọn vẹn)</option>
+                                            <option value="fixed-6">✂️ Fixed 6 Parts (Chia đều 6 phần trọn vẹn)</option>
+                                            <option value="no-split">📦 No Split (Xuất toàn bộ 1 video hoàn chỉnh)</option>
+                                        </optgroup>
                                     </select>
                                 </div>
                                 <div class="form-col">
                                     <label class="sub-label">Export Full Video Output</label>
                                     <select id="export-full-toggle" class="form-select">
-                                        <option value="yes">Export Full Video + Splitted Parts</option>
-                                        <option value="no">Export Splitted Parts Only</option>
+                                        <option value="no" selected>Chỉ xuất các Part đã cắt (Khuyên dùng)</option>
+                                        <option value="yes">Xuất cả Full Video + Các Part</option>
                                     </select>
                                 </div>
                             </div>
+                            <div class="split-rule-info-card">
+                                <i class="fa-solid fa-circle-info text-primary"></i>
+                                <span>Hỗ trợ đa dạng: <strong>Cắt theo từng phút</strong> liên tiếp, <strong>AI Cao trào</strong> (25-30s / 30-45s / 45-60s) hoặc <strong>Chia đều trọn vẹn</strong> các part.</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- Button Action Bar -->
-                    <div class="studio-execute-bar">
-                        <div class="selected-summary">
-                            <span>Selected: <strong id="selected-count-badge" class="text-primary">0</strong> videos</span>
-                        </div>
-                        <button class="btn btn-hero" id="btn-start-processing">
-                            <i class="fa-solid fa-play"></i> START BATCH PROCESS
-                        </button>
-                        <button class="btn btn-danger hidden" id="btn-stop-processing">
-                            <i class="fa-solid fa-stop"></i> Abort Processing
-                        </button>
-                    </div>
-                </section>
-
-                <!-- Column Right: Live Preview Mockup -->
-                <section class="panel preview-panel">
-                    <div class="panel-header">
-                        <div class="panel-title-group">
-                            <i class="fa-solid fa-eye text-primary"></i>
-                            <h3>Live Canvas Preview</h3>
-                        </div>
-                        <span class="preview-ratio-tag" id="preview-ratio-label">3:4 Canvas</span>
-                    </div>
-
-                    <div class="preview-canvas-wrapper">
-                        <div class="mockup-canvas ratio-3-4-canvas" id="mockup-canvas">
-                            <div class="canvas-bg-blur" id="canvas-bg-blur"></div>
-                            <div class="canvas-fg-video" id="canvas-fg-video">
-                                <div class="video-placeholder-content">
-                                    <i class="fa-solid fa-film"></i>
-                                    <span>Raw Video Centered</span>
+                        <!-- Step 5: AI Localization & Dubbing -->
+                        <div class="control-box">
+                            <label class="control-label">
+                                <span class="control-step-badge">5</span>
+                                <i class="fa-solid fa-earth-americas"></i> AI Localization & Dubbing (Dịch & Lồng tiếng Đa Quốc Gia)
+                            </label>
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <label class="sub-label">Ngôn ngữ Mục tiêu (Target Market)</label>
+                                    <select id="localization-target-lang" class="form-select">
+                                        <option value="none" selected>🚫 Giữ nguyên tiếng gốc (Không chuyển ngữ)</option>
+                                        <option value="pt-br">🇧🇷 Brazil (Portuguese - Tiếng Bồ Đào Nha)</option>
+                                        <option value="es-mx">🇲🇽 Mexico (Spanish - Tiếng Tây Ban Nha)</option>
+                                        <option value="vi">🇻🇳 Việt Nam (Tiếng Việt)</option>
+                                        <option value="id">🇮🇩 Indonesia (Tiếng Indonesia)</option>
+                                    </select>
+                                </div>
+                                <div class="form-col">
+                                    <label class="sub-label">Giọng đọc AI (Voice Gender)</label>
+                                    <select id="localization-voice-gender" class="form-select">
+                                        <option value="male" selected>👨 Nam (Male Neural AI)</option>
+                                        <option value="female">👩 Nữ (Female Neural AI)</option>
+                                    </select>
+                                </div>
+                                <div class="form-col">
+                                    <label class="sub-label">Chế độ Lồng tiếng / Phụ đề</label>
+                                    <select id="localization-dubbing-mode" class="form-select">
+                                        <option value="dub_and_sub" selected>🎙️ Lồng tiếng AI + Phụ đề dịch (Khuyên dùng)</option>
+                                        <option value="sub_only">📝 Chỉ chèn Phụ đề dịch (Giữ giọng gốc)</option>
+                                        <option value="dub_only">🗣️ Chỉ Lồng tiếng AI (Không hiện phụ đề)</option>
+                                    </select>
+                                </div>
+                                <div class="form-col">
+                                    <label class="sub-label">Phong cách Phụ đề (Subtitle Style)</label>
+                                    <select id="localization-sub-style" class="form-select">
+                                        <option value="tiktok-yellow" selected>⚡ TikTok Yellow (Chữ Vàng viền đen)</option>
+                                        <option value="white-glass">🧊 White Glass (Chữ Trắng hộp mờ)</option>
+                                        <option value="classic">✨ Classic Minimalist (Tối giản thanh lịch)</option>
+                                    </select>
                                 </div>
                             </div>
-                            <div class="canvas-banner banner-white-rounded" id="canvas-banner">
-                                <span id="canvas-banner-text">AYUDÉ A EXTRAÑOS A LLEGAR A LAS 500 NOCHES</span>
+                            <div class="split-rule-info-card" style="margin-top: 8px;">
+                                <i class="fa-solid fa-sparkles text-primary"></i>
+                                <span>Tự động nhận diện lời thoại tiếng Anh, dịch và lồng tiếng Neural AI siêu mượt hoàn toàn <strong>Miễn Phí 100%</strong>.</span>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="preview-footer-tips">
-                        <i class="fa-solid fa-circle-info"></i>
-                        <span>Simulates real canvas layout and title banner rendering.</span>
                     </div>
                 </section>
             </div>
+
+            <!-- Row Bottom: Video Explorer (Full-width Workspace) -->
+            <section class="panel video-explorer-panel video-explorer-wide" id="video-explorer-panel" style="margin-top: 16px;">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-folder-tree text-primary"></i>
+                        <h3>2. Video Explorer</h3>
+                        <span class="badge badge-info" id="explorer-total-badge" style="font-size: 11px; margin-left: 4px;">0 Videos</span>
+                    </div>
+                    <div class="panel-header-actions">
+                        <button type="button" class="btn btn-xs btn-outline" id="btn-toggle-all-folders" title="Expand / Collapse all channel folders">
+                            <i class="fa-solid fa-layer-group"></i> Expand / Collapse
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-success" id="btn-select-all-unedited-btn" title="Quickly select all unedited videos across channels">
+                            <i class="fa-solid fa-check-double"></i> Select All Unedited
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-danger" id="btn-deselect-all-btn" title="Deselect all videos">
+                            <i class="fa-solid fa-xmark"></i> Deselect All
+                        </button>
+                        <button type="button" class="btn-icon-xs" id="btn-collapse-explorer-panel" title="Collapse / Expand Video Explorer panel">
+                            <i class="fa-solid fa-chevron-up" id="icon-collapse-explorer"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="explorer-body" id="explorer-body">
+                    <div class="explorer-toolbar explorer-toolbar-wide">
+                        <!-- Search box -->
+                        <div class="explorer-search-wrapper">
+                            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                            <input type="text" id="input-explorer-search" class="explorer-search-input" placeholder="🔍 Search video title or channel name..." autocomplete="off">
+                            <button type="button" id="btn-clear-explorer-search" class="btn-clear-search hidden" title="Clear search">&times;</button>
+                        </div>
+
+                        <!-- Actions & Filters -->
+                        <div class="explorer-actions-row">
+                            <div class="batch-select-all">
+                                <label class="custom-checkbox">
+                                    <input type="checkbox" id="chk-select-all">
+                                    <span class="checkmark"></span>
+                                    <span class="label-text">Select unedited</span>
+                                </label>
+                            </div>
+                            <div class="filter-group">
+                                <button type="button" class="filter-btn active" data-filter="all">All</button>
+                                <button type="button" class="filter-btn" data-filter="unedited">Unedited</button>
+                                <button type="button" class="filter-btn" data-filter="edited">Edited</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="video-tree-container video-tree-container-wide" id="video-tree-container">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <p>Configure source folder path and click <strong>"Scan Source Data"</strong>.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Resize Handle Bar -->
+                    <div class="explorer-resize-handle" id="explorer-resize-handle" title="Drag up / down to resize list height">
+                        <div class="resize-grip"></div>
+                    </div>
+                </div>
+            </section>
 
             <!-- Queue Progress Section (Placed under editor in Tab 2) -->
             <section class="panel queue-progress-panel" style="margin-top: 16px; min-height: 200px;">
@@ -998,22 +1598,46 @@
         <!-- Tab 3: Finished Products & Output Section -->
         <div id="tab-outputs" class="tab-content">
             <section class="panel finished-products-full-panel">
-                <div class="panel-header">
-                    <div class="panel-title-group">
-                        <i class="fa-solid fa-circle-check text-success"></i>
-                        <h3>Finished Library (Outputs)</h3>
-                        <span class="badge badge-primary" id="finished-total-badge" style="font-size: 11px;">0 videos</span>
+                <div class="panel-header" style="flex-direction: column; gap: 12px; align-items: stretch;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div class="panel-title-group">
+                            <i class="fa-solid fa-circle-check text-success"></i>
+                            <div>
+                                <h3>Finished Library</h3>
+                                <span class="sub-text-hint">Sorted by: Pending TikTok uploads first ➔ Uploaded clips after ➔ Newest on top</span>
+                            </div>
+                            <span class="badge badge-primary" id="finished-total-badge" style="font-size: 11px; margin-left: 6px;">0 videos</span>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <button class="btn btn-sm btn-outline" id="btn-refresh-finished" title="Reload list">
+                                <i class="fa-solid fa-arrows-rotate"></i> Reload
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" id="btn-delete-all-finished" title="Delete all finished video files">
+                                <i class="fa-solid fa-trash-can"></i> Delete All
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" id="link-open-gdrive-dest-tab">
+                                <i class="fa-solid fa-folder-open"></i> Open Destination Folder ↗
+                            </button>
+                        </div>
                     </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <button class="btn btn-sm btn-outline" id="btn-refresh-finished" title="Reload Finished Library">
-                            <i class="fa-solid fa-arrows-rotate"></i> Reload
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" id="btn-delete-all-finished" title="Clear all finished outputs">
-                            <i class="fa-solid fa-trash-can"></i> Delete All
-                        </button>
-                        <button class="btn btn-sm btn-outline-success" id="link-open-gdrive-dest-tab">
-                            <i class="fa-solid fa-folder-open"></i> Open Destination Folder ↗
-                        </button>
+
+                    <!-- Quick Filter & Search Toolbar -->
+                    <div class="finished-toolbar" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+                        <div class="finished-filter-tabs" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-xs finished-filter-btn active" data-filter="all" id="filter-btn-finished-all">
+                                <i class="fa-solid fa-list"></i> All (<span id="count-finished-all">0</span>)
+                            </button>
+                            <button type="button" class="btn btn-xs finished-filter-btn" data-filter="unuploaded" id="filter-btn-finished-unuploaded">
+                                <i class="fa-solid fa-cloud-arrow-up text-success"></i> Pending Upload (<span id="count-finished-unuploaded">0</span>)
+                            </button>
+                            <button type="button" class="btn btn-xs finished-filter-btn" data-filter="uploaded" id="filter-btn-finished-uploaded">
+                                <i class="fa-solid fa-circle-check text-accent"></i> Uploaded to TikTok (<span id="count-finished-uploaded">0</span>)
+                            </button>
+                        </div>
+                        <div style="position: relative; min-width: 240px; flex: 1; max-width: 320px;">
+                            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-muted);"></i>
+                            <input type="text" id="input-search-finished" class="form-input" placeholder="Search finished videos or channels..." style="padding-left: 28px; width: 100%; font-size: 11.5px; height: 30px;">
+                        </div>
                     </div>
                 </div>
 
@@ -1026,229 +1650,29 @@
             </section>
         </div>
 
-        <!-- Tab 4: TikTok Mexico Trend & Viral Discovery Engine -->
-        <div id="tab-mexico-trends" class="tab-content">
-            <!-- 1. Real-time Mexico Golden Time & Status Banner -->
-            <section class="mexico-header-card" style="margin-bottom: 20px; background: linear-gradient(135deg, rgba(255, 71, 87, 0.08), rgba(255, 107, 129, 0.04)); border: 1px solid rgba(255, 71, 87, 0.25); border-radius: 12px; padding: 18px 24px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-                    <div style="display: flex; align-items: center; gap: 14px;">
-                        <div style="width: 46px; height: 46px; border-radius: 10px; background: linear-gradient(135deg, #ff4757, #ff6b81); display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);">
-                            <i class="fa-solid fa-fire"></i>
-                        </div>
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--text-primary);">TikTok Mexico Trend Radar (es-MX)</h3>
-                                <span class="badge" style="background: rgba(255, 71, 87, 0.15); color: #ff4757; font-weight: 700; font-size: 11px;">Region: MX 🇲🇽</span>
-                            </div>
-                            <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-secondary);">
-                                Khám phá chủ đề hot, thuật toán Hashtag 4 tầng và kịch bản Hook giữ chân 3s thị trường Mexico.
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Mexico City Realtime Clock & Posting Slot -->
-                    <div style="display: flex; gap: 16px; align-items: center; background: var(--bg-card); padding: 10px 18px; border-radius: 10px; border: 1px solid var(--border-color);">
-                        <div style="text-align: right;">
-                            <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
-                                <i class="fa-regular fa-clock"></i> Giờ Mexico City (CST / UTC-6)
-                            </div>
-                            <div id="mx-clock-display" style="font-size: 16px; font-weight: 800; color: var(--text-primary);">--:-- --</div>
-                        </div>
-                        <div style="border-left: 1px solid var(--border-color); padding-left: 14px;">
-                            <div id="mx-golden-status-badge" class="status-badge" style="background: rgba(46, 213, 115, 0.12); color: #2ed573; border: 1px solid rgba(46, 213, 115, 0.3); font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 20px;">
-                                <span class="status-dot" style="background: #2ed573;"></span> <span id="mx-golden-text">Đang kiểm tra...</span>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary btn-sm" id="btn-refresh-mexico-trends" style="background: #ff4757; border-color: #ff4757; box-shadow: 0 4px 10px rgba(255,71,87,0.3);">
-                            <i class="fa-solid fa-arrows-rotate"></i> Quét Xu Hướng Live
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 2. Controls & Filter Bar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <label style="font-size: 13px; font-weight: 700; color: var(--text-secondary);">
-                        <i class="fa-solid fa-filter text-primary"></i> Ngách (Niche):
-                    </label>
-                    <select id="mx-niche-select" class="form-control" style="width: 220px; font-size: 13px; font-weight: 600;">
-                        <option value="all">🔥 Tất cả chủ đề hot</option>
-                        <option value="humor">😂 Humor & Comedia Mexicana</option>
-                        <option value="chisme">🤫 Chisme & Storytime</option>
-                        <option value="misterio">👻 Leyendas & Misterio MX</option>
-                        <option value="curiosidades">💡 Curiosidades & Cultura</option>
-                        <option value="futbol">⚽ Fútbol Mexicano (Liga MX)</option>
-                        <option value="comida">🌮 Comida & Tacos Callejeros</option>
-                        <option value="musica">🎵 Música & Corridos Tumbados</option>
-                    </select>
-
-                    <label style="font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-left: 10px;">
-                        <i class="fa-solid fa-calendar-days"></i> Chu kỳ:
-                    </label>
-                    <div class="btn-group" style="display: inline-flex; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color);">
-                        <button type="button" class="btn btn-xs btn-primary mx-period-btn" data-period="7" style="padding: 6px 12px; font-weight: 700;">7 Ngày</button>
-                        <button type="button" class="btn btn-xs btn-outline mx-period-btn" data-period="30" style="padding: 6px 12px; font-weight: 700;">30 Ngày</button>
-                    </div>
-                </div>
-
-                <div style="font-size: 12px; color: var(--text-muted);">
-                    <i class="fa-solid fa-circle-info"></i> Nguồn dữ liệu: <strong>TikTok Creative Center MX & Search Radar</strong>
-                </div>
-            </div>
-
-            <!-- 3. Main 2-Column Dashboard Grid -->
-            <div style="display: grid; grid-template-columns: 1fr 420px; gap: 20px;">
-                <!-- Left Column: Top Trending Hashtags & Topics -->
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    <!-- Hashtags Table Panel -->
-                    <section class="panel" style="margin: 0;">
-                        <div class="panel-header" style="padding: 14px 20px;">
-                            <div class="panel-title-group">
-                                <i class="fa-solid fa-hashtag" style="color: #ff4757;"></i>
-                                <h3 style="font-size: 15px;">Bảng Xếp Hạng Hashtag & Chủ Đề Tăng Trưởng Nhanh (Mexico)</h3>
-                                <span class="badge badge-primary" id="mx-hashtag-count-badge" style="font-size: 11px;">0 hashtags</span>
-                            </div>
-                        </div>
-                        <div class="panel-body" style="padding: 0; overflow-x: auto;">
-                            <table class="table-custom" style="width: 100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="background: var(--bg-hover); font-size: 12px; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
-                                        <th style="padding: 10px 14px; text-align: center; width: 50px;">Hạng</th>
-                                        <th style="padding: 10px 14px; text-align: left;">Hashtag & Ngách</th>
-                                        <th style="padding: 10px 14px; text-align: right;">Lượt xem</th>
-                                        <th style="padding: 10px 14px; text-align: right;">Tăng trưởng</th>
-                                        <th style="padding: 10px 14px; text-align: center; width: 110px;">Viral Score</th>
-                                        <th style="padding: 10px 14px; text-align: center; width: 180px;">Hành động</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="mx-hashtags-table-body">
-                                    <tr>
-                                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                                            <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: #ff4757; margin-bottom: 10px; display: block;"></i>
-                                            Đang tải dữ liệu xu hướng TikTok Mexico...
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-
-                    <!-- Packaged Hot Topics Carousel / Cards -->
-                    <section class="panel" style="margin: 0;">
-                        <div class="panel-header" style="padding: 14px 20px;">
-                            <div class="panel-title-group">
-                                <i class="fa-solid fa-box-archive text-success"></i>
-                                <h3 style="font-size: 15px;">Gói Chủ Đề Đóng Gói Sẵn Cho AI Content Agent & Video Factory</h3>
-                            </div>
-                        </div>
-                        <div class="panel-body" id="mx-packaged-topics-container" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-                            <!-- Topics will be dynamically rendered here -->
-                        </div>
-                    </section>
-                </div>
-
-                <!-- Right Column: AI Hook Generator (es-MX) & Viral Sounds -->
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    <!-- 1. AI Mexican Hook Generator Card -->
-                    <section class="panel" style="margin: 0; border: 1px solid rgba(139, 92, 246, 0.3);">
-                        <div class="panel-header" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(236, 72, 153, 0.04)); padding: 14px 18px;">
-                            <div class="panel-title-group">
-                                <i class="fa-solid fa-wand-magic-sparkles" style="color: #8b5cf6;"></i>
-                                <h3 style="font-size: 14px; font-weight: 800;">AI Mexican Hook & Slang Generator</h3>
-                            </div>
-                        </div>
-                        <div class="panel-body" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-                            <div>
-                                <label style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; display: block;">
-                                    Chủ đề video (Topic / Từ khóa):
-                                </label>
-                                <input type="text" id="mx-hook-topic-input" class="form-control" placeholder="VD: El Chavo del 8, Tacos al pastor, Fantasma en CDMX..." style="font-size: 13px;">
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                                <div>
-                                    <label style="font-size: 11px; font-weight: 700; color: var(--text-muted);">Ngách / Phong cách:</label>
-                                    <select id="mx-hook-niche-select" class="form-control" style="font-size: 12px;">
-                                        <option value="chisme">🤫 Chisme & Storytime</option>
-                                        <option value="humor">😂 Humor Mexicano</option>
-                                        <option value="misterio">👻 Leyendas & Misterio</option>
-                                        <option value="curiosidades">💡 Curiosidades</option>
-                                        <option value="futbol">⚽ Fútbol Liga MX</option>
-                                        <option value="comida">🌮 Comida Mexicana</option>
-                                    </select>
-                                </div>
-                                <div style="display: flex; align-items: flex-end;">
-                                    <button class="btn btn-primary" id="btn-generate-mx-hooks" style="width: 100%; font-size: 12px; font-weight: 700; background: linear-gradient(135deg, #8b5cf6, #ec4899); border: none;">
-                                        <i class="fa-solid fa-bolt"></i> Sinh Hook (es-MX)
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Generated Hooks Display Area -->
-                            <div id="mx-generated-hooks-box" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-                                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
-                                    Gợi ý câu mở đầu 3s (Nhấn để Copy):
-                                </div>
-                                <div class="hook-item-box" style="background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: var(--text-primary); cursor: pointer; transition: all 0.2s;" title="Nhấn để copy câu hook">
-                                    <em>"¡Wey, no vas a creer lo que pasó cuando..."</em>
-                                    <span style="float: right; color: var(--primary); font-size: 11px;"><i class="fa-regular fa-copy"></i></span>
-                                </div>
-                            </div>
-
-                            <!-- 4-Tier Hashtag Preview Box -->
-                            <div id="mx-generated-hashtag-box" style="background: rgba(255, 71, 87, 0.06); border: 1px dashed rgba(255, 71, 87, 0.3); border-radius: 8px; padding: 10px 12px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                    <span style="font-size: 11px; font-weight: 700; color: #ff4757; text-transform: uppercase;">Bộ 4-Tier Hashtags Tối Ưu:</span>
-                                    <button class="btn btn-xs btn-outline" id="btn-copy-generated-tags" style="font-size: 10px; padding: 2px 8px;">
-                                        <i class="fa-regular fa-copy"></i> Copy tất cả
-                                    </button>
-                                </div>
-                                <div id="mx-generated-tags-text" style="font-size: 12px; color: var(--text-primary); font-weight: 600; word-break: break-word;">
-                                    #parati #mexico #chismestiktok #storytime #chisme
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- 2. Top Trending Sounds / Nhạc Mexico Panel -->
-                    <section class="panel" style="margin: 0;">
-                        <div class="panel-header" style="padding: 14px 18px;">
-                            <div class="panel-title-group">
-                                <i class="fa-solid fa-music" style="color: #2ed573;"></i>
-                                <h3 style="font-size: 14px;">Top Âm Thanh / Nhạc Viral Mexico</h3>
-                            </div>
-                        </div>
-                        <div class="panel-body" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;" id="mx-sounds-container">
-                            <!-- Sounds will be dynamically rendered here -->
-                        </div>
-                    </section>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab 8: Auto-Pilot Pipeline & Nightly Automation Hub -->
+        <!-- Tab 8: Automation Pipeline Hub -->
         <div id="tab-autopilot" class="tab-content">
             <!-- Header Hero Banner -->
-            <section class="panel" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(217, 70, 239, 0.12)); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px;">
+            <section class="panel" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
                     <div style="display: flex; align-items: center; gap: 16px;">
-                        <div style="width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, #6366f1, #d946ef); display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45); font-size: 24px;">
+                        <div style="width: 48px; height: 48px; border-radius: 10px; background: var(--bg-input); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--text-primary); font-size: 22px;">
                             <i class="fa-solid fa-rocket"></i>
                         </div>
                         <div>
-                            <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: var(--text-primary);">Trung Tâm Tự Động Hóa Pipeline (Auto-Pilot Hub)</h2>
-                            <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">Tự động đăng toàn bộ clip chờ đăng ➔ Đổi IP HMA ➔ AdsPower Chrome ➔ TikTok Studio ➔ Báo cáo Telegram ➔ Hẹn giờ tắt máy</p>
+                            <h2 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--text-primary);">Automation Pipeline Hub</h2>
+                            <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">Automated video publishing ➔ HMA IP Switch ➔ AdsPower Chrome ➔ TikTok Studio ➔ Telegram Report ➔ Auto Shutdown</p>
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px;">
                         <button type="button" class="btn btn-outline" id="btn-page-open-n8n" style="font-weight: 700;">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở n8n Dashboard
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open n8n Dashboard
                         </button>
-                        <button type="button" class="btn btn-primary" id="btn-page-start-autopilot" style="background: linear-gradient(135deg, #6366f1, #d946ef); border: none; font-weight: 800; padding: 10px 22px; border-radius: 8px; box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4); font-size: 14px; cursor: pointer;">
-                            <i class="fa-solid fa-play"></i> BẮT ĐẦU CHẠY PIPELINE
+                        <button type="button" class="btn btn-primary" id="btn-page-start-autopilot" style="font-weight: 800; padding: 10px 22px; font-size: 13px; cursor: pointer;">
+                            <i class="fa-solid fa-play"></i> START PIPELINE
                         </button>
                         <button type="button" class="btn btn-danger hidden" id="btn-page-stop-autopilot" style="font-weight: 800; padding: 10px 22px;">
-                            <i class="fa-solid fa-stop"></i> Dừng Pipeline
+                            <i class="fa-solid fa-stop"></i> Stop Pipeline
                         </button>
                     </div>
                 </div>
@@ -1295,23 +1719,48 @@
                             <i class="fa-solid fa-list-check text-primary"></i>
                             <h3>Hàng Đợi Xuất Bản (Pending Clips Queue)</h3>
                         </div>
-                        <button type="button" class="btn btn-xs btn-outline" id="btn-page-refresh-queue">
-                            <i class="fa-solid fa-arrows-rotate"></i> Quét lại
-                        </button>
+                        <div style="display: flex; gap: 6px;">
+                            <button type="button" class="btn btn-xs btn-outline" id="btn-page-sync-history" style="font-weight: 700; color: var(--primary);">
+                                <i class="fa-solid fa-rotate text-primary"></i> Đồng bộ Lịch Sử
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline" id="btn-page-refresh-queue">
+                                <i class="fa-solid fa-arrows-rotate"></i> Quét lại
+                            </button>
+                        </div>
                     </div>
-                    <div class="table-scroll-area" style="max-height: 440px; overflow-y: auto;">
+
+                    <!-- Account Selector Box -->
+                    <div style="padding: 12px 14px; background: rgba(0,0,0,0.03); border-bottom: 1px solid var(--border-color);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-user-check text-primary" style="font-size: 13px;"></i>
+                                <span style="font-size: 12px; font-weight: 700;">Chọn tài khoản cần đăng:</span>
+                                <span class="badge badge-primary" id="autopilot-selected-acc-badge" style="font-size: 11px;">Tất cả</span>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" class="btn btn-xs btn-outline" id="btn-page-acc-select-all">Chọn tất cả</button>
+                                <button type="button" class="btn btn-xs btn-outline" id="btn-page-acc-deselect-all">Bỏ chọn</button>
+                            </div>
+                        </div>
+                        <div id="autopilot-page-accounts-list" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 90px; overflow-y: auto;">
+                            <!-- Dynamically generated account chips -->
+                        </div>
+                    </div>
+
+                    <div class="table-scroll-area" style="max-height: 380px; overflow-y: auto;">
                         <table class="dashboard-table">
                             <thead>
                                 <tr>
                                     <th width="40">STT</th>
                                     <th>Kênh & Tên Clip</th>
-                                    <th width="100">Part</th>
-                                    <th width="130">Tài khoản đích</th>
-                                    <th width="70" style="text-align: center;">IP</th>
+                                    <th width="90">Part</th>
+                                    <th width="120">Tài khoản đích</th>
+                                    <th width="65" style="text-align: center;">IP</th>
+                                    <th width="105" style="text-align: center;">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody id="tab-autopilot-table-body">
-                                <tr><td colspan="5" class="table-empty">Đang tải danh sách clip chờ đăng...</td></tr>
+                                <tr><td colspan="6" class="table-empty">Đang tải danh sách clip chờ đăng...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1365,7 +1814,7 @@
                                 <span style="font-size: 12px; font-weight: 800; color: var(--primary);" id="tab-autopilot-progress-percent">0%</span>
                             </div>
                             <div style="background: rgba(0,0,0,0.1); height: 8px; border-radius: 4px; overflow: hidden;">
-                                <div id="tab-autopilot-progress-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #6366f1, #d946ef); transition: width 0.3s ease;"></div>
+                                <div id="tab-autopilot-progress-bar" style="height: 100%; width: 0%; background: var(--primary); transition: width 0.3s ease;"></div>
                             </div>
                             <div id="tab-autopilot-logs" style="background: rgba(0,0,0,0.9); color: #22c55e; font-family: monospace; font-size: 11px; padding: 10px; border-radius: 6px; height: 180px; overflow-y: auto; line-height: 1.5; border: 1px solid var(--border-color); flex: 1;">
                                 <div class="log-line text-muted">[Sẵn sàng] Bấm "BẮT ĐẦU CHẠY PIPELINE" để khởi động chu trình tự động.</div>
@@ -1375,7 +1824,10 @@
                 </div>
             </div>
         </div>
-    </div>
+        <!-- End of all tab contents -->
+        </div>
+    </main>
+</div>
 
     <!-- Modal Video Player Preview -->
     <div class="modal-overlay hidden" id="video-modal">
@@ -1395,7 +1847,7 @@
         <div class="modal-card" style="max-width: 580px;">
             <div class="modal-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #ec4899, #8b5cf6); display: flex; align-items: center; justify-content: center; color: white;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--bg-input); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--text-primary);">
                         <i class="fa-brands fa-tiktok" style="font-size: 18px;"></i>
                     </div>
                     <div>
@@ -1448,12 +1900,12 @@
         <div class="modal-card" style="max-width: 650px;">
             <div class="modal-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #ec4899, #8b5cf6); display: flex; align-items: center; justify-content: center; color: white;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--bg-input); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--text-primary);">
                         <i class="fa-brands fa-tiktok" style="font-size: 18px;"></i>
                     </div>
                     <div>
-                        <h4 id="posting-modal-title" style="margin: 0; font-size: 16px; font-weight: 800;">Đang Đăng Clip Lên TikTok</h4>
-                        <span id="posting-modal-subtitle" style="font-size: 12px; color: var(--text-secondary);">Tự động đổi IP HMA & điều khiển AdsPower Chrome</span>
+                        <h4 id="posting-modal-title" style="margin: 0; font-size: 16px; font-weight: 800;">Posting to TikTok</h4>
+                        <span id="posting-modal-subtitle" style="font-size: 12px; color: var(--text-secondary);">Automated HMA IP Switch & AdsPower Chrome Control</span>
                     </div>
                 </div>
                 <button class="btn-close-modal" id="btn-close-posting-modal"><i class="fa-solid fa-xmark"></i></button>
@@ -1461,23 +1913,23 @@
 
             <div class="modal-body" style="padding: 20px;">
                 <!-- Account & Target Info Banner -->
-                <div class="posting-meta-card" style="background: rgba(0, 0, 0, 0.08); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--border-color);">
+                <div class="posting-meta-card" style="background: var(--bg-input); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--border-color);">
                     <div class="posting-meta-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                         <div>
-                            <span class="text-muted" style="font-size: 11px; display: block;">Tài khoản TikTok:</span>
-                            <div id="posting-meta-acc" style="font-weight: 800; color: var(--accent);">@user</div>
+                            <span class="text-muted" style="font-size: 11px; display: block;">TikTok Account:</span>
+                            <div id="posting-meta-acc" style="font-weight: 800; color: var(--text-primary);">@user</div>
                         </div>
                         <div>
-                            <span class="text-muted" style="font-size: 11px; display: block;">IP Vị trí mục tiêu:</span>
-                            <div id="posting-meta-ip" style="font-weight: 700; color: var(--primary);">US</div>
+                            <span class="text-muted" style="font-size: 11px; display: block;">Target Location / IP:</span>
+                            <div id="posting-meta-ip" style="font-weight: 700; color: var(--text-primary);">US</div>
                         </div>
                         <div>
-                            <span class="text-muted" style="font-size: 11px; display: block;">Profile AdsPower:</span>
+                            <span class="text-muted" style="font-size: 11px; display: block;">AdsPower Profile:</span>
                             <div id="posting-meta-profile" style="font-weight: 700;">Default</div>
                         </div>
                     </div>
                     <div style="margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--text-primary); border-top: 1px dashed var(--border-color); padding-top: 8px;">
-                        <i class="fa-solid fa-film text-primary"></i> <span id="posting-meta-clip-title">Tên clip</span>
+                        <i class="fa-solid fa-film"></i> <span id="posting-meta-clip-title">Clip Title</span>
                     </div>
                 </div>
 
@@ -1486,59 +1938,62 @@
                     <div class="posting-step active" id="step-hma">
                         <div class="step-icon"><i class="fa-solid fa-shield-halved"></i></div>
                         <div class="step-info">
-                            <span class="step-title">1. Đổi IP HMA</span>
-                            <span class="step-status" id="step-hma-status">Đang chạy...</span>
+                            <span class="step-title">1. HMA VPN</span>
+                            <span class="step-status" id="step-hma-status">Running...</span>
                         </div>
                     </div>
                     <div class="posting-step" id="step-ads">
                         <div class="step-icon"><i class="fa-solid fa-bolt"></i></div>
                         <div class="step-info">
                             <span class="step-title">2. AdsPower</span>
-                            <span class="step-status" id="step-ads-status">Chờ...</span>
+                            <span class="step-status" id="step-ads-status">Idle</span>
                         </div>
                     </div>
                     <div class="posting-step" id="step-upload">
                         <div class="step-icon"><i class="fa-brands fa-tiktok"></i></div>
                         <div class="step-info">
-                            <span class="step-title">3. Tải lên Clip</span>
-                            <span class="step-status" id="step-upload-status">Chờ...</span>
+                            <span class="step-title">3. Upload Clip</span>
+                            <span class="step-status" id="step-upload-status">Idle</span>
                         </div>
                     </div>
                     <div class="posting-step" id="step-done">
                         <div class="step-icon"><i class="fa-solid fa-circle-check"></i></div>
                         <div class="step-info">
-                            <span class="step-title">4. Hoàn tất</span>
-                            <span class="step-status" id="step-done-status">Chờ...</span>
+                            <span class="step-title">4. Complete</span>
+                            <span class="step-status" id="step-done-status">Idle</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Live Log Window -->
-                <div class="posting-terminal-logs" id="posting-terminal-logs" style="background: rgba(0,0,0,0.85); color: #22c55e; font-family: monospace; font-size: 11px; padding: 12px; border-radius: 6px; height: 140px; overflow-y: auto; line-height: 1.5; border: 1px solid var(--border-color);">
-                    <div class="log-line text-muted">[Sẵn sàng] Khởi tạo luồng tự động...</div>
+                <div class="posting-terminal-logs" id="posting-terminal-logs" style="background: #000000; color: #22c55e; font-family: monospace; font-size: 11px; padding: 12px; border-radius: 6px; height: 140px; overflow-y: auto; line-height: 1.5; border: 1px solid var(--border-color);">
+                    <div class="log-line text-muted">[Ready] Initializing automated pipeline...</div>
                 </div>
 
                 <!-- Footer Action Buttons -->
                 <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;">
                     <button class="btn btn-secondary btn-sm" id="btn-finish-posting-modal">
-                        <i class="fa-solid fa-xmark"></i> Đóng
+                        <i class="fa-solid fa-xmark"></i> Close
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm hidden" id="btn-force-stop-posting">
+                        <i class="fa-solid fa-ban"></i> Force Stop
                     </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Auto-Pilot Hub (Tự Động Hóa Pipeline & Nightly Automation) -->
+    <!-- Modal: Automation Pipeline Hub -->
     <div class="modal-overlay hidden" id="modal-autopilot-pipeline">
         <div class="modal-card" style="max-width: 720px;">
-            <div class="modal-header" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(217, 70, 239, 0.15)); border-bottom: 1px solid var(--border-color);">
+            <div class="modal-header">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #d946ef); display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);">
-                        <i class="fa-solid fa-rocket" style="font-size: 20px;"></i>
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--bg-input); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--text-primary);">
+                        <i class="fa-solid fa-rocket" style="font-size: 18px;"></i>
                     </div>
                     <div>
-                        <h4 style="margin: 0; font-size: 17px; font-weight: 800;">Trung Tâm Tự Động Hóa Pipeline (Auto-Pilot Hub)</h4>
-                        <span style="font-size: 12px; color: var(--text-secondary);">Tự động đăng toàn bộ clip chờ đăng ➔ Đổi IP HMA ➔ AdsPower ➔ TikTok ➔ Telegram</span>
+                        <h4 style="margin: 0; font-size: 17px; font-weight: 800;">Automation Pipeline Hub</h4>
+                        <span style="font-size: 12px; color: var(--text-secondary);">Automated clip publishing ➔ HMA IP Switch ➔ AdsPower ➔ TikTok ➔ Telegram</span>
                     </div>
                 </div>
                 <button class="btn-close-modal" id="btn-close-autopilot-modal"><i class="fa-solid fa-xmark"></i></button>
@@ -1551,18 +2006,36 @@
                         <span style="font-size: 12px;"><i class="fa-solid fa-server text-primary"></i> Python API: <strong style="color: #22c55e;">Port 8000 (Active)</strong></span>
                         <span style="font-size: 12px;"><i class="fa-solid fa-diagram-project text-accent"></i> n8n Engine: <strong id="autopilot-n8n-status" style="color: #22c55e;">Port 5678</strong></span>
                     </div>
-                    <button type="button" class="btn btn-outline btn-xs" id="btn-open-n8n-tab" title="Mở n8n Workflow Dashboard">
-                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở n8n Dashboard
+                    <button type="button" class="btn btn-outline btn-xs" id="btn-open-n8n-tab" title="Open n8n Workflow Dashboard">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Open n8n Dashboard
                     </button>
                 </div>
 
+                <!-- Account Selector Box in Modal -->
+                <div style="background: rgba(0,0,0,0.04); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-user-check text-primary" style="font-size: 13px;"></i>
+                            <span style="font-size: 12px; font-weight: 700;">Target Accounts:</span>
+                            <span class="badge badge-primary" id="autopilot-modal-selected-acc-badge" style="font-size: 11px;">All</span>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                            <button type="button" class="btn btn-xs btn-outline" id="btn-modal-acc-select-all">Select All</button>
+                            <button type="button" class="btn btn-xs btn-outline" id="btn-modal-acc-deselect-all">Deselect All</button>
+                        </div>
+                    </div>
+                    <div id="autopilot-modal-accounts-list" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 80px; overflow-y: auto;">
+                        <!-- Dynamically generated account chips -->
+                    </div>
+                </div>
+
                 <!-- Queue Summary Card -->
-                <div style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px; padding: 14px;">
+                <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-size: 13px; font-weight: 700; color: var(--primary);">
-                            <i class="fa-solid fa-layer-group"></i> Hàng đợi clip chờ xuất bản:
+                        <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">
+                            <i class="fa-solid fa-layer-group"></i> Publishing Queue:
                         </span>
-                        <span class="badge badge-primary" id="autopilot-queue-badge" style="font-size: 11px;">Đang quét...</span>
+                        <span class="badge badge-primary" id="autopilot-queue-badge" style="font-size: 11px;">Scanning...</span>
                     </div>
                     <div id="autopilot-queue-preview" style="max-height: 120px; overflow-y: auto; font-size: 12px; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
                         <!-- Dynamically populated queue items -->
@@ -1575,8 +2048,8 @@
                         <input type="checkbox" id="autopilot-opt-ai" checked>
                         <span class="toggle-slider"></span>
                         <div class="toggle-info">
-                            <strong>AI Gemini Tự Sinh Caption</strong>
-                            <span style="font-size: 11px;">Tạo tiêu đề & hashtag triệu view</span>
+                            <strong>Gemini AI Auto-Caption</strong>
+                            <span style="font-size: 11px;">Generate viral titles & hashtags</span>
                         </div>
                     </label>
 
@@ -1584,8 +2057,8 @@
                         <input type="checkbox" id="autopilot-opt-hma" checked>
                         <span class="toggle-slider"></span>
                         <div class="toggle-info">
-                            <strong>Tự Đổi IP HMA VPN</strong>
-                            <span style="font-size: 11px;">Theo quốc gia tài khoản mục tiêu</span>
+                            <strong>Auto-Switch HMA VPN</strong>
+                            <span style="font-size: 11px;">Match target account country</span>
                         </div>
                     </label>
 
@@ -1593,8 +2066,8 @@
                         <input type="checkbox" id="autopilot-opt-telegram" checked>
                         <span class="toggle-slider"></span>
                         <div class="toggle-info">
-                            <strong>Báo Cáo Telegram Bot</strong>
-                            <span style="font-size: 11px;">Gửi thông báo về điện thoại</span>
+                            <strong>Telegram Bot Report</strong>
+                            <span style="font-size: 11px;">Send status to mobile app</span>
                         </div>
                     </label>
 
@@ -1602,8 +2075,8 @@
                         <input type="checkbox" id="autopilot-opt-shutdown">
                         <span class="toggle-slider"></span>
                         <div class="toggle-info">
-                            <strong style="color: #ef4444;">Tự Động Tắt Máy Khi Xong</strong>
-                            <span style="font-size: 11px;">Hẹn giờ Shutdown sau 15 phút</span>
+                            <strong style="color: #ef4444;">Auto Shutdown When Done</strong>
+                            <span style="font-size: 11px;">Schedule shutdown after 15 mins</span>
                         </div>
                     </label>
                 </div>
@@ -1611,28 +2084,28 @@
                 <!-- Live Progress & Execution Box -->
                 <div id="autopilot-execution-box" class="hidden" style="margin-top: 4px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="font-size: 12px; font-weight: 700;" id="autopilot-current-task">Đang xử lý...</span>
+                        <span style="font-size: 12px; font-weight: 700;" id="autopilot-current-task">Processing...</span>
                         <span style="font-size: 12px; font-weight: 800; color: var(--primary);" id="autopilot-progress-percent">0%</span>
                     </div>
                     <div style="background: rgba(0,0,0,0.1); height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 10px;">
-                        <div id="autopilot-progress-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #6366f1, #d946ef); transition: width 0.3s ease;"></div>
+                        <div id="autopilot-progress-bar" style="height: 100%; width: 0%; background: var(--primary); transition: width 0.3s ease;"></div>
                     </div>
                     <div id="autopilot-logs" style="background: rgba(0,0,0,0.85); color: #22c55e; font-family: monospace; font-size: 11px; padding: 10px; border-radius: 6px; height: 120px; overflow-y: auto; line-height: 1.5; border: 1px solid var(--border-color);">
-                        <div class="log-line text-muted">[Sẵn sàng] Bấm "Bắt đầu chạy Pipeline" để tiến hành.</div>
+                        <div class="log-line text-muted">[Ready] Click "START PIPELINE" to proceed.</div>
                     </div>
                 </div>
 
                 <!-- Footer Action Buttons -->
                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 14px; margin-top: 4px;">
                     <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-autopilot-queue">
-                        <i class="fa-solid fa-arrows-rotate"></i> Quét Lại Hàng Đợi
+                        <i class="fa-solid fa-arrows-rotate"></i> Refresh Queue
                     </button>
                     <div style="display: flex; gap: 10px;">
                         <button type="button" class="btn btn-danger btn-sm hidden" id="btn-stop-autopilot">
-                            <i class="fa-solid fa-stop"></i> Dừng Pipeline
+                            <i class="fa-solid fa-stop"></i> Stop Pipeline
                         </button>
-                        <button type="button" class="btn btn-primary btn-sm" id="btn-start-autopilot" style="background: linear-gradient(135deg, #6366f1, #d946ef); border: none; font-weight: 800; padding: 8px 18px; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);">
-                            <i class="fa-solid fa-play"></i> BẮT ĐẦU CHẠY PIPELINE
+                        <button type="button" class="btn btn-primary btn-sm" id="btn-start-autopilot" style="font-weight: 800; padding: 8px 18px;">
+                            <i class="fa-solid fa-play"></i> START PIPELINE
                         </button>
                     </div>
                 </div>
@@ -1640,7 +2113,58 @@
         </div>
     </div>
 
-    <script src="script.js?v=35"></script>
+    <!-- ==========================================================================
+         Floating Bottom-Right Download Queue Widget (Global Across All Tabs)
+         ========================================================================== -->
+    <div id="floating-download-widget" class="floating-dl-widget hidden">
+        <!-- 1. Minimized Pill Button (Default / Collapsed State) -->
+        <div id="dl-widget-minimized" class="dl-widget-pill" title="Nhấp để mở rộng chi tiết hàng đợi tải">
+            <div class="dl-widget-pill-icon">
+                <i class="fa-solid fa-cloud-arrow-down fa-bounce" style="color: #ef4444;"></i>
+            </div>
+            <div class="dl-widget-pill-content">
+                <span id="dl-widget-mini-title" class="dl-widget-mini-title">Đang tải video...</span>
+                <span id="dl-widget-mini-status" class="dl-widget-mini-status">0/0 video (0%)</span>
+            </div>
+        </div>
+
+        <!-- 2. Expanded Detail Card / Panel -->
+        <div id="dl-widget-expanded" class="dl-widget-card hidden">
+            <!-- Header -->
+            <div class="dl-widget-header">
+                <div class="dl-widget-header-title">
+                    <i class="fa-solid fa-cloud-arrow-down text-danger" style="color: #ef4444;"></i>
+                    <span>Hàng Đợi Tải Nền</span>
+                    <span id="dl-widget-active-badge" class="badge-count">0 clip</span>
+                </div>
+                <div class="dl-widget-header-actions">
+                    <button type="button" class="dl-widget-btn-icon" id="btn-dl-widget-clear" title="Xóa các mục đã tải xong / lỗi">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                    <button type="button" class="dl-widget-btn-icon" id="btn-dl-widget-minimize" title="Thu nhỏ popup">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- List of Queue Items -->
+            <div id="dl-widget-queue-list" class="dl-widget-list">
+                <!-- Dynamically populated queue items -->
+            </div>
+
+            <!-- Footer -->
+            <div class="dl-widget-footer">
+                <span id="dl-widget-footer-summary" style="font-size: 11px; color: var(--text-secondary);">
+                    0 hoàn tất | 0 chờ tải
+                </span>
+                <button type="button" class="btn btn-xs btn-outline" id="btn-dl-widget-open-folder" title="Mở thư mục input_sources">
+                    <i class="fa-solid fa-folder-open"></i> Thư mục nguồn
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=84"></script>
 </body>
 </html>
 

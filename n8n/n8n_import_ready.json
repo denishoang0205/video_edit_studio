@@ -1,0 +1,164 @@
+[
+  {
+    "name": "🚀 TikTok Studio Pro - WebApp On-Demand Publisher",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "webapp-autopilot-post",
+          "options": {}
+        },
+        "id": "node-webapp-webhook",
+        "name": "🌐 1. Nhận Lệnh Thực Thi Từ WebApp",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          200,
+          300
+        ],
+        "webhookId": "webapp-autopilot-post"
+      },
+      {
+        "parameters": {
+          "url": "={{ 'http://localhost:8000/api/n8n/pending_clips?only_current_target=true' + ($json.body && $json.body.accounts ? '&accounts=' + (Array.isArray($json.body.accounts) ? $json.body.accounts.join(',') : $json.body.accounts) : '') }}",
+          "options": {
+            "timeout": 15000
+          }
+        },
+        "id": "node-get-pending-clips",
+        "name": "📥 2. Lấy Clip Chờ Đăng Của Tài Khoản Đã Chọn",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          440,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Kiểm tra danh sách clip chờ đăng\nconst response = $input.first().json;\nconst items = response.items || [];\n\nif (items.length === 0) {\n  return [];\n}\n\n// Lấy clip đầu tiên trong hàng đợi để xử lý\nconst nextClip = items[0];\n\n// Làm sạch tiêu đề không dính chữ Part\nlet cleanTitle = (nextClip.title || '').replace(/[\\s\\-_\\(\\[\\{]+(part|phần|tập)\\s*[\\d]+[\\)\\]\\}]*/gi, '').trim();\n\nreturn [{\n  json: {\n    account_name: nextClip.account_name,\n    channel: nextClip.channel,\n    title: cleanTitle || nextClip.title,\n    clip_key: nextClip.clip_key,\n    part_label: nextClip.part_label || '',\n    video_file: nextClip.video_file,\n    hashtag_default: nextClip.hashtag || '#fyp #viral #trending',\n    target_ip: nextClip.target_ip || 'US',\n    adspower_id: nextClip.adspower_id\n  }\n}];"
+        },
+        "id": "node-select-next-clip",
+        "name": "🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          680,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "model": "gemini-1.5-flash",
+          "prompt": "Bạn là chuyên gia sáng tạo nội dung TikTok triệu view.\nHãy tạo 1 tiêu đề ngắn gọn (dưới 100 ký tự) và danh sách 5-7 hashtag viral (bắt đầu bằng #) cho video có tiêu đề gốc: \"{{ $json.title }}\" thuộc kênh: \"{{ $json.channel }}\".\n\nQUY TẮC QUAN TRỌNG:\n- Tuyệt đối KHÔNG chèn các từ như 'Part', 'Part 1', 'Phần', 'Tập' vào tiêu đề hay hashtag.\n- Viết tiếng Anh hoặc tiếng phù hợp với tệp khán giả kênh.\n\nĐịnh dạng trả về DUY NHẤT định dạng JSON (không kèm markdown):\n{\n  \"caption\": \"Tiêu đề ngắn thu hút kèm icon\",\n  \"hashtags\": \"#hashtag1 #hashtag2 #fyp #viral #trending\"\n}"
+        },
+        "id": "node-gemini-ai",
+        "name": "🤖 4. AI Gemini Sinh Caption Viral",
+        "type": "@n8n/n8n-nodes-langchain.googleGeminiChatModel",
+        "typeVersion": 1,
+        "position": [
+          920,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://localhost:8000/api/publishing/post_to_tiktok",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"account_name\": \"{{ $('🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)').item.json.account_name }}\",\n  \"clip_key\": \"{{ $('🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)').item.json.clip_key }}\",\n  \"channel\": \"{{ $('🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)').item.json.channel }}\",\n  \"title\": \"{{ $('🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)').item.json.title }}\",\n  \"video_file\": \"{{ $('🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)').item.json.video_file }}\",\n  \"override_caption\": \"{{ $json.caption || $('🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)').item.json.title }}\",\n  \"override_hashtags\": \"{{ $json.hashtags || $('🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)').item.json.hashtag_default }}\",\n  \"auto_submit\": true\n}",
+          "options": {
+            "timeout": 180000
+          }
+        },
+        "id": "node-publish-tiktok",
+        "name": "🚀 5. Server Thực Thi Đăng Clip (Playwright + AdsPower)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1160,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "chatId": "6661216386",
+          "text": "=🤖 *[TikTok Studio Pro]*\n🎉 **BÁO CÁO XUẤT BẢN VIDEO THÀNH CÔNG!**\n━━━━━━━━━━━━━━━━━━━━\n👤 **Tài khoản:** `@{{ $('🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)').item.json.account_name }}`\n📺 **Kênh Nguồn:** `{{ $('🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)').item.json.channel }}`\n📝 **Tiêu đề:** {{ $('🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)').item.json.title }}\n🔥 **Hashtags:** {{ $json.override_hashtags || '#fyp #viral' }}\n🌐 **IP Đăng:** `{{ $json.client_ip || 'US Proxy' }}`\n⏰ **Thời gian:** {{ $now.format('yyyy-MM-dd HH:mm:ss') }}\n━━━━━━━━━━━━━━━━━━━━\n✅ _Đã hoàn thành lệnh đăng video theo yêu cầu từ WebApp!_",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "id": "node-telegram-report",
+        "name": "📢 6. Bắn Báo Cáo Telegram (Chat ID 6661216386)",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1400,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "🌐 1. Nhận Lệnh Thực Thi Từ WebApp": {
+        "main": [
+          [
+            {
+              "node": "📥 2. Lấy Clip Chờ Đăng Của Tài Khoản Đã Chọn",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "📥 2. Lấy Clip Chờ Đăng Của Tài Khoản Đã Chọn": {
+        "main": [
+          [
+            {
+              "node": "🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)": {
+        "main": [
+          [
+            {
+              "node": "🤖 4. AI Gemini Sinh Caption Viral",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "🤖 4. AI Gemini Sinh Caption Viral": {
+        "main": [
+          [
+            {
+              "node": "🚀 5. Server Thực Thi Đăng Clip (Playwright + AdsPower)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "🚀 5. Server Thực Thi Đăng Clip (Playwright + AdsPower)": {
+        "main": [
+          [
+            {
+              "node": "📢 6. Bắn Báo Cáo Telegram (Chat ID 6661216386)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "id": "1"
+  }
+]
