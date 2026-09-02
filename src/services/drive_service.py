@@ -122,9 +122,16 @@ def resolve_google_drive_path(url_or_path):
                 if os.path.exists(sub_path) and os.path.isdir(sub_path):
                     return sub_path
             return g_base
-    return url_or_path
+_CACHE_SCAN_SOURCE = {}
+_CACHE_FINISHED_RESULTS = {}
+_CACHE_TTL = 4.0  # Giữ cache 4 giây để UI phản hồi tức thì (<5ms) khi chuyển tab
 
-def scan_finished_results(dest_path):
+def invalidate_drive_caches():
+    global _CACHE_SCAN_SOURCE, _CACHE_FINISHED_RESULTS
+    _CACHE_SCAN_SOURCE.clear()
+    _CACHE_FINISHED_RESULTS.clear()
+
+def scan_finished_results(dest_path, force=False):
     """
     Quét các video thành phẩm đã xuất trong thư mục đích.
     Sắp xếp có logic rõ ràng theo yêu cầu:
@@ -132,9 +139,19 @@ def scan_finished_results(dest_path):
     2. Video ĐÃ upload lên TikTok đứng sau.
     3. Trong mỗi nhóm: Video MỚI NHẤT (mtime gần nhất) đứng trước, video cũ đứng sau cùng.
     """
+    global _CACHE_FINISHED_RESULTS
+    cache_key = str(dest_path or "")
+    now = time.time()
+    if not force and cache_key in _CACHE_FINISHED_RESULTS:
+        c_time, c_val = _CACHE_FINISHED_RESULTS[cache_key]
+        if now - c_time < _CACHE_TTL:
+            return c_val
+
     resolved_dest = resolve_google_drive_path(dest_path)
     if not resolved_dest or not os.path.exists(resolved_dest):
-        return {"results": [], "total_count": 0, "unuploaded_count": 0, "uploaded_count": 0}
+        empty_res = {"results": [], "total_count": 0, "unuploaded_count": 0, "uploaded_count": 0}
+        _CACHE_FINISHED_RESULTS[cache_key] = (now, empty_res)
+        return empty_res
 
     # Nạp dữ liệu tài khoản TikTok để kiểm tra trạng thái đã đăng
     accounts_data = load_accounts_data()
@@ -244,15 +261,17 @@ def scan_finished_results(dest_path):
     unuploaded_count = sum(1 for r in results if not r.get("is_uploaded", False))
     uploaded_count = sum(1 for r in results if r.get("is_uploaded", False))
 
-    return {
+    res_data = {
         "results": results,
         "total_count": len(results),
         "unuploaded_count": unuploaded_count,
         "uploaded_count": uploaded_count
     }
+    _CACHE_FINISHED_RESULTS[cache_key] = (now, res_data)
+    return res_data
 
 
-def scan_source_directory(source_path, dest_path=None):
+def scan_source_directory(source_path, dest_path=None, force=False):
     """
     Quét toàn diện thư mục nguồn và thư mục đích:
     - Quét các video thô (raw) đang có ở Source.
@@ -260,6 +279,14 @@ def scan_source_directory(source_path, dest_path=None):
     - Đảm bảo các chỉ số trên Dashboard, Editor Studio và Kênh YouTube luôn chính xác 100%
       ngay cả sau khi video gốc đã được biên tập và xóa để tiết kiệm dung lượng đĩa.
     """
+    global _CACHE_SCAN_SOURCE
+    cache_key = f"{source_path or ''}|{dest_path or ''}"
+    now = time.time()
+    if not force and cache_key in _CACHE_SCAN_SOURCE:
+        c_time, c_val = _CACHE_SCAN_SOURCE[cache_key]
+        if now - c_time < _CACHE_TTL:
+            return c_val
+
     resolved_source = resolve_google_drive_path(source_path)
     resolved_dest = resolve_google_drive_path(dest_path)
 
@@ -462,7 +489,9 @@ def scan_source_directory(source_path, dest_path=None):
             "videos": v_list
         })
 
-    return {"folders": result_folders, "source_path": source_path}
+    out_res = {"folders": result_folders, "source_path": source_path}
+    _CACHE_SCAN_SOURCE[cache_key] = (now, out_res)
+    return out_res
 
 def remove_readonly(func, path, excinfo):
     """Callback xử lý file Read-Only trên Windows khi rmtree"""

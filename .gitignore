@@ -19,6 +19,12 @@ accounts.json
 history.json
 settings.json
 cookies.txt
+*key*.json
+*secret*.json
+*credential*.json
+*token*.json
+*.session
+*.session-journal
 /data/*.json
 /data/*.txt
 !/data/*.example.json

@@ -616,16 +616,24 @@ body.theme-light .sidebar-nav .tab-link-autopilot:hover {
     display: none;
     flex-direction: column;
     gap: 16px;
-    animation: fadeIn 0.2s ease-out;
+    opacity: 0;
+    will-change: opacity, transform;
 }
 
 .tab-content.active {
     display: flex;
+    animation: tabEnter 0.14s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+@keyframes tabEnter {
+    from { 
+        opacity: 0; 
+        transform: translate3d(0, 3px, 0); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translate3d(0, 0, 0); 
+    }
 }
 
 /* ==========================================================================
@@ -4212,6 +4220,116 @@ body.theme-light .dl-widget-item-channel {
     }
     .app-main-content {
         height: auto;
+    }
+}
+
+/* ==========================================================================
+   Tactile Micro-Interactions & Instant Active Feedback (Minimalist Speed)
+   ========================================================================== */
+.btn:active, 
+.subtab-pill:active, 
+.tab-link:active, 
+.btn-picker:active, 
+.btn-icon-xs:active, 
+.btn-post-auto:active, 
+.finished-part-chip:active,
+.btn-header-start:active,
+.btn-autopilot-sidebar:active,
+.dl-tab-btn:active {
+    transform: scale(0.96) translate3d(0, 1px, 0);
+    transition: transform 0.05s ease !important;
+}
+
+.ratio-card:active, .folder-header:active {
+    transform: scale(0.99);
+    transition: transform 0.05s ease !important;
+}
+
+/* Instant Hover Polish */
+.tab-link, .btn, .ratio-card, .finished-card, .folder-group, .stats-card {
+    will-change: transform, border-color;
+}
+
+/* Skeleton Loading Polish */
+.skeleton-shimmer {
+    background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-badge) 50%, var(--bg-card) 75%);
+    background-size: 200% 100%;
+    animation: skeletonLoading 1.2s infinite ease-in-out;
+    border-radius: var(--radius-sm);
+}
+
+@keyframes skeletonLoading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ==========================================================================
+   cris. studio Floating Toast Notifications Engine
+   ========================================================================== */
+.toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 99999;
+    pointer-events: none;
+}
+
+.toast-message {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    pointer-events: auto;
+    animation: toastSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    backdrop-filter: blur(12px);
+    max-width: 400px;
+}
+
+.toast-message.toast-success {
+    border-left: 4px solid var(--success);
+}
+
+.toast-message.toast-error {
+    border-left: 4px solid var(--danger);
+}
+
+.toast-message.toast-info {
+    border-left: 4px solid var(--primary);
+}
+
+.toast-message.toast-hide {
+    animation: toastSlideOut 0.18s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes toastSlideIn {
+    from {
+        opacity: 0;
+        transform: translate3d(24px, 0, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes toastSlideOut {
+    from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+    to {
+        opacity: 0;
+        transform: translate3d(24px, 0, 0);
     }
 }
 

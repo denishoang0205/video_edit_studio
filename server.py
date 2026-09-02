@@ -45,7 +45,7 @@ except Exception:
 
 from src.services.drive_service import (
     scan_source_directory, scan_finished_results, load_history, save_history, 
-    delete_finished_result, delete_all_finished_results,
+    delete_finished_result, delete_all_finished_results, invalidate_drive_caches,
     get_publishing_matrix, toggle_publishing_clip_status, change_account_target_channel, batch_toggle_publishing_clips,
     load_accounts_data, save_accounts_data, ensure_channel_folders,
     load_settings, save_settings, get_pending_publishing_queue, get_account_daily_posted_count
@@ -903,7 +903,8 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/scan_source":
             source = body_data.get("source", "")
             dest = body_data.get("dest", None)
-            result = scan_source_directory(source, dest)
+            invalidate_drive_caches()
+            result = scan_source_directory(source, dest, force=True)
             self.send_json(result)
             return
 

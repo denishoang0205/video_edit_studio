@@ -24,6 +24,49 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAndPollProgress();
 });
 
+/* ==========================================================================
+   Utility: Debounce & Modern Floating Toast Notification Engine
+   ========================================================================== */
+function debounce(fn, delay = 120) {
+    let timer = null;
+    return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
+function showToast(message, type = 'info', duration = 3000) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast-message toast-${type}`;
+    
+    let iconClass = 'fa-solid fa-circle-info';
+    if (type === 'success') iconClass = 'fa-solid fa-circle-check text-success';
+    else if (type === 'error') iconClass = 'fa-solid fa-circle-exclamation text-danger';
+    else if (type === 'warning') iconClass = 'fa-solid fa-triangle-exclamation text-warning';
+
+    toast.innerHTML = `
+        <i class="${iconClass}" style="font-size: 16px;"></i>
+        <div style="flex: 1; line-height: 1.4;">${escapeHtml(message)}</div>
+    `;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('toast-hide');
+        setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 220);
+    }, duration);
+}
+window.showToast = showToast;
 
 /* ==========================================================================
    1. Tab Navigation & Theme Engine
@@ -79,7 +122,7 @@ function initTabs() {
             const targetTab = link.dataset.tab;
             if (!targetTab) return;
             
-            // Toggle active classes
+            // Toggle active classes instantaneously
             tabLinks.forEach(l => l.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
             
@@ -96,9 +139,9 @@ function initTabs() {
                 if (subEl) subEl.textContent = meta.subtitle;
             }
 
-            // Cuộn trang lên đầu mượt mà
+            // Cuộn trang lên đầu tức thì không bị giật lag
             if (mainContent) {
-                mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+                mainContent.scrollTop = 0;
             }
 
             if (targetTab === 'tab-publishing') {
@@ -575,9 +618,13 @@ function setupEventListeners() {
 
     const inputSearchFinished = document.getElementById('input-search-finished');
     if (inputSearchFinished) {
+        const debouncedFinishedSearch = debounce(() => {
+            renderFinishedLibrary();
+        }, 100);
+
         inputSearchFinished.addEventListener('input', (e) => {
             currentFinishedSearch = e.target.value.trim().toLowerCase();
-            renderFinishedLibrary();
+            debouncedFinishedSearch();
         });
     }
 
@@ -707,6 +754,7 @@ function renderVideoTree(folders) {
     }
 
     container.innerHTML = '';
+    const fragment = document.createDocumentFragment();
     let totalVideosAcrossFolders = 0;
 
     folders.forEach(folder => {
@@ -794,7 +842,7 @@ function renderVideoTree(folders) {
                 if (e.target.checked) {
                     if (video.edited) {
                         if (video.is_finished_only) {
-                            alert(`Video "${video.title}" đã được xuất thành phẩm hoàn tất trong thư mục Output!\n\n(Tệp video gốc đã được tự động dọn dẹp để tiết kiệm dung lượng đĩa. Nếu bạn muốn biên tập lại, hãy copy tệp video gốc mới vào thư mục Kênh).`);
+                            showToast(`Video "${video.title}" đã được xuất thành phẩm hoàn tất!`, 'info');
                             e.target.checked = false;
                             return;
                         }
@@ -825,10 +873,11 @@ function renderVideoTree(folders) {
                                     document.getElementById('preview-text-input').value = video.title;
                                     document.getElementById('canvas-banner-text').textContent = video.title.toUpperCase();
                                     updateSelectedCount();
+                                    showToast(`Đã xóa bản thành phẩm cũ của "${video.title}"`, 'success');
                                     return;
                                 }
                             } catch (err) {
-                                alert('Lỗi khi xóa bản thành phẩm cũ: ' + err.message);
+                                showToast('Lỗi khi xóa bản thành phẩm cũ: ' + err.message, 'error');
                             }
                         }
                         e.target.checked = false;
@@ -848,7 +897,7 @@ function renderVideoTree(folders) {
 
         // Folder accordion collapse toggle
         folderEl.querySelector('.folder-header').addEventListener('click', (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.closest('.custom-checkbox')) return;
+            if (e.target.tagName === 'INPUT' || e.target.closest('.custom-checkbox') || e.target.closest('.btn-select-folder-all')) return;
             folderEl.classList.toggle('is-collapsed');
             const icon = folderEl.querySelector('.folder-icon');
             if (icon) {
@@ -858,8 +907,10 @@ function renderVideoTree(folders) {
             }
         });
 
-        container.appendChild(folderEl);
+        fragment.appendChild(folderEl);
     });
+
+    container.appendChild(fragment);
 
     if (totalBadge) totalBadge.textContent = `${totalVideosAcrossFolders} Video`;
     
@@ -932,13 +983,17 @@ function initExplorerControls() {
     const clearBtn = document.getElementById('btn-clear-explorer-search');
 
     if (searchInput) {
+        const debouncedExplorerSearch = debounce(() => {
+            applyVideoTreeFilters();
+        }, 100);
+
         searchInput.addEventListener('input', (e) => {
             currentVideoTreeSearch = e.target.value;
             if (clearBtn) {
                 if (currentVideoTreeSearch) clearBtn.classList.remove('hidden');
                 else clearBtn.classList.add('hidden');
             }
-            applyVideoTreeFilters();
+            debouncedExplorerSearch();
         });
     }
 
@@ -1181,7 +1236,7 @@ window.actionStartEditFolder = actionStartEditFolder;
 async function startBatchProcessing() {
     const checkboxes = document.querySelectorAll('.video-checkbox:checked');
     if (checkboxes.length === 0) {
-        alert("Please select at least 1 video to process!");
+        showToast("Vui lòng chọn ít nhất 1 video để biên tập!", "warning");
         return;
     }
 
@@ -1227,11 +1282,12 @@ async function startBatchProcessing() {
         if (data.status === 'started') {
             setProcessState(true);
             startPollingProgress();
+            showToast(`🚀 Đã bắt đầu biên tập batch cho ${videoItems.length} video!`, "success");
         } else {
-            alert("Render launch error: " + (data.error || "Unknown reason"));
+            showToast("Render launch error: " + (data.error || "Unknown reason"), "error");
         }
     } catch (err) {
-        alert("API connection error: " + err.message);
+        showToast("API connection error: " + err.message, "error");
     }
 }
 
@@ -1248,17 +1304,17 @@ function setProcessState(running) {
     isRunning = running;
     const btnStart = document.getElementById('btn-start-processing');
     const btnStop = document.getElementById('btn-stop-processing');
-    const statusDot = document.querySelector('.sidebar-status .status-dot') || document.querySelector('.status-dot');
+    const statusDot = document.querySelector('#system-status .status-dot') || document.querySelector('.status-dot');
     const statusText = document.getElementById('status-text');
 
     if (running) {
-        btnStart?.classList.add('hidden');
-        btnStop?.classList.remove('hidden');
+        if (btnStart) btnStart.classList.add('hidden');
+        if (btnStop) btnStop.classList.remove('hidden');
         if (statusDot) statusDot.className = 'status-dot busy';
         if (statusText) statusText.textContent = 'Rendering videos...';
     } else {
-        btnStart?.classList.remove('hidden');
-        btnStop?.classList.add('hidden');
+        if (btnStart) btnStart.classList.remove('hidden');
+        if (btnStop) btnStop.classList.add('hidden');
         if (statusDot) statusDot.className = 'status-dot online';
         if (statusText) statusText.textContent = 'Ready';
     }
@@ -1317,6 +1373,7 @@ function navigateToTab(targetTab) {
         if (titleEl) titleEl.textContent = meta.title;
         if (subEl) subEl.textContent = meta.subtitle;
     }
+
     if (mainContent) mainContent.scrollTo({ top: 0, behavior: 'smooth' });
 
     if (targetTab === 'tab-outputs') {
@@ -1342,6 +1399,9 @@ async function updateProgressUI(data) {
     const perc = data.percentage || 0;
     if (percEl) percEl.textContent = `${perc}%`;
     if (fillEl) fillEl.style.width = `${perc}%`;
+
+    // Đồng bộ nút bấm & trạng thái với máy chủ trên từng nhịp
+    setProcessState(Boolean(data.is_running));
 
     if (data.is_running) {
         document.title = `(${perc}%) 🎬 Đang Render... - cris. studio`;
@@ -1387,13 +1447,21 @@ async function checkAndPollProgress() {
         const res = await fetch('/api/progress');
         const data = await res.json();
         await updateProgressUI(data);
-
-        setProcessState(Boolean(data.is_running));
         startPollingProgress();
     } catch (err) {
         console.error("checkAndPollProgress error:", err);
     }
 }
+
+// Tự động kiểm tra ngay lập tức khi người dùng quay lại tab trình duyệt từ Telegram/ứng dụng khác
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        checkAndPollProgress();
+    }
+});
+window.addEventListener('focus', () => {
+    checkAndPollProgress();
+});
 
 let lastLoggedFinishedState = false;
 
@@ -1403,16 +1471,21 @@ function startPollingProgress() {
         try {
             const res = await fetch('/api/progress');
             const data = await res.json();
+            
+            const prevRunning = isRunning;
             await updateProgressUI(data);
 
-            // Sync process state if external or auto triggered
-            if (data.is_running && !isRunning) {
-                setProcessState(true);
-            } else if (!data.is_running && isRunning) {
-                setProcessState(false);
+            // Trigger completion event when transitioning from running to not running
+            if (!data.is_running && prevRunning) {
                 playNotificationSound();
                 showToast("🎉 HOÀN TẤT BIÊN TẬP TẤT CẢ VIDEO! Các clip đã sẵn sàng trong Finished Library.");
                 
+                // Tự động hủy chọn các video vừa render xong và cập nhật lại bộ đếm
+                selectedVideos.clear();
+                updateSelectedVideosSummary();
+                document.querySelectorAll('.video-item-checkbox:checked').forEach(cb => { cb.checked = false; });
+                document.querySelectorAll('.video-item-card.selected').forEach(card => { card.classList.remove('selected'); });
+
                 // HTML5 Desktop Notification
                 if ('Notification' in window) {
                     if (Notification.permission === 'granted') {
@@ -1425,32 +1498,14 @@ function startPollingProgress() {
                     }
                 }
 
-                // Tự động làm mới danh sách thành phẩm
+                // Tự động làm mới danh sách thành phẩm & quét lại nguồn
                 fetchResults();
-                const source = document.getElementById('source-drive-link')?.value.trim();
+                const source = document.getElementById('source-drive-link')?.value?.trim();
                 if (source) scanSourcePath(source);
 
                 setTimeout(() => {
                     document.title = "cris. studio - Video Automation Platform";
                 }, 8000);
-            } else if (!data.is_running && !isRunning) {
-                // Ensure UI buttons are in sync (Ready & Start button visible)
-                const btnStart = document.getElementById('btn-start-processing');
-                const btnStop = document.getElementById('btn-stop-processing');
-                if (btnStart && btnStart.classList.contains('hidden')) {
-                    btnStart.classList.remove('hidden');
-                }
-                if (btnStop && !btnStop.classList.contains('hidden')) {
-                    btnStop.classList.add('hidden');
-                }
-                const statusDot = document.querySelector('.sidebar-status .status-dot') || document.querySelector('.status-dot');
-                const statusText = document.getElementById('status-text');
-                if (statusDot && statusDot.classList.contains('busy')) {
-                    statusDot.className = 'status-dot online';
-                }
-                if (statusText && statusText.textContent === 'Rendering videos...') {
-                    statusText.textContent = 'Ready';
-                }
             }
         } catch (err) {
             console.error("Progress fetch error:", err);
@@ -1566,11 +1621,7 @@ function renderFinishedLibrary() {
         return;
     }
 
-    container.innerHTML = '';
-    filtered.forEach(item => {
-        const card = document.createElement('div');
-        card.className = `finished-card ${item.is_uploaded ? 'is-uploaded' : 'is-unuploaded'}`;
-
+    const cardsHtml = filtered.map(item => {
         // Status Badge
         const statusBadgeHtml = item.is_uploaded
             ? `<span class="badge-uploaded"><i class="fa-solid fa-circle-check"></i> Uploaded to TikTok ${item.posted_account ? '(@' + escapeHtml(item.posted_account) + ')' : ''}</span>`
@@ -1603,34 +1654,37 @@ function renderFinishedLibrary() {
             `;
         }
 
-        card.innerHTML = `
-            <div class="finished-info" style="flex: 1; min-width: 0;">
-                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <span class="finished-title" style="font-size: 13.5px; font-weight: 700; color: var(--text-primary);" title="${escapeAttr(item.title)}">
-                        ${escapeHtml(item.title)}
-                    </span>
-                    <span class="badge badge-neutral">
-                        ${escapeHtml(item.folder_name)}
-                    </span>
-                    ${statusBadgeHtml}
-                    ${timeBadgeHtml}
+        return `
+            <div class="finished-card ${item.is_uploaded ? 'is-uploaded' : 'is-unuploaded'}">
+                <div class="finished-info" style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span class="finished-title" style="font-size: 13.5px; font-weight: 700; color: var(--text-primary);" title="${escapeAttr(item.title)}">
+                            ${escapeHtml(item.title)}
+                        </span>
+                        <span class="badge badge-neutral">
+                            ${escapeHtml(item.folder_name)}
+                        </span>
+                        ${statusBadgeHtml}
+                        ${timeBadgeHtml}
+                    </div>
+                    ${partsHtml}
                 </div>
-                ${partsHtml}
-            </div>
-            <div class="finished-actions" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                <span style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-right: 4px;">
-                    ${item.parts.length} videos
-                </span>
-                <button class="btn btn-sm btn-secondary" onclick="openOutputDirectory('${escapeAttr(item.path)}')" title="Open folder in File Explorer">
-                    <i class="fa-solid fa-folder-open"></i> Open Folder
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteFinishedVideo('${escapeAttr(item.path)}', '${escapeAttr(item.title)}', '${escapeAttr(item.folder_name)}')" title="Delete this finished video">
-                    <i class="fa-solid fa-trash-can"></i> Delete
-                </button>
+                <div class="finished-actions" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-right: 4px;">
+                        ${item.parts.length} videos
+                    </span>
+                    <button class="btn btn-sm btn-secondary" onclick="openOutputDirectory('${escapeAttr(item.path)}')" title="Open folder in File Explorer">
+                        <i class="fa-solid fa-folder-open"></i> Open Folder
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteFinishedVideo('${escapeAttr(item.path)}', '${escapeAttr(item.title)}', '${escapeAttr(item.folder_name)}')" title="Delete this finished video">
+                        <i class="fa-solid fa-trash-can"></i> Delete
+                    </button>
+                </div>
             </div>
         `;
-        container.appendChild(card);
-    });
+    }).join('');
+
+    container.innerHTML = cardsHtml;
 }
 
 async function deleteFinishedVideo(folderPath, videoTitle, channelName) {
@@ -1773,76 +1827,88 @@ function initAccountsManager() {
     const btnSavePaths = document.getElementById('btn-save-paths');
     
     // Save Paths configuration
-    btnSavePaths.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const source = document.getElementById('source-drive-link').value.trim();
-        const dest = document.getElementById('dest-drive-link').value.trim();
-        if (!source || !dest) {
-            alert('Please input both source and destination paths!');
-            return;
-        }
-        
-        const isWebLink = (str) => str.startsWith('http://') || str.startsWith('https://') || str.includes('drive.google.com');
-        if (isWebLink(source) || isWebLink(dest)) {
-            alert('The system only accepts local directories (e.g. C:\\Users\\... or D:\\Output) for maximum speed and stability. Web links like Google Drive URLs are not supported!');
-            return;
-        }
+    if (btnSavePaths) {
+        btnSavePaths.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const source = document.getElementById('source-drive-link')?.value?.trim() || '';
+            const dest = document.getElementById('dest-drive-link')?.value?.trim() || '';
+            if (!source || !dest) {
+                alert('Vui lòng nhập cả đường dẫn thư mục Source và Destination!');
+                return;
+            }
+            
+            const isWebLink = (str) => str.startsWith('http://') || str.startsWith('https://') || str.includes('drive.google.com');
+            if (isWebLink(source) || isWebLink(dest)) {
+                alert('Hệ thống chỉ chấp nhận thư mục cục bộ trên ổ cứng (ví dụ C:\\... hoặc D:\\...). Không chấp nhận link web Google Drive!');
+                return;
+            }
 
-        accountsData.source_path = source;
-        accountsData.dest_path = dest;
-        const success = await saveAccountsToBackend();
-        if (success) {
-            alert('Paths saved successfully!');
-            scanSourcePath(source);
-        }
-    });
+            accountsData.source_path = source;
+            accountsData.dest_path = dest;
+            const success = await saveAccountsToBackend();
+            if (success) {
+                showToast('🎉 Đã lưu đường dẫn thư mục thành công!');
+                scanSourcePath(source);
+            }
+        });
+    }
     
     // Toggle Channel Form
-    btnToggleChannel.addEventListener('click', () => {
-        editingChannelIdx = -1;
-        clearChannelForm();
-        channelFormArea.classList.toggle('hidden');
-        btnToggleChannel.innerHTML = channelFormArea.classList.contains('hidden') 
-            ? '<i class="fa-solid fa-plus"></i> Add New Channel'
-            : '<i class="fa-solid fa-xmark"></i> Close Form';
-    });
+    if (btnToggleChannel && channelFormArea) {
+        btnToggleChannel.addEventListener('click', () => {
+            editingChannelIdx = -1;
+            clearChannelForm();
+            channelFormArea.classList.toggle('hidden');
+            btnToggleChannel.innerHTML = channelFormArea.classList.contains('hidden') 
+                ? '<i class="fa-solid fa-plus"></i> Add New Channel'
+                : '<i class="fa-solid fa-xmark"></i> Close Form';
+        });
+    }
     
-    btnCancelChannel.addEventListener('click', (e) => {
-        e.preventDefault();
-        channelFormArea.classList.add('hidden');
-        btnToggleChannel.innerHTML = '<i class="fa-solid fa-plus"></i> Add New Channel';
-        clearChannelForm();
-    });
+    if (btnCancelChannel && channelFormArea) {
+        btnCancelChannel.addEventListener('click', (e) => {
+            e.preventDefault();
+            channelFormArea.classList.add('hidden');
+            if (btnToggleChannel) btnToggleChannel.innerHTML = '<i class="fa-solid fa-plus"></i> Add New Channel';
+            clearChannelForm();
+        });
+    }
     
     // Toggle Account Form
-    btnToggleAccount.addEventListener('click', () => {
-        editingAccountIdx = -1;
-        clearAccountForm();
-        accountFormArea.classList.toggle('hidden');
-        btnToggleAccount.innerHTML = accountFormArea.classList.contains('hidden')
-            ? '<i class="fa-solid fa-plus"></i> Add New Account'
-            : '<i class="fa-solid fa-xmark"></i> Close Form';
-    });
+    if (btnToggleAccount && accountFormArea) {
+        btnToggleAccount.addEventListener('click', () => {
+            editingAccountIdx = -1;
+            clearAccountForm();
+            accountFormArea.classList.toggle('hidden');
+            btnToggleAccount.innerHTML = accountFormArea.classList.contains('hidden')
+                ? '<i class="fa-solid fa-plus"></i> Add New Account'
+                : '<i class="fa-solid fa-xmark"></i> Close Form';
+        });
+    }
     
-    btnCancelAccount.addEventListener('click', (e) => {
-        e.preventDefault();
-        accountFormArea.classList.add('hidden');
-        btnToggleAccount.innerHTML = '<i class="fa-solid fa-plus"></i> Add New Account';
-        clearAccountForm();
-    });
+    if (btnCancelAccount && accountFormArea) {
+        btnCancelAccount.addEventListener('click', (e) => {
+            e.preventDefault();
+            accountFormArea.classList.add('hidden');
+            if (btnToggleAccount) btnToggleAccount.innerHTML = '<i class="fa-solid fa-plus"></i> Add New Account';
+            clearAccountForm();
+        });
+    }
     
     // Eye icon inside Add Account form
-    btnToggleInputPw.addEventListener('click', () => {
-        if (inputAccPassword.type === 'password') {
-            inputAccPassword.type = 'text';
-            btnToggleInputPw.classList.remove('fa-eye-slash');
-            btnToggleInputPw.classList.add('fa-eye');
-        } else {
-            inputAccPassword.type = 'password';
-            btnToggleInputPw.classList.remove('fa-eye');
-            btnToggleInputPw.classList.add('fa-eye-slash');
-        }
-    });
+    if (btnToggleInputPw && inputAccPassword) {
+        btnToggleInputPw.addEventListener('click', () => {
+            if (inputAccPassword.type === 'password') {
+                inputAccPassword.type = 'text';
+                btnToggleInputPw.classList.remove('fa-eye-slash');
+                btnToggleInputPw.classList.add('fa-eye');
+            } else {
+                inputAccPassword.type = 'password';
+                btnToggleInputPw.classList.remove('fa-eye');
+                btnToggleInputPw.classList.add('fa-eye-slash');
+            }
+        });
+    }
     
     // Auto-fill folder name when typing channel name
     const inputChanName = document.getElementById('input-channel-name');
@@ -1860,113 +1926,147 @@ function initAccountsManager() {
     }
     
     // Save Channel
-    btnSaveChannel.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const name = document.getElementById('input-channel-name').value.trim();
-        const url = document.getElementById('input-channel-url').value.trim();
-        let folder = document.getElementById('input-channel-folder').value.trim();
-        const content = document.getElementById('input-channel-content')?.value.trim() || '';
-        if (!folder && name) {
-            folder = name;
-        }
-        
-        if (!name || !folder) {
-            alert('Please enter both the Channel Name and Source Folder Name!');
-            return;
-        }
-        
-        const newChan = { name, url, folder_name: folder, content, note: 'Custom configured' };
-        
-        if (editingChannelIdx > -1) {
-            // Keep existing downloaded count if editing
-            const oldChan = accountsData.youtube_channels[editingChannelIdx];
-            newChan.total_downloaded = oldChan.total_downloaded || 0;
-            accountsData.youtube_channels[editingChannelIdx] = newChan;
-        } else {
-            newChan.total_downloaded = 0;
-            accountsData.youtube_channels.push(newChan);
-        }
-        
-        const success = await saveAccountsToBackend();
-        if (success) {
-            channelFormArea.classList.add('hidden');
-            btnToggleChannel.innerHTML = '<i class="fa-solid fa-plus"></i> Add New Channel';
-            clearChannelForm();
-            await fetchAccountsData();
+    if (btnSaveChannel) {
+        btnSaveChannel.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('input-channel-name')?.value?.trim() || '';
+            const url = document.getElementById('input-channel-url')?.value?.trim() || '';
+            let folder = document.getElementById('input-channel-folder')?.value?.trim() || '';
+            const content = document.getElementById('input-channel-content')?.value?.trim() || '';
             
-            // Tự động quét lại Source & Output để hiển thị ngay folder mới
-            const src = document.getElementById('source-drive-link').value.trim();
-            if (src) scanSourcePath(src);
-            fetchResults();
-            fetchPublishingMatrix();
-        }
-    });
+            if (!folder && name) {
+                folder = name;
+            }
+            
+            if (!name || !folder) {
+                alert('Vui lòng nhập Tên Kênh YouTube và Tên Thư Mục Nguồn!');
+                return;
+            }
+            
+            btnSaveChannel.disabled = true;
+            btnSaveChannel.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            
+            try {
+                accountsData.youtube_channels = accountsData.youtube_channels || [];
+                const newChan = { name, url, folder_name: folder, content, note: 'Custom configured' };
+                
+                if (editingChannelIdx > -1 && editingChannelIdx < accountsData.youtube_channels.length) {
+                    const oldChan = accountsData.youtube_channels[editingChannelIdx];
+                    newChan.total_downloaded = oldChan.total_downloaded || 0;
+                    accountsData.youtube_channels[editingChannelIdx] = newChan;
+                } else {
+                    newChan.total_downloaded = 0;
+                    accountsData.youtube_channels.push(newChan);
+                }
+                
+                const success = await saveAccountsToBackend();
+                if (success) {
+                    if (channelFormArea) channelFormArea.classList.add('hidden');
+                    if (btnToggleChannel) btnToggleChannel.innerHTML = '<i class="fa-solid fa-plus"></i> Add New Channel';
+                    clearChannelForm();
+                    await fetchAccountsData();
+                    showToast(`🎉 Đã lưu kênh YouTube: "${name}" thành công!`);
+                    
+                    // Tự động quét lại Source & Output để hiển thị ngay folder mới
+                    const src = document.getElementById('source-drive-link')?.value?.trim() || '';
+                    if (src) scanSourcePath(src);
+                    fetchResults();
+                    fetchPublishingMatrix();
+                } else {
+                    alert('❌ Không thể lưu kênh YouTube. Vui lòng kiểm tra lại kết nối server!');
+                }
+            } catch (err) {
+                alert('❌ Lỗi khi lưu kênh: ' + err.message);
+            } finally {
+                btnSaveChannel.disabled = false;
+                btnSaveChannel.innerHTML = 'Save Channel';
+            }
+        });
+    }
     
     // Save Account
-    btnSaveAccount.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const username = document.getElementById('input-acc-username').value.trim();
-        const password = document.getElementById('input-acc-password').value.trim();
-        const email = document.getElementById('input-acc-email').value.trim();
-        const emailConfirm = document.getElementById('input-acc-email-confirm').value.trim();
-        const ipOrig = document.getElementById('input-acc-ip-orig').value.trim();
-        const ipBuild = document.getElementById('input-acc-ip-build').value.trim();
-        const adspowerId = document.getElementById('input-acc-adspower')?.value.trim() || '';
-        const date = document.getElementById('input-acc-date').value;
-        const target = document.getElementById('input-acc-target').value;
-        const hashtags = document.getElementById('input-acc-hashtags').value.trim();
-        const content = document.getElementById('input-acc-content').value.trim();
-        const note = document.getElementById('input-acc-note').value.trim();
-        
-        if (!username || !password) {
-            alert('Please enter both Account Name and Password!');
-            return;
-        }
-        
-        const newAcc = {
-            account_name: username,
-            password: password,
-            mail: email,
-            mail_confirm: emailConfirm,
-            original_ip: ipOrig,
-            build_up_ip: ipBuild,
-            adspower_id: adspowerId,
-            created_date: date,
-            target_channel: target,
-            content: content,
-            hashtag: hashtags,
-            note: note
-        };
-        
-        if (editingAccountIdx > -1) {
-            accountsData.tiktok_accounts[editingAccountIdx] = newAcc;
-        } else {
-            accountsData.tiktok_accounts.push(newAcc);
-        }
-        
-        const success = await saveAccountsToBackend();
-        if (success) {
-            accountFormArea.classList.add('hidden');
-            btnToggleAccount.innerHTML = '<i class="fa-solid fa-plus"></i> Add New Account';
-            clearAccountForm();
-            await fetchAccountsData();
-        }
-    });
-
-    // Quick select AdsPower profile
-    const selectAdsQuick = document.getElementById('select-acc-adspower-quick');
-    if (selectAdsQuick) {
-        selectAdsQuick.addEventListener('change', (e) => {
-            if (e.target.value) {
-                const inputAds = document.getElementById('input-acc-adspower');
-                if (inputAds) inputAds.value = e.target.value;
+    if (btnSaveAccount) {
+        btnSaveAccount.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('input-acc-username')?.value?.trim() || '';
+            const password = document.getElementById('input-acc-password')?.value?.trim() || '';
+            const email = document.getElementById('input-acc-email')?.value?.trim() || '';
+            const emailConfirm = document.getElementById('input-acc-email-confirm')?.value?.trim() || '';
+            const ipOrig = document.getElementById('input-acc-ip-orig')?.value?.trim() || '';
+            const ipBuild = document.getElementById('input-acc-ip-build')?.value?.trim() || '';
+            const adspowerId = document.getElementById('input-acc-adspower')?.value?.trim() || '';
+            const date = document.getElementById('input-acc-date')?.value || '';
+            const target = document.getElementById('input-acc-target')?.value || '';
+            const hashtags = document.getElementById('input-acc-hashtags')?.value?.trim() || '';
+            const content = document.getElementById('input-acc-content')?.value?.trim() || '';
+            const note = document.getElementById('input-acc-note')?.value?.trim() || '';
+            
+            if (!username || !password) {
+                alert('Vui lòng nhập đầy đủ Tên tài khoản và Mật khẩu!');
+                return;
+            }
+            
+            btnSaveAccount.disabled = true;
+            btnSaveAccount.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            
+            try {
+                accountsData.tiktok_accounts = accountsData.tiktok_accounts || [];
+                const newAcc = {
+                    account_name: username,
+                    password: password,
+                    mail: email,
+                    mail_confirm: emailConfirm,
+                    original_ip: ipOrig,
+                    build_up_ip: ipBuild,
+                    adspower_id: adspowerId,
+                    created_date: date,
+                    target_channel: target,
+                    content: content,
+                    hashtag: hashtags,
+                    note: note
+                };
+                
+                if (editingAccountIdx > -1 && editingAccountIdx < accountsData.tiktok_accounts.length) {
+                    accountsData.tiktok_accounts[editingAccountIdx] = newAcc;
+                } else {
+                    accountsData.tiktok_accounts.push(newAcc);
+                }
+                
+                const success = await saveAccountsToBackend();
+                if (success) {
+                    if (accountFormArea) accountFormArea.classList.add('hidden');
+                    if (btnToggleAccount) btnToggleAccount.innerHTML = '<i class="fa-solid fa-plus"></i> Add New Account';
+                    clearAccountForm();
+                    await fetchAccountsData();
+                    showToast(`🎉 Đã lưu tài khoản TikTok: @${username} thành công!`);
+                } else {
+                    alert('❌ Không thể lưu tài khoản TikTok. Vui lòng thử lại!');
+                }
+            } catch (err) {
+                alert('❌ Lỗi khi lưu tài khoản: ' + err.message);
+            } finally {
+                btnSaveAccount.disabled = false;
+                btnSaveAccount.innerHTML = 'Save Account';
             }
         });
     }
 
+    // Quick select AdsPower profile
+    const selectAdsQuick = document.getElementById('select-acc-adspower-quick');
+    if (selectAdsQuick) {
+        selectAdsQuick.addEventListener('change', () => {
+            const val = selectAdsQuick.value;
+            if (val) {
+                const inputAds = document.getElementById('input-acc-adspower');
+                if (inputAds) inputAds.value = val;
+            }
+        });
+    }
+    
     const btnRefreshAdsProfiles = document.getElementById('btn-refresh-adspower-profiles');
     if (btnRefreshAdsProfiles) {
-        btnRefreshAdsProfiles.addEventListener('click', () => {
+        btnRefreshAdsProfiles.addEventListener('click', (e) => {
+            e.preventDefault();
             if (typeof fetchAdsPowerProfiles === 'function') {
                 fetchAdsPowerProfiles(true);
             }
@@ -1977,34 +2077,33 @@ function initAccountsManager() {
 }
 
 function clearChannelForm() {
-    document.getElementById('input-channel-name').value = '';
-    document.getElementById('input-channel-url').value = '';
-    document.getElementById('input-channel-folder').value = '';
-    if (document.getElementById('input-channel-content')) {
-        document.getElementById('input-channel-content').value = '';
-    }
+    const n = document.getElementById('input-channel-name');
+    const u = document.getElementById('input-channel-url');
+    const f = document.getElementById('input-channel-folder');
+    const c = document.getElementById('input-channel-content');
+    if (n) n.value = '';
+    if (u) u.value = '';
+    if (f) f.value = '';
+    if (c) c.value = '';
 }
 
 function clearAccountForm() {
-    document.getElementById('input-acc-username').value = '';
-    document.getElementById('input-acc-password').value = '';
-    document.getElementById('input-acc-email').value = '';
-    document.getElementById('input-acc-email-confirm').value = '';
-    document.getElementById('input-acc-ip-orig').value = '';
-    document.getElementById('input-acc-ip-build').value = '';
-    if (document.getElementById('input-acc-adspower')) document.getElementById('input-acc-adspower').value = '';
-    if (document.getElementById('select-acc-adspower-quick')) document.getElementById('select-acc-adspower-quick').value = '';
-    document.getElementById('input-acc-date').value = '';
-    document.getElementById('input-acc-target').value = '';
-    document.getElementById('input-acc-hashtags').value = '';
-    document.getElementById('input-acc-content').value = '';
-    document.getElementById('input-acc-note').value = '';
+    const fields = [
+        'input-acc-username', 'input-acc-password', 'input-acc-email',
+        'input-acc-email-confirm', 'input-acc-ip-orig', 'input-acc-ip-build',
+        'input-acc-adspower', 'select-acc-adspower-quick', 'input-acc-date',
+        'input-acc-target', 'input-acc-hashtags', 'input-acc-content', 'input-acc-note'
+    ];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
 }
 
 async function fetchAccountsData() {
     const sourcePathInput = document.getElementById('source-drive-link');
     const destPathInput = document.getElementById('dest-drive-link');
-    const currentSource = sourcePathInput.value.trim();
+    const currentSource = sourcePathInput?.value?.trim() || '';
     
     try {
         const res = await fetch(`/api/accounts?source=${encodeURIComponent(currentSource)}`);
@@ -2012,11 +2111,11 @@ async function fetchAccountsData() {
         accountsData = data || { youtube_channels: [], tiktok_accounts: [] };
         
         let shouldScan = false;
-        if (data.source_path && !currentSource) {
+        if (data.source_path && sourcePathInput && !currentSource) {
             sourcePathInput.value = data.source_path;
             shouldScan = true;
         }
-        if (data.dest_path && !destPathInput.value.trim()) {
+        if (data.dest_path && destPathInput && !destPathInput.value.trim()) {
             destPathInput.value = data.dest_path;
         }
         
@@ -3496,12 +3595,12 @@ async function saveAllSettings(silent = false) {
 
         const data = await res.json();
         if (data.success) {
-            if (!silent) alert('🎉 Đã lưu toàn bộ cấu hình Settings & Workspaces thành công!');
+            if (!silent) showToast('🎉 Đã lưu toàn bộ cấu hình Settings & Workspaces thành công!', 'success');
         } else {
-            if (!silent) alert('Lỗi khi lưu cài đặt!');
+            if (!silent) showToast('Lỗi khi lưu cài đặt!', 'error');
         }
     } catch (err) {
-        if (!silent) alert('Lỗi kết nối khi lưu cài đặt: ' + err.message);
+        if (!silent) showToast('Lỗi kết nối khi lưu cài đặt: ' + err.message, 'error');
     }
 }
 
@@ -4810,8 +4909,12 @@ function initDownloadVideoPipeline() {
 
     // 4. Keyword search input
     if (searchInput) {
-        searchInput.addEventListener('input', () => {
+        const debouncedDlSearch = debounce(() => {
             renderDownloadMediaCards();
+        }, 100);
+
+        searchInput.addEventListener('input', () => {
+            debouncedDlSearch();
         });
     }
 
@@ -5141,6 +5244,7 @@ function renderDownloadMediaCards() {
     }
 
     container.innerHTML = '';
+    const fragment = document.createDocumentFragment();
 
     list.forEach(item => {
         const isSelected = dlSelectedItems.has(item.id);
@@ -5232,8 +5336,10 @@ function renderDownloadMediaCards() {
             triggerSingleVideoDownload(item, card);
         });
 
-        container.appendChild(card);
+        fragment.appendChild(card);
     });
+
+    container.appendChild(fragment);
 
     updateDownloadSelectionUI();
 }
