@@ -162,14 +162,19 @@ def upload_multiple_videos_to_tiktok_cdp(
 
             # 2. Điều hướng tất cả các tab đến trang TikTok Studio Upload
             tiktok_upload_url = "https://www.tiktok.com/tiktokstudio/upload"
+            log(f"🌐 Đang nạp trang TikTok Studio Upload trên {total_tabs} tab...")
             for i, page in enumerate(pages):
-                log(f"🌐 [Tab {i+1}/{total_tabs}] Đang nạp trang TikTok Studio Upload...")
+                log(f"🌐 [Tab {i+1}/{total_tabs}] Đang mở TikTok Studio Upload...")
                 try:
+                    page.bring_to_front()
                     page.goto(tiktok_upload_url, timeout=45000, wait_until="domcontentloaded")
                 except Exception as e:
                     log(f"⚠️ [Tab {i+1}] Đang chờ trang tải: {e}")
 
-            time.sleep(3)
+            time.sleep(2)
+            
+            # Theo dõi tab nào bị lỗi (ví dụ không nạp được file) để bỏ qua lúc đợi nút Đăng
+            failed_tabs = [False] * total_tabs
 
             # Kiểm tra xem có bị chuyển về trang đăng nhập không
             for page in pages:
@@ -214,6 +219,11 @@ def upload_multiple_videos_to_tiktok_cdp(
             ]
 
             for i, (page, item) in enumerate(zip(pages, valid_items)):
+                try:
+                    page.bring_to_front()
+                    time.sleep(0.3)
+                except Exception:
+                    pass
                 v_path = item["video_path"]
                 log(f"📤 [Tab {i+1}/{total_tabs}] Đang nạp video: '{os.path.basename(v_path)}'...")
                 file_input_found = False
@@ -264,7 +274,8 @@ def upload_multiple_videos_to_tiktok_cdp(
                 if file_input_found:
                     log(f"✅ [Tab {i+1}/{total_tabs}] Đã nạp video vào trình tải lên thành công!")
                 else:
-                    log(f"⚠️ [Tab {i+1}/{total_tabs}] Không tìm thấy nút nạp tệp.")
+                    failed_tabs[i] = True
+                    log(f"⚠️ [Tab {i+1}/{total_tabs}] Không tìm thấy nút nạp tệp. Đã đánh dấu bỏ qua chờ đăng cho tab này.")
 
             # 5. Điền Description/Caption (Chỉ lấy phần title + hashtags, không kèm part_label, chèn tức thì không gõ chậm)
             caption_selectors = [
@@ -369,10 +380,15 @@ def upload_multiple_videos_to_tiktok_cdp(
             start_wait = time.time()
             tabs_ready = [False] * total_tabs
             last_progress_logged = {}
+            
+            # Gán tabs_ready = True cho những tab đã bị failed để vòng while không chờ chúng nữa
+            for i in range(total_tabs):
+                if failed_tabs[i]:
+                    tabs_ready[i] = True
 
             while time.time() - start_wait < wait_timeout:
                 for i, page in enumerate(pages):
-                    if not tabs_ready[i]:
+                    if not tabs_ready[i] and not failed_tabs[i]:
                         try:
                             # Đưa tab lên phía trước để Chrome không bóp tiến trình CPU xử lý video
                             page.bring_to_front()
@@ -416,6 +432,8 @@ def upload_multiple_videos_to_tiktok_cdp(
                 log(f"🚀 Bắt đầu bấm nút ĐĂNG VIDEO trên các tab đã sẵn sàng...")
                 posted_count = 0
                 for i, page in enumerate(pages):
+                    if failed_tabs[i]:
+                        continue
                     try:
                         page.bring_to_front()
                         time.sleep(0.5)
@@ -537,7 +555,7 @@ def upload_multiple_videos_to_tiktok_cdp(
                             pass
 
                 log(f"🎉 HOÀN TẤT ĐĂNG ĐỒNG THỜI {posted_count}/{total_tabs} TAB LÊN TIKTOK THÀNH CÔNG!")
-                time.sleep(4) # Chờ 4s để request đăng hoàn tất trên server TikTok
+                time.sleep(2) # Chờ 2s để request đăng hoàn tất trên server TikTok
             else:
                 log(f"📝 Chế độ xem trước (Draft): Đã nạp video và caption trên {total_tabs} tab.")
 
@@ -550,11 +568,23 @@ def upload_multiple_videos_to_tiktok_cdp(
             except Exception:
                 pass
 
+            # Lọc danh sách những item đã đăng thành công thực sự
+            successful_items = []
+            for i, it in enumerate(valid_items):
+                if auto_submit:
+                    if not failed_tabs[i]:
+                        successful_items.append(it)
+                else:
+                    successful_items.append(it)
+            
+            final_count = len(successful_items)
+            is_success = final_count > 0
+
             return {
-                "success": True,
-                "message": f"Đã đăng thành công {len(valid_items)} video trên {total_tabs} tab cùng lúc!",
-                "count": len(valid_items),
-                "items": valid_items
+                "success": is_success,
+                "message": f"Đã đăng thành công {final_count} video trên {total_tabs} tab!" if is_success else "Toàn bộ video bị lỗi nạp tệp hoặc chưa bấm được nút Đăng.",
+                "count": final_count,
+                "items": successful_items
             }
 
     except Exception as e:

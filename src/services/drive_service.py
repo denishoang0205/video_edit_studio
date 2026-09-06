@@ -122,6 +122,8 @@ def resolve_google_drive_path(url_or_path):
                 if os.path.exists(sub_path) and os.path.isdir(sub_path):
                     return sub_path
             return g_base
+    return os.path.normpath(url_or_path)
+
 _CACHE_SCAN_SOURCE = {}
 _CACHE_FINISHED_RESULTS = {}
 _CACHE_TTL = 4.0  # Giữ cache 4 giây để UI phản hồi tức thì (<5ms) khi chuyển tab
@@ -131,7 +133,7 @@ def invalidate_drive_caches():
     _CACHE_SCAN_SOURCE.clear()
     _CACHE_FINISHED_RESULTS.clear()
 
-def scan_finished_results(dest_path, force=False):
+def scan_finished_results(dest_path=None, force=False):
     """
     Quét các video thành phẩm đã xuất trong thư mục đích.
     Sắp xếp có logic rõ ràng theo yêu cầu:
@@ -140,14 +142,31 @@ def scan_finished_results(dest_path, force=False):
     3. Trong mỗi nhóm: Video MỚI NHẤT (mtime gần nhất) đứng trước, video cũ đứng sau cùng.
     """
     global _CACHE_FINISHED_RESULTS
-    cache_key = str(dest_path or "")
+    
+    if not dest_path:
+        acc_d = load_accounts_data()
+        dest_path = acc_d.get("dest_path", "")
+        if not dest_path or not os.path.exists(dest_path):
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            candidates = [
+                OUTPUT_BASE_DIR,
+                os.path.join(base_dir, "output_product"),
+                os.path.join(base_dir, "storage", "outputs"),
+                os.path.join(base_dir, "Tiktok_Builder_Output")
+            ]
+            for cand in candidates:
+                if cand and os.path.exists(cand):
+                    dest_path = cand
+                    break
+
+    resolved_dest = resolve_google_drive_path(dest_path)
+    cache_key = str(resolved_dest or "")
     now = time.time()
     if not force and cache_key in _CACHE_FINISHED_RESULTS:
         c_time, c_val = _CACHE_FINISHED_RESULTS[cache_key]
         if now - c_time < _CACHE_TTL:
             return c_val
 
-    resolved_dest = resolve_google_drive_path(dest_path)
     if not resolved_dest or not os.path.exists(resolved_dest):
         empty_res = {"results": [], "total_count": 0, "unuploaded_count": 0, "uploaded_count": 0}
         _CACHE_FINISHED_RESULTS[cache_key] = (now, empty_res)
@@ -739,7 +758,7 @@ def ensure_channel_folders(data=None):
     if not resolved_source:
         resolved_source = os.path.join(base_dir, "video")
     if not resolved_dest:
-        resolved_dest = os.path.join(base_dir, "Tiktok_Builder_Output")
+        resolved_dest = os.path.join(base_dir, "output_product")
         
     created_info = []
     channels = data.get("youtube_channels", [])
@@ -777,7 +796,7 @@ def ensure_channel_folders(data=None):
 def load_accounts_data():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     default_source = os.path.join(base_dir, "video")
-    default_dest = os.path.join(base_dir, "Tiktok_Builder_Output")
+    default_dest = os.path.join(base_dir, "output_product")
     
     data = None
     if os.path.exists(ACCOUNTS_FILE):
@@ -831,6 +850,7 @@ def save_accounts_data(data):
             json.dump(data, f, ensure_ascii=False, indent=2)
         # Tự động tạo thư mục Source & Output cho tất cả các kênh ngay lặp tức
         ensure_channel_folders(data)
+        invalidate_drive_caches()
         return True
     except Exception as e:
         print(f"Error saving accounts: {e}")
@@ -838,15 +858,31 @@ def save_accounts_data(data):
 
 def get_publishing_matrix(dest_path=None):
     """
-    Tổng hợp ma trận liên kết giữa TikTok Accounts, Kênh YouTube mục tiêu, các video clips thành phẩm và trạng thái đăng
+    Tổng hợp ma trận liên kết giữa TikTok Accounts, Kênh YouTube mục tiêu, các video clips thành phẩm và trạng thái đăng.
+    Hỗ trợ ánh xạ 2 chiều giữa Tên Kênh (name) và Tên Thư Mục (folder_name) trên ổ đĩa.
     """
     accounts_data = load_accounts_data()
     if not dest_path:
-        dest_path = accounts_data.get("dest_path", os.path.join(os.path.dirname(os.path.abspath(__file__)), "Tiktok_Builder_Output"))
+        dest_path = accounts_data.get("dest_path", os.path.join(os.path.dirname(os.path.abspath(__file__)), "output_product"))
     
     finished_data = scan_finished_results(dest_path)
     all_finished = finished_data.get("results", [])
     
+    # Tạo mapping 2 chiều giữa name <-> folder_name của youtube_channels
+    channel_name_to_folder = {}
+    channel_folder_to_name = {}
+    for chan in accounts_data.get("youtube_channels", []):
+        c_n = str(chan.get("name", "")).strip()
+        c_f = str(chan.get("folder_name", "") or c_n).strip()
+        if c_n:
+            channel_name_to_folder[c_n] = c_f
+            channel_name_to_folder[c_n.lower()] = c_f
+            channel_name_to_folder[sanitize_filename(c_n).lower()] = c_f
+        if c_f:
+            channel_folder_to_name[c_f] = c_n
+            channel_folder_to_name[c_f.lower()] = c_n
+            channel_folder_to_name[sanitize_filename(c_f).lower()] = c_n
+
     # Tạo map tra cứu nhanh theo channel -> list of clips
     channel_clips_map = {}
     for clip in all_finished:
@@ -875,15 +911,44 @@ def get_publishing_matrix(dest_path=None):
             if h and h not in all_relevant_channels:
                 all_relevant_channels.append(h)
                 
+        # Candidate names for current target
+        current_target_aliases = set()
+        if target_channel:
+            current_target_aliases.add(target_channel.lower())
+            current_target_aliases.add(sanitize_filename(target_channel).lower())
+            f_tar = channel_name_to_folder.get(target_channel.lower()) or channel_name_to_folder.get(sanitize_filename(target_channel).lower())
+            if f_tar:
+                current_target_aliases.add(f_tar.lower())
+                current_target_aliases.add(sanitize_filename(f_tar).lower())
+            n_tar = channel_folder_to_name.get(target_channel.lower()) or channel_folder_to_name.get(sanitize_filename(target_channel).lower())
+            if n_tar:
+                current_target_aliases.add(n_tar.lower())
+                current_target_aliases.add(sanitize_filename(n_tar).lower())
+
         clips_feed = []
         seen_keys = set()
         
         # 1. Thêm các clip từ kênh mục tiêu hiện tại và các kênh trong lịch sử có sẵn trên ổ đĩa
         for ch in all_relevant_channels:
-            matched_clips = channel_clips_map.get(ch, [])
+            if not ch:
+                continue
+            possible_keys = [ch, sanitize_filename(ch), ch.lower(), sanitize_filename(ch).lower()]
+            f_name = channel_name_to_folder.get(ch.lower()) or channel_name_to_folder.get(sanitize_filename(ch).lower())
+            if f_name:
+                possible_keys.extend([f_name, sanitize_filename(f_name), f_name.lower(), sanitize_filename(f_name).lower()])
+            n_name = channel_folder_to_name.get(ch.lower()) or channel_folder_to_name.get(sanitize_filename(ch).lower())
+            if n_name:
+                possible_keys.extend([n_name, sanitize_filename(n_name), n_name.lower(), sanitize_filename(n_name).lower()])
+
+            matched_clips = []
+            for pk in possible_keys:
+                if pk in channel_clips_map:
+                    matched_clips = channel_clips_map[pk]
+                    break
+            
             if not matched_clips:
                 for k, v in channel_clips_map.items():
-                    if sanitize_filename(k) == sanitize_filename(ch):
+                    if any(k.lower() == pk.lower() or sanitize_filename(k).lower() == sanitize_filename(pk).lower() for pk in possible_keys):
                         matched_clips = v
                         break
                         
@@ -894,11 +959,16 @@ def get_publishing_matrix(dest_path=None):
                     continue
                 seen_keys.add(clip_key)
                 
+                # Check is_current_target
+                is_cur_target = False
+                if c_channel.lower() in current_target_aliases or sanitize_filename(c_channel).lower() in current_target_aliases or ch.lower() in current_target_aliases:
+                    is_cur_target = True
+
                 # Kiểm tra trạng thái đã đăng
                 post_info = posted_clips.get(clip_key, {})
                 if not post_info:
                     for pk, pv in posted_clips.items():
-                        if sanitize_filename(pk) == sanitize_filename(clip_key) or (pv.get("title") == c.get("title") and sanitize_filename(pv.get("channel", "")) == sanitize_filename(c_channel)):
+                        if sanitize_filename(pk).lower() == sanitize_filename(clip_key).lower() or (pv.get("title") == c.get("title") and sanitize_filename(pv.get("channel", "")).lower() == sanitize_filename(c_channel).lower()):
                             post_info = pv
                             break
                             
@@ -932,7 +1002,7 @@ def get_publishing_matrix(dest_path=None):
                     "key": clip_key,
                     "title": c.get("title"),
                     "channel": c_channel,
-                    "is_current_target": (sanitize_filename(c_channel) == sanitize_filename(target_channel)),
+                    "is_current_target": is_cur_target,
                     "path": c.get("path"),
                     "parts": parts_data,
                     "parts_count": len(parts_data),
@@ -947,11 +1017,15 @@ def get_publishing_matrix(dest_path=None):
             if pkey not in seen_keys and pval.get("posted"):
                 seen_keys.add(pkey)
                 pchannel = pval.get("channel", "")
+                is_cur_target = False
+                if pchannel.lower() in current_target_aliases or sanitize_filename(pchannel).lower() in current_target_aliases:
+                    is_cur_target = True
+
                 clips_feed.append({
                     "key": pkey,
                     "title": pval.get("title", os.path.basename(pkey)),
                     "channel": pchannel,
-                    "is_current_target": (sanitize_filename(pchannel) == sanitize_filename(target_channel)),
+                    "is_current_target": is_cur_target,
                     "path": "",
                     "parts": [],
                     "parts_count": 0,
@@ -960,6 +1034,14 @@ def get_publishing_matrix(dest_path=None):
                     "posted_at": pval.get("posted_at", ""),
                     "on_disk": False
                 })
+                
+        # Sắp xếp clips: Ưu tiên kênh mục tiêu hiện tại lên trước (is_current_target True),
+        # Sau đó clip CHƯA đăng (posted False) lên trước clip ĐÃ đăng (posted True)
+        clips_feed.sort(key=lambda x: (
+            0 if x.get("is_current_target") else 1,
+            1 if x.get("posted") else 0,
+            x.get("title", "")
+        ))
 
         total_clips = len(clips_feed)
         posted_count = sum(1 for c in clips_feed if c["posted"])

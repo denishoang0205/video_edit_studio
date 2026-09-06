@@ -167,8 +167,10 @@ def test_gemini_api(api_key: str, model: str = "gemini-3.6-flash"):
         return False, f"Không thể kết nối: {msg}"
 
     # 4. Nếu là Google Gemini Key (Hỗ trợ hoàn hảo cả AQ... và AIzaSy...)
-    candidate_chain = [model] if model and model != "builtin" else []
-    for m in ["gemini-3.6-flash", "gemini-3-flash-preview", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-2.5-flash"]:
+    candidate_chain = []
+    if model and model != "builtin" and "3.6" not in model:
+        candidate_chain.append(model)
+    for m in ["gemini-3-flash-preview", "gemini-3.5-flash", "gemini-2.5-flash"]:
         if m not in candidate_chain:
             candidate_chain.append(m)
 
@@ -187,29 +189,25 @@ def generate_tiktok_caption(video_title: str, channel_name: str = "", api_key: s
     """
     key = clean_api_key(api_key) or get_active_gemini_key()
     
-    # 1. Thử gọi qua API nếu có Key hợp lệ
-    if key:
+    # 1. Thử gọi qua API nếu có Key hợp lệ và không chọn model 'builtin'
+    if key and model != "builtin" and not key.startswith("AQ."):
         prompt = f"""Bạn là chuyên gia sáng tạo nội dung TikTok. Tạo 1 Caption ngắn (dưới 80 từ, có emoji) và 5-7 Hashtags triệu view cho video TikTok sau:
 - Tiêu đề: {video_title}
 - Kênh/Chủ đề: {channel_name}
 Định dạng JSON thuần: {{"caption": "Nội dung caption 🔥", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5"}}"""
 
         raw_text = ""
+        ok = False
         if key.startswith("gsk_"):
             ok, _, raw_text, _ = call_openai_compatible_api(key, "llama-3.3-70b-versatile", prompt)
         elif key.startswith("sk-"):
             ok, _, raw_text, _ = call_openai_compatible_api(key, "gpt-4o-mini", prompt)
-        else:
-            # Gemini (Hỗ trợ cả AQ... và AIzaSy...)
-            candidate_chain = [model] if model and model != "builtin" else []
-            for m in ["gemini-3.6-flash", "gemini-3-flash-preview", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-2.5-flash"]:
-                if m not in candidate_chain:
-                    candidate_chain.append(m)
-            
-            for m in candidate_chain:
-                ok, _, raw_text, _ = call_single_gemini_model(key, m, prompt)
-                if ok and raw_text:
-                    break
+        elif key.startswith("AIzaSy"):
+            # Google AI Studio API Key
+            target_m = model if (model and "3.6" not in model and model != "builtin") else "gemini-3-flash-preview"
+            ok, _, raw_text, _ = call_single_gemini_model(key, target_m, prompt, timeout=3)
+            if not ok:
+                ok, _, raw_text, _ = call_single_gemini_model(key, "gemini-2.5-flash", prompt, timeout=3)
 
         if ok and raw_text:
             try:

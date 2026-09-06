@@ -25,8 +25,30 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ==========================================================================
-   Utility: Debounce & Modern Floating Toast Notification Engine
+   Utility: HTML & Attribute Escaping, Debounce & Modern Floating Toast
    ========================================================================== */
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+window.escapeHtml = escapeHtml;
+
+function escapeAttr(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+window.escapeAttr = escapeAttr;
+
 function debounce(fn, delay = 120) {
     let timer = null;
     return function(...args) {
@@ -1440,6 +1462,11 @@ async function updateProgressUI(data) {
         }).join('');
         term.scrollTop = term.scrollHeight;
     }
+
+    // Luôn luôn đồng bộ trạng thái Auto-Pilot Hub (Nút bấm, tiến độ, logs) trên từng nhịp polling
+    if (typeof updateAutopilotProgressUI === 'function') {
+        updateAutopilotProgressUI(data);
+    }
 }
 
 async function checkAndPollProgress() {
@@ -2436,7 +2463,7 @@ function initPublishingTracker() {
             });
             updateGlobalSelectedPartsCount();
             if (!hasAny) {
-                alert('Tất cả các part đã được đăng!');
+                showToast('Tất cả các part đã được đăng!', 'info');
             }
         });
     }
@@ -2446,7 +2473,7 @@ function initPublishingTracker() {
         btnBatchPostSelected.addEventListener('click', () => {
             const checkedChks = Array.from(document.querySelectorAll('.part-pill-chk:checked'));
             if (checkedChks.length === 0) {
-                alert('Vui lòng tích chọn ít nhất 1 Part trên danh sách để đăng!');
+                showToast('Vui lòng tích chọn ít nhất 1 Part trên danh sách để đăng!', 'warning');
                 return;
             }
             const partsList = checkedChks.map(chk => ({
@@ -2561,6 +2588,13 @@ function renderPublishingAccountsList() {
 function selectPublishingAccount(accountName) {
     activePublishingAccountName = accountName;
     
+    // Reset channel filter to 'all' on account switch so clips are never hidden
+    activePublishingChannelFilter = 'all';
+    const channelFilterSelect = document.getElementById('pub-filter-channel');
+    if (channelFilterSelect) {
+        channelFilterSelect.value = 'all';
+    }
+
     const accounts = publishingMatrixData.accounts || [];
     const acc = accounts.find(a => a.account_name === accountName);
     
@@ -2635,20 +2669,25 @@ function renderPublishingClipsFeed() {
 
     const clips = acc.clips || [];
     
-    // Update Channel Filter Dropdown options
+    // Update Channel Filter Dropdown options & validate active filter
     const channelFilterSelect = document.getElementById('pub-filter-channel');
     if (channelFilterSelect) {
         const uniqueChannels = Array.from(new Set(clips.map(c => c.channel).filter(Boolean)));
-        const currentSelectedVal = channelFilterSelect.value;
         
+        // If current filter is not present in available channels, reset safely to 'all'
+        if (activePublishingChannelFilter !== 'all' && !uniqueChannels.includes(activePublishingChannelFilter)) {
+            activePublishingChannelFilter = 'all';
+        }
+
         channelFilterSelect.innerHTML = '<option value="all">Tất cả nguồn kênh</option>';
         uniqueChannels.forEach(ch => {
             const opt = document.createElement('option');
             opt.value = ch;
             opt.textContent = `Kênh: ${ch}`;
-            if (ch === currentSelectedVal) opt.selected = true;
+            if (ch === activePublishingChannelFilter) opt.selected = true;
             channelFilterSelect.appendChild(opt);
         });
+        channelFilterSelect.value = activePublishingChannelFilter;
     }
 
     // Filter clips
@@ -2669,11 +2708,31 @@ function renderPublishingClipsFeed() {
     document.getElementById('pub-count-posted').textContent = postedCount;
 
     if (filteredClips.length === 0) {
+        const isNoClips = clips.length === 0;
+        const targetChan = acc.target_channel || 'Chưa gán';
         container.innerHTML = `
-            <div class="empty-state" style="padding: 40px;">
-                <i class="fa-solid fa-film"></i>
-                <p>${clips.length === 0 ? `Chưa có video thành phẩm nào cho kênh mục tiêu: <strong>${escapeHtml(acc.target_channel || 'Chưa gán')}</strong>.` : 'Không có clip nào phù hợp với bộ lọc hiện tại.'}</p>
-                ${clips.length === 0 ? `<p style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">Hãy render video của kênh <strong>${escapeHtml(acc.target_channel)}</strong> tại tab Editor Studio để video xuất hiện tại đây!</p>` : ''}
+            <div class="empty-state" style="padding: 40px 20px; text-align: center;">
+                <i class="fa-solid fa-film" style="font-size: 38px; color: var(--text-muted); margin-bottom: 12px; opacity: 0.6;"></i>
+                <h4 style="margin: 0 0 8px; font-size: 15px; font-weight: 700;">${isNoClips ? `Chưa có video thành phẩm cho kênh "${escapeHtml(targetChan)}"` : 'Không có clip nào phù hợp với bộ lọc'}</h4>
+                <p style="font-size: 12px; color: var(--text-secondary); max-width: 440px; margin: 0 auto 16px; line-height: 1.5;">
+                    ${isNoClips 
+                        ? `Thư mục đích chưa có video đã render từ kênh <strong>${escapeHtml(targetChan)}</strong>. Bạn có thể tải video từ YouTube hoặc xuất video trong Editor Studio!` 
+                        : 'Thử chuyển bộ lọc về "All Clips" hoặc "Tất cả nguồn kênh" để xem toàn bộ danh sách.'}
+                </p>
+                ${isNoClips ? `
+                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-sm btn-outline" onclick="document.querySelector('[data-tab=\\'tab-download\\']')?.click()">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Tải video YouTube
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="document.querySelector('[data-tab=\\'tab-studio\\']')?.click()">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Mở Editor Studio
+                        </button>
+                    </div>
+                ` : `
+                    <button type="button" class="btn btn-sm btn-outline" onclick="activePublishingChannelFilter='all';activePublishingFilter='all';document.querySelectorAll('.pub-filter-btn').forEach(b=>b.dataset.filter==='all'?b.classList.add('active'):b.classList.remove('active'));renderPublishingClipsFeed();">
+                        <i class="fa-solid fa-rotate-left"></i> Đặt lại bộ lọc
+                    </button>
+                `}
             </div>
         `;
         return;
@@ -3938,10 +3997,10 @@ async function handleToggleClipPost(clipKey, channel, title, newPosted) {
             renderPublishingAccountsList();
             renderPublishingClipsFeed();
         } else {
-            alert('Lỗi cập nhật trạng thái: ' + (data.error || 'Unknown'));
+            showToast('Lỗi cập nhật trạng thái: ' + (data.error || 'Unknown'), 'error');
         }
     } catch (err) {
-        alert('Lỗi kết nối: ' + err.message);
+        showToast('Lỗi kết nối: ' + err.message, 'error');
     }
 }
 
@@ -3949,9 +4008,10 @@ async function handleSwitchTargetChannel() {
     if (!activePublishingAccountName) return;
 
     const selectTarget = document.getElementById('pub-select-target');
-    const newTarget = selectTarget.value.trim();
+    const btnChangeTarget = document.getElementById('btn-pub-change-target');
+    const newTarget = selectTarget ? selectTarget.value.trim() : '';
     if (!newTarget) {
-        alert('Vui lòng chọn một kênh YouTube mục tiêu!');
+        showToast('Vui lòng chọn một kênh YouTube mục tiêu!', 'warning');
         return;
     }
 
@@ -3960,12 +4020,14 @@ async function handleSwitchTargetChannel() {
     const oldTarget = acc?.target_channel || '';
 
     if (newTarget === oldTarget) {
-        alert(`Tài khoản "${activePublishingAccountName}" đã và đang sử dụng kênh mục tiêu "${newTarget}" rồi!`);
+        showToast(`Tài khoản "${activePublishingAccountName}" đã sử dụng kênh mục tiêu "${newTarget}" rồi!`, 'info');
         return;
     }
 
-    const confirmMsg = `Bạn có chắc chắn muốn chuyển kênh mục tiêu của tài khoản "${activePublishingAccountName}" từ "${oldTarget || 'Chưa có'}" sang "${newTarget}" không?\n\n- Các clip đã đăng từ kênh "${oldTarget}" vẫn sẽ được lưu lại trong lịch sử.\n- Toàn bộ video thành phẩm của kênh mới "${newTarget}" sẽ được tự động nạp vào danh sách.`;
-    if (!confirm(confirmMsg)) return;
+    if (btnChangeTarget) {
+        btnChangeTarget.disabled = true;
+        btnChangeTarget.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Switching...`;
+    }
 
     try {
         const res = await fetch('/api/publishing/change_target', {
@@ -3979,17 +4041,44 @@ async function handleSwitchTargetChannel() {
 
         const data = await res.json();
         if (data.success) {
-            await fetchPublishingMatrix();
-            // Đồng bộ sang accounts.json của Tab Accounts Manager nếu có
-            if (typeof fetchAccountsData === 'function') {
-                fetchAccountsData();
+            if (acc) {
+                acc.target_channel = newTarget;
             }
-            alert(`Đã chuyển kênh mục tiêu sang "${newTarget}" thành công!`);
+
+            // Reset active filters to 'all' so clips from the new channel are immediately displayed
+            activePublishingChannelFilter = 'all';
+            activePublishingFilter = 'all';
+
+            // Reset UI filter button states
+            document.querySelectorAll('.pub-filter-btn').forEach(btn => {
+                if (btn.dataset.filter === 'all') btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+
+            const channelFilterSelect = document.getElementById('pub-filter-channel');
+            if (channelFilterSelect) {
+                channelFilterSelect.value = 'all';
+            }
+
+            // Reload publishing matrix
+            await fetchPublishingMatrix();
+
+            // Also reload accounts data in Accounts Manager tab if function exists
+            if (typeof fetchAccountsData === 'function') {
+                try { fetchAccountsData(); } catch(e) {}
+            }
+
+            showToast(`🎯 Đã chuyển kênh mục tiêu sang "${newTarget}" thành công!`, 'success');
         } else {
-            alert('Lỗi chuyển đổi kênh: ' + (data.error || 'Unknown'));
+            showToast('Lỗi chuyển đổi kênh: ' + (data.error || 'Unknown'), 'error');
         }
     } catch (err) {
-        alert('Lỗi kết nối: ' + err.message);
+        showToast('Lỗi kết nối: ' + err.message, 'error');
+    } finally {
+        if (btnChangeTarget) {
+            btnChangeTarget.disabled = false;
+            btnChangeTarget.innerHTML = `<i class="fa-solid fa-arrow-right-arrow-left"></i> Switch Target`;
+        }
     }
 }
 
@@ -3998,12 +4087,14 @@ function handleCopyAccountHashtags() {
     const accounts = publishingMatrixData.accounts || [];
     const acc = accounts.find(a => a.account_name === activePublishingAccountName);
     if (!acc || !acc.hashtag) {
-        alert('Tài khoản này chưa có cấu hình Hashtag!');
+        showToast('Tài khoản này chưa có cấu hình Hashtag!', 'warning');
         return;
     }
 
     navigator.clipboard.writeText(acc.hashtag).then(() => {
-        alert(`Đã sao chép Hashtag của tài khoản "${activePublishingAccountName}" vào Clipboard!`);
+        showToast(`📋 Đã sao chép Hashtag của tài khoản "${activePublishingAccountName}"!`, 'success');
+    }).catch(() => {
+        showToast('Không thể sao chép vào bộ nhớ tạm!', 'error');
     });
 }
 
@@ -4015,7 +4106,9 @@ function handleCopyCaptionForClip(clipTitle) {
     const fullCaption = `${clipTitle}\n\n${hashtag}`.trim();
 
     navigator.clipboard.writeText(fullCaption).then(() => {
-        alert(`Đã sao chép Caption + Hashtag của clip:\n"${clipTitle}" vào Clipboard!`);
+        showToast(`📋 Đã sao chép Caption + Hashtag của clip:\n"${clipTitle}"!`, 'success');
+    }).catch(() => {
+        showToast('Không thể sao chép vào bộ nhớ tạm!', 'error');
     });
 }
 
@@ -4027,7 +4120,7 @@ async function handleBatchMarkAllPosted() {
 
     const pendingClips = acc.clips?.filter(c => !c.posted) || [];
     if (pendingClips.length === 0) {
-        alert('Tất cả clip hiện tại đã được đánh dấu Đã Đăng rồi!');
+        showToast('Tất cả clip hiện tại đã được đánh dấu Đã Đăng rồi!', 'info');
         return;
     }
 
@@ -4036,7 +4129,7 @@ async function handleBatchMarkAllPosted() {
     }
 
     try {
-        const res = await fetch('/api/publishing/batch_toggle', {
+        const res = await fetch('/api/publishing/batch_toggle_post', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -4049,12 +4142,12 @@ async function handleBatchMarkAllPosted() {
         const data = await res.json();
         if (data.success) {
             await fetchPublishingMatrix();
-            alert(`Đã đánh dấu Đã Đăng cho ${pendingClips.length} clips thành công!`);
+            showToast(`✅ Đã đánh dấu Đã Đăng cho ${pendingClips.length} clips thành công!`, 'success');
         } else {
-            alert('Lỗi cập nhật: ' + (data.error || 'Unknown'));
+            showToast('Lỗi cập nhật: ' + (data.error || 'Unknown'), 'error');
         }
     } catch (err) {
-        alert('Lỗi kết nối: ' + err.message);
+        showToast('Lỗi kết nối: ' + err.message, 'error');
     }
 }
 
@@ -4260,11 +4353,53 @@ function initAutoPilotHub() {
     if (btnStopModal) btnStopModal.addEventListener('click', stopAutopilotPipeline);
     if (btnStopPage) btnStopPage.addEventListener('click', stopAutopilotPipeline);
 
-    // Pre-load on init
+    // Pre-load on init and sync button state with server
+    syncAutopilotButtonState();
     loadAutopilotQueue();
 }
 
+async function syncAutopilotButtonState() {
+    try {
+        const res = await fetch('/api/autopilot/status');
+        const data = await res.json();
+        const isRunning = (data && data.is_running) || false;
+        isAutopilotRunning = isRunning;
+
+        const btnStartModal = document.getElementById('btn-start-autopilot');
+        const btnStopModal = document.getElementById('btn-stop-autopilot');
+        const btnStartPage = document.getElementById('btn-page-start-autopilot');
+        const btnStopPage = document.getElementById('btn-page-stop-autopilot');
+        const statusBadgePage = document.getElementById('tab-autopilot-status-badge');
+
+        if (isRunning) {
+            if (btnStartModal) btnStartModal.classList.add('hidden');
+            if (btnStopModal) btnStopModal.classList.remove('hidden');
+            if (btnStartPage) btnStartPage.classList.add('hidden');
+            if (btnStopPage) btnStopPage.classList.remove('hidden');
+            if (statusBadgePage) {
+                statusBadgePage.textContent = 'Đang chạy...';
+                statusBadgePage.className = 'badge badge-primary';
+            }
+        } else {
+            if (btnStartModal) btnStartModal.classList.remove('hidden');
+            if (btnStopModal) btnStopModal.classList.add('hidden');
+            if (btnStartPage) btnStartPage.classList.remove('hidden');
+            if (btnStopPage) btnStopPage.classList.add('hidden');
+            if (statusBadgePage) {
+                if (data.state && (data.state.success_count > 0 || data.state.fail_count > 0)) {
+                    statusBadgePage.textContent = 'Đã hoàn thành';
+                    statusBadgePage.className = 'badge badge-success';
+                } else if (statusBadgePage.textContent === 'Đang chạy...') {
+                    statusBadgePage.textContent = 'Sẵn sàng';
+                    statusBadgePage.className = 'badge badge-secondary';
+                }
+            }
+        }
+    } catch (e) {}
+}
+
 async function loadAutopilotQueue() {
+    syncAutopilotButtonState();
     const queueBadgeModal = document.getElementById('autopilot-queue-badge');
     const queuePreviewModal = document.getElementById('autopilot-queue-preview');
     const queueCountPage = document.getElementById('tab-autopilot-queue-count');
@@ -4543,6 +4678,9 @@ function renderAutopilotUI() {
     }
 }
 
+let seenAutopilotLogKeys = new Set();
+let lastAutopilotRunningState = false;
+
 function appendAutopilotLog(msg, type = 'info') {
     const timeStr = new Date().toLocaleTimeString();
     const containers = [
@@ -4565,6 +4703,132 @@ function appendAutopilotLog(msg, type = 'info') {
     });
 }
 
+function syncAutopilotLogsToTerminals(serverLogs) {
+    if (!serverLogs || !serverLogs.length) return;
+    const containers = [
+        document.getElementById('autopilot-logs'),
+        document.getElementById('tab-autopilot-logs')
+    ];
+
+    let hasNew = false;
+    for (const raw of serverLogs) {
+        if (!raw) continue;
+        const key = raw.trim();
+        if (seenAutopilotLogKeys.has(key)) continue;
+        seenAutopilotLogKeys.add(key);
+        hasNew = true;
+
+        const clean = raw.replace(/^\[.*?\]\s*/, '');
+        const timeMatch = raw.match(/^\[(.*?)\]/);
+        const timeStr = timeMatch ? timeMatch[1] : new Date().toLocaleTimeString();
+
+        let color = '#60a5fa';
+        if (clean.includes('❌')) color = '#ef4444';
+        else if (clean.includes('⚠️') || clean.includes('🎯')) color = '#f59e0b';
+        else if (clean.includes('🎉') || clean.includes('🏁') || clean.includes('✅') || clean.includes('✨')) color = '#22c55e';
+
+        containers.forEach(container => {
+            if (!container) return;
+            const logLine = document.createElement('div');
+            logLine.className = 'log-line';
+            logLine.style.color = color;
+            logLine.textContent = `[${timeStr}] ${clean}`;
+            container.appendChild(logLine);
+        });
+    }
+
+    if (hasNew) {
+        containers.forEach(container => {
+            if (container) container.scrollTop = container.scrollHeight;
+        });
+    }
+}
+
+function setAutopilotRunningUI(isRunning) {
+    isAutopilotRunning = isRunning;
+    const btnStartModal = document.getElementById('btn-start-autopilot');
+    const btnStopModal = document.getElementById('btn-stop-autopilot');
+    const btnStartPage = document.getElementById('btn-page-start-autopilot');
+    const btnStopPage = document.getElementById('btn-page-stop-autopilot');
+    const statusBadgePage = document.getElementById('tab-autopilot-status-badge');
+    const execBoxModal = document.getElementById('autopilot-execution-box');
+
+    if (isRunning) {
+        if (execBoxModal) execBoxModal.classList.remove('hidden');
+        if (btnStartModal) btnStartModal.classList.add('hidden');
+        if (btnStopModal) btnStopModal.classList.remove('hidden');
+        if (btnStartPage) btnStartPage.classList.add('hidden');
+        if (btnStopPage) btnStopPage.classList.remove('hidden');
+        if (statusBadgePage) {
+            statusBadgePage.textContent = 'Đang chạy...';
+            statusBadgePage.className = 'badge badge-primary';
+        }
+    } else {
+        if (btnStartModal) btnStartModal.classList.remove('hidden');
+        if (btnStopModal) btnStopModal.classList.add('hidden');
+        if (btnStartPage) btnStartPage.classList.remove('hidden');
+        if (btnStopPage) btnStopPage.classList.add('hidden');
+    }
+}
+
+function updateAutopilotProgressUI(data) {
+    if (!data) return;
+
+    const isRunning = Boolean(data.is_autopilot_running);
+    setAutopilotRunningUI(isRunning);
+
+    const progressBars = [
+        document.getElementById('autopilot-progress-bar'),
+        document.getElementById('tab-autopilot-progress-bar')
+    ];
+    const percentTexts = [
+        document.getElementById('autopilot-progress-percent'),
+        document.getElementById('tab-autopilot-progress-percent')
+    ];
+    const currentTasks = [
+        document.getElementById('autopilot-current-task'),
+        document.getElementById('tab-autopilot-current-task')
+    ];
+    const statusBadgePage = document.getElementById('tab-autopilot-status-badge');
+
+    const percent = data.percentage || 0;
+    const task = data.current_task || '';
+    const autoState = data.autopilot_state || {};
+    const successCount = autoState.success_count || 0;
+
+    if (isRunning) {
+        progressBars.forEach(b => { if (b) b.style.width = `${percent}%`; });
+        percentTexts.forEach(p => { if (p) p.textContent = `${percent}%`; });
+        currentTasks.forEach(t => { if (t) t.textContent = task || 'Đang xử lý Auto-Pilot...'; });
+    } else {
+        if (percent >= 100 || successCount > 0) {
+            progressBars.forEach(b => { if (b) b.style.width = '100%'; });
+            percentTexts.forEach(p => { if (p) p.textContent = '100%'; });
+            currentTasks.forEach(t => { if (t) t.textContent = task || 'Hoàn tất Auto-Pilot!'; });
+            if (statusBadgePage) {
+                statusBadgePage.textContent = 'Đã hoàn thành';
+                statusBadgePage.className = 'badge badge-success';
+            }
+        }
+    }
+
+    // Tự động reload hàng đợi khi chuyển trạng thái từ đang chạy sang đã chạy xong
+    if (lastAutopilotRunningState && !isRunning) {
+        if (typeof loadAutopilotQueue === 'function') {
+            loadAutopilotQueue();
+        }
+        if (typeof fetchPublishingMatrix === 'function') {
+            fetchPublishingMatrix();
+        }
+    }
+    lastAutopilotRunningState = isRunning;
+
+    // Stream logs vào terminal
+    if (data.logs && data.logs.length > 0) {
+        syncAutopilotLogsToTerminals(data.logs);
+    }
+}
+
 async function startAutopilotPipeline() {
     if (pendingQueueRawCache.length === 0) {
         await loadAutopilotQueue();
@@ -4578,32 +4842,6 @@ async function startAutopilotPipeline() {
     const optShutdown = (document.getElementById('autopilot-opt-shutdown')?.checked) ||
                         (document.getElementById('tab-opt-shutdown')?.checked) || false;
 
-    isAutopilotRunning = true;
-    autopilotCancelRequested = false;
-
-    const execBoxModal = document.getElementById('autopilot-execution-box');
-    const btnStartModal = document.getElementById('btn-start-autopilot');
-    const btnStopModal = document.getElementById('btn-stop-autopilot');
-    const btnStartPage = document.getElementById('btn-page-start-autopilot');
-    const btnStopPage = document.getElementById('btn-page-stop-autopilot');
-    const statusBadgePage = document.getElementById('tab-autopilot-status-badge');
-
-    if (execBoxModal) execBoxModal.classList.remove('hidden');
-    if (btnStartModal) btnStartModal.classList.add('hidden');
-    if (btnStopModal) btnStopModal.classList.remove('hidden');
-    if (btnStartPage) btnStartPage.classList.add('hidden');
-    if (btnStopPage) btnStopPage.classList.remove('hidden');
-    if (statusBadgePage) {
-        statusBadgePage.textContent = 'Đang chạy...';
-        statusBadgePage.className = 'badge badge-primary';
-    }
-
-    // Clear logs
-    const logsModal = document.getElementById('autopilot-logs');
-    const logsPage = document.getElementById('tab-autopilot-logs');
-    if (logsModal) logsModal.innerHTML = '';
-    if (logsPage) logsPage.innerHTML = '';
-
     // Nhóm các clip theo từng tài khoản
     const accountsGroupMap = new Map();
     for (const item of pendingQueueFilteredCache) {
@@ -4616,211 +4854,59 @@ async function startAutopilotPipeline() {
     const accountList = Array.from(accountsGroupMap.keys());
     const totalAccounts = accountList.length;
 
+    // Reset log cache and set UI to running state immediately
+    seenAutopilotLogKeys.clear();
+    const logsModal = document.getElementById('autopilot-logs');
+    const logsPage = document.getElementById('tab-autopilot-logs');
+    if (logsModal) logsModal.innerHTML = '';
+    if (logsPage) logsPage.innerHTML = '';
+
+    setAutopilotRunningUI(true);
+
     appendAutopilotLog(`🚀 Bắt đầu quy trình Auto-Pilot Multi-Tab (${totalAccounts} tài khoản đã chọn - Mở 1 Chrome 3 tab/nick)...`, 'info');
 
-    let successCount = 0;
-    let failCount = 0;
-    const completedSummary = {}; // acc_name -> { channel, count, today_total, clips: [] }
-
-    for (let accIdx = 0; accIdx < totalAccounts; accIdx++) {
-        if (autopilotCancelRequested) {
-            appendAutopilotLog('⚠️ Tiến trình đã bị người dùng dừng lại!', 'warn');
-            break;
-        }
-
-        const accName = accountList[accIdx];
-        const accClips = accountsGroupMap.get(accName) || [];
-        // Lấy tối đa 3 clip cho tài khoản này để đăng 1 lượt trên 3 tab
-        const batchClips = accClips.slice(0, 3);
-
-        if (batchClips.length === 0) continue;
-
-        const percent = Math.round((accIdx / totalAccounts) * 100);
-
-        // Update progress UI on both Modal & Page
-        const progressBars = [document.getElementById('autopilot-progress-bar'), document.getElementById('tab-autopilot-progress-bar')];
-        const percentTexts = [document.getElementById('autopilot-progress-percent'), document.getElementById('tab-autopilot-progress-percent')];
-        const currentTasks = [document.getElementById('autopilot-current-task'), document.getElementById('tab-autopilot-current-task')];
-
-        progressBars.forEach(b => { if (b) b.style.width = `${percent}%`; });
-        percentTexts.forEach(p => { if (p) p.textContent = `${percent}%`; });
-        currentTasks.forEach(t => { if (t) t.textContent = `[${accIdx+1}/${totalAccounts}] @${accName}: Đăng đồng thời ${batchClips.length} clip (3 tab)`; });
-
-        appendAutopilotLog(`▶️ [Tài khoản ${accIdx+1}/${totalAccounts}] Khởi chạy AdsPower Chrome cho @${accName} (mở ${batchClips.length} tab)...`, 'info');
-        batchClips.forEach((c, cIdx) => {
-            appendAutopilotLog(`   📑 [Tab ${cIdx+1}] Clip: "${c.title}" [${c.channel}]`, 'info');
+    // 1. Khởi chạy Native Auto-Pilot trên máy chủ
+    try {
+        const startRes = await fetch('/api/autopilot/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accounts: accountList, auto_submit: true })
         });
-
-        try {
-            const payload = {
-                account_name: accName,
-                channel: batchClips[0].channel,
-                items: batchClips.map(c => ({
-                    clip_key: c.clip_key,
-                    channel: c.channel,
-                    title: c.title,
-                    video_file: c.video_file,
-                    part_label: c.part_label
-                })),
-                auto_submit: true
-            };
-
-            appendAutopilotLog(`   ⚡ Đang nạp ${batchClips.length} video, điền caption và bấm Đăng đồng thời...`, 'info');
-            let data = null;
-            try {
-                const res = await fetch('/api/publishing/post_to_tiktok', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                data = await res.json();
-            } catch (fetchErr) {
-                // Nếu bị rớt socket tạm thời do mạng hoặc chuyển VPN, thăm dò backend xem tiến trình có đang chạy ngầm không
-                appendAutopilotLog(`   ⚠️ Mạng kết nối gián đoạn (${fetchErr.message}), đang theo dõi tiến trình thực tế từ máy chủ...`, 'warn');
-                await new Promise(r => setTimeout(r, 4000));
-                
-                // Polling kiểm tra xem server có đang xử lý xong tài khoản này không
-                let isFinished = false;
-                for (let poll = 0; poll < 20; poll++) {
-                    try {
-                        const checkRes = await fetch('/api/progress');
-                        const checkData = await checkRes.json();
-                        const logs = checkData.logs || [];
-                        const recent = logs.slice(-12).join(' ');
-                        if (recent.includes(`@${accName}`) && (recent.includes('ĐÃ ĐĂNG VIDEO THÀNH CÔNG') || recent.includes('HOÀN TẤT ĐĂNG') || recent.includes('Thành công 100%') || recent.includes('toàn bộ 3 video thành công'))) {
-                            data = { success: true, count: batchClips.length };
-                            isFinished = true;
-                            break;
-                        } else if (recent.includes(`@${accName}`) && (recent.includes('LỖI ĐĂNG VIDEO') || recent.includes('LỖI ADSPOWER'))) {
-                            data = { success: false, error: 'Phát hiện lỗi xuất bản từ nhật ký máy chủ' };
-                            isFinished = true;
-                            break;
-                        }
-                    } catch (e) {}
-                    await new Promise(r => setTimeout(r, 3000));
-                }
-                if (!isFinished && !data) {
-                    throw fetchErr;
-                }
-            }
-
-            if (data.success) {
-                const postedNum = data.count || batchClips.length;
-                successCount += postedNum;
-                appendAutopilotLog(`   🎉 ĐĂNG THÀNH CÔNG ĐỒNG THỜI ${postedNum} CLIP TRÊN ${postedNum} TAB CHO @${accName}!`, 'success');
-
-                // Ghi nhận vào báo cáo
-                if (!completedSummary[accName]) {
-                    completedSummary[accName] = { channel: batchClips[0].channel || '', count: 0, today_total: 0, clips: [] };
-                }
-                completedSummary[accName].count += postedNum;
-                completedSummary[accName].clips.push(...batchClips.map(c => c.title));
-                completedSummary[accName].today_total = data.today_posted_count || completedSummary[accName].count;
-
-                appendAutopilotLog(`   🔒 Đã tự động đóng Chrome @${accName}.`, 'info');
-            } else {
-                if (data.daily_quota_reached) {
-                    appendAutopilotLog(`   🎯 Tài khoản @${accName} đã đủ hạn mức 3/3 clip hôm nay -> Đã bỏ qua an toàn!`, 'warn');
-                } else {
-                    failCount += batchClips.length;
-                    appendAutopilotLog(`   ❌ Thất bại @${accName}: ${data.error || 'Lỗi không xác định'}`, 'error');
-                }
-            }
-        } catch (err) {
-            failCount += batchClips.length;
-            appendAutopilotLog(`   ❌ Lỗi kết nối @${accName}: ${err.message}`, 'error');
+        const startData = await startRes.json();
+        if (!startData.success) {
+            appendAutopilotLog(`❌ Không thể khởi chạy Auto-Pilot: ${startData.error}`, 'error');
+            setAutopilotRunningUI(false);
+            return;
         }
-
-        // Nghỉ ngắn 4 giây giữa các tài khoản để đảm bảo AdsPower chuyển profile sạch sẽ
-        if (accIdx < totalAccounts - 1 && !autopilotCancelRequested) {
-            appendAutopilotLog('   ⏳ Chờ 4 giây trước khi mở tài khoản tiếp theo...', 'info');
-            await new Promise(r => setTimeout(r, 4000));
-        }
+    } catch (e) {
+        appendAutopilotLog(`❌ Lỗi kết nối tới máy chủ: ${e.message}`, 'error');
+        setAutopilotRunningUI(false);
+        return;
     }
 
-    const progressBars = [document.getElementById('autopilot-progress-bar'), document.getElementById('tab-autopilot-progress-bar')];
-    const percentTexts = [document.getElementById('autopilot-progress-percent'), document.getElementById('tab-autopilot-progress-percent')];
-    const currentTasks = [document.getElementById('autopilot-current-task'), document.getElementById('tab-autopilot-current-task')];
+    appendAutopilotLog('⚡ Auto-Pilot đã được bàn giao cho máy chủ thực thi liên tục không ngừng nghỉ...', 'success');
 
-    progressBars.forEach(b => { if (b) b.style.width = '100%'; });
-    percentTexts.forEach(p => { if (p) p.textContent = '100%'; });
-    currentTasks.forEach(t => { if (t) t.textContent = 'Hoàn thành toàn bộ Pipeline!'; });
-
-    appendAutopilotLog(`🏁 HOÀN TẤT PIPELINE! Thành công: ${successCount} | Thất bại: ${failCount}`, successCount > 0 ? 'success' : 'warn');
-
-    if (statusBadgePage) {
-        statusBadgePage.textContent = 'Đã hoàn thành';
-        statusBadgePage.className = 'badge badge-success';
-    }
-
-    // 📢 GỬI BÁO CÁO TỔNG KẾT CHI TIẾT VỀ TELEGRAM
-    const postedAccNames = Object.keys(completedSummary);
-    if (postedAccNames.length > 0 || successCount > 0) {
-        let summaryLines = [];
-        for (const acc of postedAccNames) {
-            const info = completedSummary[acc];
-            summaryLines.push(`• 👤 <b>@${acc}</b> (+${info.count} clip mới | Tổng hôm nay: <code>${info.today_total}/3</code>)\n  📺 <b>Kênh:</b> <code>${info.channel}</code>`);
-        }
-
-        const telegramReport = 
-            `📊 <b>[TikTok Studio Pro]</b>\n` +
-            `🎉 <b>BÁO CÁO TỔNG KẾT XUẤT BẢN VIDEO HÔM NAY</b>\n` +
-            `━━━━━━━━━━━━━━━━━━━━\n` +
-            `✅ <b>Tổng số video vừa đăng:</b> ${successCount} clip\n` +
-            (failCount > 0 ? `⚠️ <b>Thất bại:</b> ${failCount} clip\n` : '') +
-            `\n📋 <b>Chi tiết theo từng tài khoản & kênh:</b>\n` +
-            summaryLines.join('\n\n') + `\n` +
-            `━━━━━━━━━━━━━━━━━━━━\n` +
-            `⏰ <b>Thời gian hoàn tất:</b> ${new Date().toLocaleString('vi-VN')}\n` +
-            `🛡️ <i>Đã mở 3 tab đồng thời và tự động đóng trình duyệt an toàn cho từng nick!</i>`;
-
-        try {
-            await fetch('/api/telegram/test', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: telegramReport })
-            });
-            appendAutopilotLog('📢 Đã gửi báo cáo tổng kết chi tiết về Telegram của bạn!', 'success');
-        } catch (e) {
-            console.error('Error sending Telegram summary report:', e);
-        }
-    }
-
-    // Nếu chọn tự động tắt máy
-    if (optShutdown && !autopilotCancelRequested) {
-        appendAutopilotLog('💤 Đang kích hoạt chế độ hẹn giờ tự động tắt máy tính sau 15 phút...', 'warn');
-        try {
-            await fetch('/api/system/shutdown', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ delay_seconds: 900 })
-            });
-            appendAutopilotLog('✅ Đã hẹn giờ Shutdown máy tính thành công. Bạn có thể yên tâm đi ngủ!', 'success');
-        } catch (e) {
-            appendAutopilotLog(`⚠️ Lỗi hẹn giờ tắt máy: ${e.message}`, 'error');
-        }
-    }
-
-    // Refresh UI matrix
-    if (typeof fetchPublishingMatrix === 'function') {
-        fetchPublishingMatrix();
-    }
-    await loadAutopilotQueue();
-
-    isAutopilotRunning = false;
-    if (btnStartModal) btnStartModal.classList.remove('hidden');
-    if (btnStopModal) btnStopModal.classList.add('hidden');
-    if (btnStartPage) btnStartPage.classList.remove('hidden');
-    if (btnStopPage) btnStopPage.classList.add('hidden');
+    // Kích hoạt ngay vòng lặp polling toàn cục
+    checkAndPollProgress();
+    startPollingProgress();
 }
 
 async function stopAutopilotPipeline() {
     autopilotCancelRequested = true;
     appendAutopilotLog('🛑 Đang gửi tín hiệu dừng pipeline...', 'warn');
     try {
+        await fetch('/api/autopilot/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
         await fetch('/api/pipeline/stop_batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
         await fetch('/api/system/cancel_shutdown', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     } catch (e) {}
+
+    // Lập tức hoàn trả nút bấm về trạng thái START PIPELINE
+    setAutopilotRunningUI(false);
+    const statusBadgePage = document.getElementById('tab-autopilot-status-badge');
+    if (statusBadgePage) {
+        statusBadgePage.textContent = 'Đã dừng';
+        statusBadgePage.className = 'badge badge-warn';
+    }
 }
 
 window.initAutoPilotHub = initAutoPilotHub;
@@ -5814,3 +5900,6 @@ window.initTikTokAnalyticsEngine = initTikTokAnalyticsEngine;
 
 
 
+
+// Heartbeat System to keep background server alive
+setInterval(() => { fetch('/api/heartbeat').catch(e => {}); }, 10000);

@@ -118,7 +118,11 @@ def resolve_profile_identifier(profile_identifier, api_url=DEFAULT_ADSPOWER_URL,
     if not ident:
         return ""
         
-    # Lấy danh sách profiles từ AdsPower
+    # Fast-path: Nếu đã là AdsPower User ID chuẩn (8-10 ký tự, ví dụ k1fast9p) hoặc Serial Number (dưới 6 số)
+    if (len(ident) in (8, 9, 10) and ident.isalnum() and ident.lower().startswith("k")) or (ident.isdigit() and len(ident) <= 6):
+        return ident
+
+    # Lấy danh sách profiles từ AdsPower để tìm kiếm theo tên hoặc email
     profiles_res = get_adspower_profiles(api_url, api_key)
     if profiles_res.get("success"):
         profiles = profiles_res.get("profiles", [])

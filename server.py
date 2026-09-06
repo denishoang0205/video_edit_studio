@@ -72,6 +72,15 @@ CANCEL_REQUESTED = False
 IS_ANALYTICS_COLLECTING = False
 ANALYTICS_LOGS = []
 PUBLISHING_LOCK = threading.Lock()
+LAST_PUBLISHING_STATE = {
+    "is_busy": False,
+    "account_name": "",
+    "success": False,
+    "count": 0,
+    "error": "",
+    "today_posted_count": 0,
+    "timestamp": 0
+}
 
 def send_telegram_notification(message, parse_mode="HTML"):
     """Gửi thông báo đến Telegram Bot cá nhân với cơ chế Fallback chống lỗi định dạng"""
@@ -129,7 +138,7 @@ def log_message(msg):
     except Exception:
         pass
     LOG_MESSAGES.append(formatted)
-    if len(LOG_MESSAGES) > 200:
+    if len(LOG_MESSAGES) > 500:
         LOG_MESSAGES.pop(0)
 
 def batch_worker(payload):
@@ -139,11 +148,11 @@ def batch_worker(payload):
     PROGRESS_PERCENT = 0
     
     video_items = payload.get("video_items", [])
-    dest_folder = payload.get("dest_folder", os.path.join(BASE_DIR, "Tiktok_Builder_Output"))
     from src.services.drive_service import resolve_google_drive_path
+    dest_folder = payload.get("dest_folder", os.path.join(BASE_DIR, "output_product"))
     dest_folder = resolve_google_drive_path(dest_folder)
     if not dest_folder or dest_folder.startswith(('http://', 'https://')):
-        dest_folder = os.path.join(BASE_DIR, "Tiktok_Builder_Output")
+        dest_folder = os.path.join(BASE_DIR, "output_product")
         
     settings = {
         "aspect_ratio": payload.get("aspect_ratio", "3:4"),
@@ -344,6 +353,422 @@ def batch_worker(payload):
     finally:
         IS_RUNNING = False
 
+def execute_tiktok_publish(body_data):
+    acc_name = body_data.get("account_name", "")
+    clip_key = body_data.get("clip_key", "")
+    channel = body_data.get("channel", "")
+    title = body_data.get("title", "")
+    auto_submit_override = body_data.get("auto_submit", None)
+    override_caption = body_data.get("override_caption", "").strip()
+    override_hashtags = body_data.get("override_hashtags", "").strip()
+
+    # Hỗ trợ nhận danh sách nhiều part (ví dụ 3 part) để mở 3 tab cùng lúc
+    incoming_items = body_data.get("items", [])
+    if not incoming_items:
+        incoming_items = [{
+            "video_file": body_data.get("video_file", ""),
+            "part_label": body_data.get("part_label", ""),
+            "title": title,
+            "clip_key": clip_key,
+            "channel": channel
+        }]
+
+    accounts_data = load_accounts_data()
+    target_acc = None
+    for a in accounts_data.get("tiktok_accounts", []):
+        if a.get("account_name") == acc_name:
+            target_acc = a
+            break
+
+    if not target_acc:
+        return {"success": False, "error": f"Không tìm thấy thông tin tài khoản @{acc_name}"}
+
+    settings = load_settings()
+    adspower_settings = settings.get("adspower", {})
+    hma_settings = settings.get("hma", {})
+    tiktok_settings = settings.get("tiktok_upload", {})
+
+    # 0. Kiểm tra Giới hạn Đăng bài (Max 3 clips / ngày / tài khoản)
+    max_daily_posts = int(tiktok_settings.get("max_daily_posts_per_account", 3))
+    if max_daily_posts > 0:
+        today_count = get_account_daily_posted_count(target_acc)
+        if today_count >= max_daily_posts:
+            err_quota = f"Tài khoản @{acc_name} đã đăng {today_count}/{max_daily_posts} clip hôm nay (đã đạt giới hạn tối đa 3 clip/ngày)."
+            log_message(f"⚠️ [Daily Quota Block] {err_quota}")
+            send_telegram_notification(
+                f"⚠️ *[GIỚI HẠN ĐĂNG BÀI]*\n"
+                f"👤 **Tài khoản:** @{acc_name}\n"
+                f"📊 **Hôm nay:** Đã đăng đủ `{today_count}/{max_daily_posts}` clip.\n"
+                f"🛑 **Hành động:** Tự động dừng để bảo vệ tài khoản và chống spam thuật toán!"
+            )
+            return {
+                "success": False, 
+                "error": err_quota, 
+                "daily_quota_reached": True,
+                "today_count": today_count,
+                "max_daily_posts": max_daily_posts
+            }
+
+    auto_submit = auto_submit_override if auto_submit_override is not None else tiktok_settings.get("auto_submit", True)
+    close_browser = tiktok_settings.get("close_browser_after_finish", False)
+    wait_timeout = tiktok_settings.get("wait_timeout", 120)
+
+    dest_dir = accounts_data.get("dest_path", os.path.join(BASE_DIR, "output_product"))
+    from src.services.drive_service import resolve_google_drive_path
+    resolved_dest = resolve_google_drive_path(dest_dir)
+
+    resolved_upload_items = []
+    for item in incoming_items:
+        item_title = item.get("title", title)
+        item_channel = item.get("channel", channel)
+        item_part = item.get("part_label", "")
+        item_clip_key = item.get("clip_key", clip_key)
+        video_file = item.get("video_file") or item.get("video_path") or item.get("file_path") or ""
+
+        if not video_file or not os.path.exists(video_file):
+            target_dir = os.path.join(resolved_dest, sanitize_filename(item_channel), sanitize_filename(item_title))
+            if os.path.exists(target_dir):
+                mp4s = [f for f in os.listdir(target_dir) if f.endswith('.mp4')]
+                if item_part:
+                    p_match = [f for f in mp4s if item_part.lower() in f.lower() or f"{item_part.replace(' ', '')}".lower() in f.lower()]
+                    if p_match:
+                        video_file = os.path.join(target_dir, p_match[0])
+                if not video_file:
+                    part_1 = [f for f in mp4s if 'part 1.mp4' in f or 'part_1.mp4' in f]
+                    if part_1:
+                        video_file = os.path.join(target_dir, part_1[0])
+                    elif mp4s:
+                        video_file = os.path.join(target_dir, mp4s[0])
+
+        if video_file and os.path.exists(video_file):
+            resolved_upload_items.append({
+                "video_path": video_file,
+                "title": item_title,
+                "override_caption": override_caption if override_caption else None,
+                "part_label": item_part,
+                "clip_key": item_clip_key,
+                "channel": item_channel
+            })
+
+    if not resolved_upload_items:
+        return {"success": False, "error": f"Không tìm thấy tệp video nào hợp lệ để tải lên"}
+
+    total_items = len(resolved_upload_items)
+    log_message(f"🚀 [Multi-Tab Post] Bắt đầu quy trình đăng đồng thời {total_items} video trên {total_items} tab cho tài khoản @{acc_name}")
+    step_logs = []
+
+    global LAST_PUBLISHING_STATE
+    LAST_PUBLISHING_STATE["is_busy"] = True
+    LAST_PUBLISHING_STATE["account_name"] = acc_name
+    LAST_PUBLISHING_STATE["success"] = False
+    LAST_PUBLISHING_STATE["count"] = 0
+    LAST_PUBLISHING_STATE["error"] = ""
+    LAST_PUBLISHING_STATE["timestamp"] = time.time()
+
+    # 1. Kiểm tra An toàn IP (Pre-flight IP Verification)
+    hma_enabled = hma_settings.get("enabled", True)
+    hma_cli = hma_settings.get("cli_path", "")
+    target_ip_loc = target_acc.get("build_up_ip") or target_acc.get("original_ip") or ""
+    block_vn_ip = hma_settings.get("block_vietnam_ip", True)
+
+    curr_ip_info = get_current_public_ip()
+    curr_country = str(curr_ip_info.get("country", "")).lower()
+    curr_code = str(curr_ip_info.get("country_code", "")).upper()
+    curr_ip = curr_ip_info.get("ip", "Unknown")
+
+    if block_vn_ip and target_ip_loc and (curr_code == "VN" or "vietnam" in curr_country):
+        ip_err_msg = f"Phát hiện IP máy tính là Việt Nam ({curr_ip}). Chưa bật HMA VPN!"
+        log_message(f"🛑 [IP SAFETY BLOCK] {ip_err_msg} Đã hủy đăng cho @{acc_name} để bảo vệ nick.")
+        send_telegram_notification(
+            f"🛑 *[BẢO VỆ TÀI KHOẢN TIKTOK]*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"⚠️ **Phát hiện IP Việt Nam (VN):** `{curr_ip}`\n"
+            f"👤 **Tài khoản:** @{acc_name} (Vùng đích: {target_ip_loc})\n"
+            f"🚫 **Hành động:** ĐÃ HỦY ĐĂNG VIDEO để tránh bị TikTok bóp reach hoặc shadowban!\n"
+            f"👉 **Hướng dẫn:** Vui lòng bật HMA VPN kết nối sang *{target_ip_loc}* rồi chạy lại."
+        )
+        return {
+            "success": False,
+            "error": ip_err_msg,
+            "ip_blocked": True,
+            "current_ip": curr_ip_info
+        }
+
+    if hma_enabled and target_ip_loc:
+        log_message(f"🛡️ [1/4] IP hiện tại: {curr_ip} ({curr_ip_info.get('country', 'N/A')}). Mục tiêu: '{target_ip_loc}'...")
+        step_logs.append(f"IP kiểm tra: {curr_ip} ({curr_ip_info.get('country', 'N/A')})")
+    else:
+        step_logs.append("HMA: Bỏ qua kiểm tra vị trí")
+
+    # 1.5. Tự động sinh Caption & Hashtags bằng AI Gemini trước khi mở trình duyệt
+    effective_hashtags = override_hashtags if override_hashtags else target_acc.get("hashtag", "")
+    gemini_settings = settings.get("gemini", {})
+    gemini_key = gemini_settings.get("api_key", "").strip()
+    gemini_model = gemini_settings.get("model", "builtin")
+    gemini_style = gemini_settings.get("style", "viral")
+
+    if not override_caption:
+        from src.services.gemini_service import generate_tiktok_caption
+        from concurrent.futures import ThreadPoolExecutor
+        engine_label = "AI Cloud" if (gemini_key and not gemini_key.startswith("AQ.") and gemini_model != "builtin") else "Smart Built-in NLP"
+        log_message(f"🤖 [{engine_label}] Đang tạo sẵn Caption & Hashtags ({gemini_style}) cho {total_items} video...")
+
+        def process_caption(item):
+            ai_res = generate_tiktok_caption(
+                video_title=item.get("title", ""),
+                channel_name=item.get("channel", ""),
+                api_key=gemini_key,
+                model=gemini_model,
+                style=gemini_style
+            )
+            if ai_res.get("success"):
+                cap = ai_res.get("caption", "").strip()
+                tags = ai_res.get("hashtags", "").strip()
+                full_cap = f"{cap} {tags}".strip()
+                item["override_caption"] = full_cap
+                log_message(f"   ✨ [{ai_res.get('engine', 'AI')}]: \"{cap[:60]}...\"")
+                step_logs.append(f"AI Caption: {cap}")
+
+        with ThreadPoolExecutor(max_workers=min(total_items, 4)) as executor:
+            list(executor.map(process_caption, resolved_upload_items))
+
+    # 2. Khởi chạy Profile AdsPower
+    profile_id = target_acc.get("adspower_id") or target_acc.get("adspower_serial") or target_acc.get("account_name")
+    log_message(f"⚡ [2/4] Khởi chạy Profile AdsPower: '{profile_id}'...")
+    ads_url = adspower_settings.get("api_url", "http://local.adspower.net:50325")
+    ads_key = adspower_settings.get("api_key", "")
+
+    ads_res = start_adspower_browser(profile_id, ads_url, ads_key)
+    if not ads_res.get("success"):
+        error_msg = f"Không thể mở Profile AdsPower '{profile_id}': {ads_res.get('error')}"
+        log_message(f"❌ {error_msg}")
+        send_telegram_notification(f"❌ *[LỖI ADSPOWER]*\n👤 Tài khoản @{acc_name}\n⚠️ Không thể mở Profile AdsPower `{profile_id}`: {ads_res.get('error')}")
+        return {"success": False, "error": error_msg, "step_logs": step_logs}
+
+    ws_endpoint = ads_res.get("ws_endpoint")
+    log_message(f"🌐 [3/4] Đã kết nối Chrome AdsPower (CDP: {ws_endpoint}). Tiến hành mở {total_items} tab đồng thời...")
+
+    # 3. Tự động hóa đăng video đa tab bằng Playwright CDP
+    def uploader_log(msg):
+        log_message(f"  └─ {msg}")
+        step_logs.append(msg)
+
+    upload_res = upload_multiple_videos_to_tiktok_cdp(
+        ws_endpoint=ws_endpoint,
+        items=resolved_upload_items,
+        hashtags=effective_hashtags,
+        auto_submit=auto_submit,
+        close_browser_after=close_browser,
+        wait_timeout=wait_timeout,
+        log_callback=uploader_log
+    )
+
+    # 5. Tự động đóng trình duyệt AdsPower Profile để chuẩn bị sạch sẽ cho tài khoản tiếp theo
+    if close_browser or auto_submit:
+        from src.services.adspower_service import stop_adspower_browser
+        try:
+            time.sleep(1) # Chờ 1s để đảm bảo request gửi TikTok hoàn tất
+            stop_res = stop_adspower_browser(profile_id, api_url=ads_url, api_key=ads_key)
+            if stop_res.get("success"):
+                log_message(f"🔒 Đã đóng trình duyệt AdsPower Profile `{profile_id}` (@{acc_name}) thành công.")
+            else:
+                log_message(f"⚠️ Thông báo đóng AdsPower Profile `{profile_id}`: {stop_res.get('message', 'Không rõ')}")
+        except Exception as e_close:
+            log_message(f"⚠️ Không thể đóng AdsPower Profile `{profile_id}`: {e_close}")
+
+    if upload_res.get("success"):
+        actual_posted_items = upload_res.get("items", resolved_upload_items)
+        for item in actual_posted_items:
+            toggle_publishing_clip_status(
+                acc_name,
+                item.get("clip_key", clip_key),
+                item.get("channel", channel),
+                item.get("title", title),
+                posted=True,
+                part_label=item.get("part_label")
+            )
+
+        log_message(f"🎉 [4/4] Đã đăng đồng thời toàn bộ {len(actual_posted_items)} video thành công!")
+        
+        today_count_after = get_account_daily_posted_count(acc_name)
+        first_item = resolved_upload_items[0]
+
+        LAST_PUBLISHING_STATE["is_busy"] = False
+        LAST_PUBLISHING_STATE["success"] = True
+        LAST_PUBLISHING_STATE["count"] = len(actual_posted_items)
+        LAST_PUBLISHING_STATE["today_posted_count"] = today_count_after
+        LAST_PUBLISHING_STATE["error"] = ""
+        LAST_PUBLISHING_STATE["timestamp"] = time.time()
+
+        send_telegram_notification(
+            f"🎉 <b>[TikTok Studio Pro] ĐÃ ĐĂNG VIDEO THÀNH CÔNG!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Tài khoản:</b> @{acc_name}\n"
+            f"📺 <b>Kênh:</b> {first_item.get('channel')}\n"
+            f"🎬 <b>Tiêu đề:</b> {first_item.get('title')}\n"
+            f"🌐 <b>IP Đăng:</b> <code>{curr_ip}</code> ({curr_ip_info.get('country', 'N/A')})\n"
+            f"⏰ <b>Thời gian:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"📊 <b>Tiến độ hôm nay:</b> Đã đăng <code>{today_count_after}/{max_daily_posts}</code> clip\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ Trạng thái: Thành công 100%"
+        )
+        
+        return {
+            "success": True,
+            "message": f"Đăng thành công {total_items} video trên {total_items} tab cùng lúc lên TikTok!",
+            "count": total_items,
+            "today_posted_count": today_count_after,
+            "items": resolved_upload_items,
+            "step_logs": step_logs
+        }
+    else:
+        err_upload = upload_res.get("error") or upload_res.get("message") or "Lỗi trong quá trình đăng clip"
+        LAST_PUBLISHING_STATE["is_busy"] = False
+        LAST_PUBLISHING_STATE["success"] = False
+        LAST_PUBLISHING_STATE["count"] = 0
+        LAST_PUBLISHING_STATE["error"] = err_upload
+        LAST_PUBLISHING_STATE["timestamp"] = time.time()
+
+        send_telegram_notification(
+            f"❌ <b>[LỖI ĐĂNG VIDEO TIKTOK]</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Tài khoản:</b> @{acc_name}\n"
+            f"⚠️ <b>Chi tiết lỗi:</b> {err_upload}\n"
+            f"⏰ <b>Thời gian:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        return {
+            "success": False,
+            "error": err_upload,
+            "step_logs": step_logs
+        }
+
+AUTOPILOT_RUNNING = False
+AUTOPILOT_CANCEL_REQUESTED = False
+AUTOPILOT_STATE = {
+    "is_running": False,
+    "total_accounts": 0,
+    "current_index": 0,
+    "current_account": "",
+    "success_count": 0,
+    "fail_count": 0,
+    "summary": {},
+    "logs": []
+}
+
+def run_autopilot_publishing_worker(payload):
+    global AUTOPILOT_RUNNING, AUTOPILOT_CANCEL_REQUESTED, AUTOPILOT_STATE
+    AUTOPILOT_RUNNING = True
+    AUTOPILOT_CANCEL_REQUESTED = False
+    
+    target_accounts = payload.get("accounts", [])
+    auto_submit = payload.get("auto_submit", True)
+    
+    # Load all pending clips
+    all_pending = get_pending_publishing_queue()
+    if isinstance(all_pending, dict):
+        all_pending = all_pending.get("items", [])
+    
+    # Group pending clips by account
+    accounts_map = {}
+    for item in all_pending:
+        acc = item.get("account_name", "")
+        if acc not in accounts_map:
+            accounts_map[acc] = []
+        accounts_map[acc].append(item)
+        
+    if not target_accounts:
+        target_accounts = list(accounts_map.keys())
+        
+    # Maintain user selection order, filtering only active accounts
+    active_accounts = [acc for acc in target_accounts if acc in accounts_map and accounts_map[acc]]
+    total_accs = len(active_accounts)
+    
+    AUTOPILOT_STATE["is_running"] = True
+    AUTOPILOT_STATE["total_accounts"] = total_accs
+    AUTOPILOT_STATE["current_index"] = 0
+    AUTOPILOT_STATE["current_account"] = ""
+    AUTOPILOT_STATE["success_count"] = 0
+    AUTOPILOT_STATE["fail_count"] = 0
+    AUTOPILOT_STATE["summary"] = {}
+    AUTOPILOT_STATE["logs"] = []
+    
+    log_message(f"🚀 [Auto-Pilot Server] Bắt đầu quy trình tự động đăng cho {total_accs} tài khoản...")
+    
+    try:
+        for idx, acc_name in enumerate(active_accounts):
+            if AUTOPILOT_CANCEL_REQUESTED:
+                log_message("⚠️ [Auto-Pilot Server] Tiến trình đã bị người dùng dừng lại!")
+                break
+                
+            clips = accounts_map.get(acc_name, [])
+            batch_clips = clips[:3]
+            if not batch_clips:
+                continue
+                
+            AUTOPILOT_STATE["current_index"] = idx + 1
+            AUTOPILOT_STATE["current_account"] = acc_name
+            
+            global CURRENT_TASK, PROGRESS_PERCENT
+            PROGRESS_PERCENT = int((idx / max(total_accs, 1)) * 100)
+            CURRENT_TASK = f"[{idx+1}/{total_accs}] @{acc_name}: Đang đăng {len(batch_clips)} clip (3 tab)"
+            
+            log_message(f"▶️ [Auto-Pilot {idx+1}/{total_accs}] Khởi chạy AdsPower Chrome cho @{acc_name} ({len(batch_clips)} clip)...")
+            for c_i, c in enumerate(batch_clips):
+                log_message(f"   📑 [Tab {c_i+1}] Clip: \"{c.get('title')}\" [{c.get('channel')}]")
+                
+            acc_payload = {
+                "account_name": acc_name,
+                "channel": batch_clips[0].get("channel", ""),
+                "items": batch_clips,
+                "auto_submit": auto_submit
+            }
+            
+            # Đăng video cho tài khoản này (khóa publishing lock)
+            with PUBLISHING_LOCK:
+                pub_res = execute_tiktok_publish(acc_payload)
+                
+            if pub_res.get("success"):
+                posted_num = pub_res.get("count", len(batch_clips))
+                AUTOPILOT_STATE["success_count"] += posted_num
+                log_message(f"   🎉 [Auto-Pilot] ĐÃ ĐĂNG THÀNH CÔNG ĐỒNG THỜI {posted_num} CLIP CHO @{acc_name}!")
+                if acc_name not in AUTOPILOT_STATE["summary"]:
+                    AUTOPILOT_STATE["summary"][acc_name] = {"count": 0, "clips": []}
+                AUTOPILOT_STATE["summary"][acc_name]["count"] += posted_num
+                AUTOPILOT_STATE["summary"][acc_name]["clips"].extend([c.get("title") for c in batch_clips])
+            else:
+                if pub_res.get("daily_quota_reached"):
+                    log_message(f"   🎯 [Auto-Pilot] Tài khoản @{acc_name} đã đạt giới hạn 3/3 clip hôm nay -> Đã bỏ qua an toàn!")
+                else:
+                    AUTOPILOT_STATE["fail_count"] += len(batch_clips)
+                    log_message(f"   ❌ [Auto-Pilot] Thất bại @{acc_name}: {pub_res.get('error', 'Lỗi không xác định')}")
+                    
+            # Nghỉ ngắn 2 giây giữa các tài khoản trên server
+            if not AUTOPILOT_CANCEL_REQUESTED and idx < total_accs - 1:
+                log_message("   ⏳ Chờ 2 giây trước khi mở tài khoản tiếp theo...")
+                time.sleep(2)
+                
+        PROGRESS_PERCENT = 100
+        CURRENT_TASK = "Hoàn tất Auto-Pilot"
+        log_message(f"🏁 [Auto-Pilot Server] Đã hoàn thành toàn bộ tiến trình! Thành công: {AUTOPILOT_STATE['success_count']} clip, Thất bại: {AUTOPILOT_STATE['fail_count']} clip.")
+        
+        # Gửi báo cáo tổng hợp qua Telegram
+        if AUTOPILOT_STATE["success_count"] > 0:
+            summary_text = f"📊 <b>[BÁO CÁO TỔNG KẾT AUTO-PILOT TIKTOK]</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+            summary_text += f"🎉 <b>Tổng clip đăng thành công:</b> <code>{AUTOPILOT_STATE['success_count']}</code>\n"
+            if AUTOPILOT_STATE['fail_count'] > 0:
+                summary_text += f"⚠️ <b>Số clip thất bại/bỏ qua:</b> <code>{AUTOPILOT_STATE['fail_count']}</code>\n"
+            summary_text += f"⏰ <b>Hoàn tất lúc:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n<b>Chi tiết theo tài khoản:</b>\n"
+            for s_acc, s_info in AUTOPILOT_STATE["summary"].items():
+                summary_text += f"• <b>@{s_acc}:</b> {s_info['count']} clip\n"
+            send_telegram_notification(summary_text)
+            
+    except Exception as e_pilot:
+        log_message(f"❌ [Auto-Pilot Server Error] {str(e_pilot)}")
+    finally:
+        AUTOPILOT_RUNNING = False
+        AUTOPILOT_STATE["is_running"] = False
+
+
 class StudioServerHandler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -388,281 +813,26 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
         return os.path.join(BASE_DIR, rel_path)
 
     def _handle_post_to_tiktok(self, body_data):
-        acc_name = body_data.get("account_name", "")
-        clip_key = body_data.get("clip_key", "")
-        channel = body_data.get("channel", "")
-        title = body_data.get("title", "")
-        auto_submit_override = body_data.get("auto_submit", None)
-        override_caption = body_data.get("override_caption", "").strip()
-        override_hashtags = body_data.get("override_hashtags", "").strip()
-
-        # Hỗ trợ nhận danh sách nhiều part (ví dụ 3 part) để mở 3 tab cùng lúc
-        incoming_items = body_data.get("items", [])
-        if not incoming_items:
-            incoming_items = [{
-                "video_file": body_data.get("video_file", ""),
-                "part_label": body_data.get("part_label", ""),
-                "title": title,
-                "clip_key": clip_key,
-                "channel": channel
-            }]
-
-        accounts_data = load_accounts_data()
-        target_acc = None
-        for a in accounts_data.get("tiktok_accounts", []):
-            if a.get("account_name") == acc_name:
-                target_acc = a
-                break
-
-        if not target_acc:
-            self.send_json({"success": False, "error": f"Không tìm thấy thông tin tài khoản @{acc_name}"}, status=400)
-            return
-
-        settings = load_settings()
-        adspower_settings = settings.get("adspower", {})
-        hma_settings = settings.get("hma", {})
-        tiktok_settings = settings.get("tiktok_upload", {})
-
-        # 0. Kiểm tra Giới hạn Đăng bài (Max 3 clips / ngày / tài khoản)
-        max_daily_posts = int(tiktok_settings.get("max_daily_posts_per_account", 3))
-        if max_daily_posts > 0:
-            today_count = get_account_daily_posted_count(target_acc)
-            if today_count >= max_daily_posts:
-                err_quota = f"Tài khoản @{acc_name} đã đăng {today_count}/{max_daily_posts} clip hôm nay (đã đạt giới hạn tối đa 3 clip/ngày)."
-                log_message(f"⚠️ [Daily Quota Block] {err_quota}")
-                send_telegram_notification(
-                    f"⚠️ *[GIỚI HẠN ĐĂNG BÀI]*\n"
-                    f"👤 **Tài khoản:** @{acc_name}\n"
-                    f"📊 **Hôm nay:** Đã đăng đủ `{today_count}/{max_daily_posts}` clip.\n"
-                    f"🛑 **Hành động:** Tự động dừng để bảo vệ tài khoản và chống spam thuật toán!"
-                )
-                self.send_json({
-                    "success": False, 
-                    "error": err_quota, 
-                    "daily_quota_reached": True,
-                    "today_count": today_count,
-                    "max_daily_posts": max_daily_posts
-                })
-                return
-
-        auto_submit = auto_submit_override if auto_submit_override is not None else tiktok_settings.get("auto_submit", True)
-        close_browser = tiktok_settings.get("close_browser_after_finish", False)
-        wait_timeout = tiktok_settings.get("wait_timeout", 120)
-
-        dest_dir = accounts_data.get("dest_path", os.path.join(BASE_DIR, "Tiktok_Builder_Output"))
-        from src.services.drive_service import resolve_google_drive_path
-        resolved_dest = resolve_google_drive_path(dest_dir)
-
-        resolved_upload_items = []
-        for item in incoming_items:
-            item_title = item.get("title", title)
-            item_channel = item.get("channel", channel)
-            item_part = item.get("part_label", "")
-            item_clip_key = item.get("clip_key", clip_key)
-            video_file = item.get("video_file") or item.get("video_path") or item.get("file_path") or ""
-
-            if not video_file or not os.path.exists(video_file):
-                target_dir = os.path.join(resolved_dest, sanitize_filename(item_channel), sanitize_filename(item_title))
-                if os.path.exists(target_dir):
-                    mp4s = [f for f in os.listdir(target_dir) if f.endswith('.mp4')]
-                    if item_part:
-                        p_match = [f for f in mp4s if item_part.lower() in f.lower() or f"{item_part.replace(' ', '')}".lower() in f.lower()]
-                        if p_match:
-                            video_file = os.path.join(target_dir, p_match[0])
-                    if not video_file:
-                        part_1 = [f for f in mp4s if 'part 1.mp4' in f or 'part_1.mp4' in f]
-                        if part_1:
-                            video_file = os.path.join(target_dir, part_1[0])
-                        elif mp4s:
-                            video_file = os.path.join(target_dir, mp4s[0])
-
-            if video_file and os.path.exists(video_file):
-                resolved_upload_items.append({
-                    "video_path": video_file,
-                    "title": item_title,
-                    "override_caption": override_caption if override_caption else None,
-                    "part_label": item_part,
-                    "clip_key": item_clip_key,
-                    "channel": item_channel
-                })
-
-        if not resolved_upload_items:
-            self.send_json({"success": False, "error": f"Không tìm thấy tệp video nào hợp lệ để tải lên"}, status=400)
-            return
-
-        total_items = len(resolved_upload_items)
-        log_message(f"🚀 [Multi-Tab Post] Bắt đầu quy trình đăng đồng thời {total_items} video trên {total_items} tab cho tài khoản @{acc_name}")
-        step_logs = []
-
-        # 1. Kiểm tra An toàn IP (Pre-flight IP Verification)
-        hma_enabled = hma_settings.get("enabled", True)
-        hma_cli = hma_settings.get("cli_path", "")
-        target_ip_loc = target_acc.get("build_up_ip") or target_acc.get("original_ip") or ""
-        block_vn_ip = hma_settings.get("block_vietnam_ip", True)
-
-        # Lấy IP công khai thực tế
-        curr_ip_info = get_current_public_ip()
-        curr_country = str(curr_ip_info.get("country", "")).lower()
-        curr_code = str(curr_ip_info.get("country_code", "")).upper()
-        curr_ip = curr_ip_info.get("ip", "Unknown")
-
-        # Chặn nếu IP vẫn là Việt Nam trong khi nuôi nick US/ngoại
-        if block_vn_ip and target_ip_loc and (curr_code == "VN" or "vietnam" in curr_country):
-            ip_err_msg = f"Phát hiện IP máy tính là Việt Nam ({curr_ip}). Chưa bật HMA VPN!"
-            log_message(f"🛑 [IP SAFETY BLOCK] {ip_err_msg} Đã hủy đăng cho @{acc_name} để bảo vệ nick.")
-            send_telegram_notification(
-                f"🛑 *[BẢO VỆ TÀI KHOẢN TIKTOK]*\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"⚠️ **Phát hiện IP Việt Nam (VN):** `{curr_ip}`\n"
-                f"👤 **Tài khoản:** @{acc_name} (Vùng đích: {target_ip_loc})\n"
-                f"🚫 **Hành động:** ĐÃ HỦY ĐĂNG VIDEO để tránh bị TikTok bóp reach hoặc shadowban!\n"
-                f"👉 **Hướng dẫn:** Vui lòng bật HMA VPN kết nối sang *{target_ip_loc}* rồi chạy lại."
-            )
-            self.send_json({
-                "success": False,
-                "error": ip_err_msg,
-                "ip_blocked": True,
-                "current_ip": curr_ip_info
-            }, status=400)
-            return
-
-        if hma_enabled and target_ip_loc:
-            log_message(f"🛡️ [1/4] IP hiện tại: {curr_ip} ({curr_ip_info.get('country', 'N/A')}). Mục tiêu: '{target_ip_loc}'...")
-            step_logs.append(f"IP kiểm tra: {curr_ip} ({curr_ip_info.get('country', 'N/A')})")
-        else:
-            step_logs.append("HMA: Bỏ qua kiểm tra vị trí")
-
-        # 2. Khởi chạy Profile AdsPower
-        profile_id = target_acc.get("adspower_id") or target_acc.get("adspower_serial") or target_acc.get("account_name")
-        log_message(f"⚡ [2/4] Khởi chạy Profile AdsPower: '{profile_id}'...")
-        ads_url = adspower_settings.get("api_url", "http://local.adspower.net:50325")
-        ads_key = adspower_settings.get("api_key", "")
-
-        ads_res = start_adspower_browser(profile_id, ads_url, ads_key)
-        if not ads_res.get("success"):
-            error_msg = f"Không thể mở Profile AdsPower '{profile_id}': {ads_res.get('error')}"
-            log_message(f"❌ {error_msg}")
-            send_telegram_notification(f"❌ *[LỖI ADSPOWER]*\n👤 Tài khoản @{acc_name}\n⚠️ Không thể mở Profile AdsPower `{profile_id}`: {ads_res.get('error')}")
-            self.send_json({"success": False, "error": error_msg, "step_logs": step_logs}, status=500)
-            return
-
-        ws_endpoint = ads_res.get("ws_endpoint")
-        log_message(f"🌐 [3/4] Đã kết nối Chrome AdsPower (CDP: {ws_endpoint}). Tiến hành mở {total_items} tab đồng thời...")
-
-        # 2.5. Tự động sinh Caption & Hashtags bằng AI Gemini nếu có override hoặc key
-        effective_hashtags = override_hashtags if override_hashtags else target_acc.get("hashtag", "")
-
-        gemini_settings = settings.get("gemini", {})
-        gemini_key = gemini_settings.get("api_key", "").strip()
-        gemini_model = gemini_settings.get("model", "gemini-2.0-flash")
-        gemini_style = gemini_settings.get("style", "viral")
-
-        if not override_caption:
-            from src.services.gemini_service import generate_tiktok_caption
-            engine_label = "AI Cloud" if gemini_key else "Smart Built-in NLP"
-            log_message(f"🤖 [{engine_label}] Đang tạo Caption & Hashtags tự động ({gemini_style}) cho {total_items} video...")
-            for item in resolved_upload_items:
-                ai_res = generate_tiktok_caption(
-                    video_title=item.get("title", ""),
-                    channel_name=item.get("channel", ""),
-                    api_key=gemini_key,
-                    model=gemini_model,
-                    style=gemini_style
-                )
-                if ai_res.get("success"):
-                    cap = ai_res.get("caption", "").strip()
-                    tags = ai_res.get("hashtags", "").strip()
-                    full_cap = f"{cap} {tags}".strip()
-                    item["override_caption"] = full_cap
-                    log_message(f"   ✨ [{ai_res.get('engine', 'AI')}]: \"{cap[:60]}...\"")
-                    step_logs.append(f"AI Caption: {cap}")
-
-        # 3. Tự động hóa đăng video đa tab bằng Playwright CDP
-        def uploader_log(msg):
-            log_message(f"  └─ {msg}")
-            step_logs.append(msg)
-
-        upload_res = upload_multiple_videos_to_tiktok_cdp(
-            ws_endpoint=ws_endpoint,
-            items=resolved_upload_items,
-            hashtags=effective_hashtags,
-            auto_submit=auto_submit,
-            close_browser_after=close_browser,
-            wait_timeout=wait_timeout,
-            log_callback=uploader_log
-        )
-
-        # 5. Tự động đóng trình duyệt AdsPower Profile để chuẩn bị sạch sẽ cho tài khoản tiếp theo
-        if close_browser or auto_submit:
-            from src.services.adspower_service import stop_adspower_browser
-            try:
-                time.sleep(2) # Chờ 2s để đảm bảo request gửi TikTok hoàn tất
-                stop_res = stop_adspower_browser(profile_id, api_url=ads_url, api_key=ads_key)
-                if stop_res.get("success"):
-                    log_message(f"🔒 Đã đóng trình duyệt AdsPower Profile `{profile_id}` (@{acc_name}) thành công.")
-                else:
-                    log_message(f"⚠️ Thông báo đóng AdsPower Profile `{profile_id}`: {stop_res.get('message', 'Không rõ')}")
-            except Exception as e_close:
-                log_message(f"⚠️ Không thể đóng AdsPower Profile `{profile_id}`: {e_close}")
-
-        if upload_res.get("success"):
-            # 4. Đánh dấu Đã đăng cho toàn bộ các part
-            for item in resolved_upload_items:
-                toggle_publishing_clip_status(
-                    acc_name,
-                    item.get("clip_key", clip_key),
-                    item.get("channel", channel),
-                    item.get("title", title),
-                    posted=True,
-                    part_label=item.get("part_label")
-                )
-
-            log_message(f"🎉 [4/4] Đã đăng đồng thời toàn bộ {total_items} video thành công!")
-            
-            # Gửi thông báo Telegram
-            today_count_after = get_account_daily_posted_count(acc_name)
-            first_item = resolved_upload_items[0]
-            send_telegram_notification(
-                f"🎉 <b>[TikTok Studio Pro] ĐÃ ĐĂNG VIDEO THÀNH CÔNG!</b>\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"👤 <b>Tài khoản:</b> @{acc_name}\n"
-                f"📺 <b>Kênh:</b> {first_item.get('channel')}\n"
-                f"🎬 <b>Tiêu đề:</b> {first_item.get('title')}\n"
-                f"🌐 <b>IP Đăng:</b> <code>{curr_ip}</code> ({curr_ip_info.get('country', 'N/A')})\n"
-                f"⏰ <b>Thời gian:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                f"📊 <b>Tiến độ hôm nay:</b> Đã đăng <code>{today_count_after}/{max_daily_posts}</code> clip\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"✅ Trạng thái: Thành công 100%"
-            )
-            
-            self.send_json({
-                "success": True,
-                "message": f"Đăng thành công {total_items} video trên {total_items} tab cùng lúc lên TikTok!",
-                "count": total_items,
-                "today_posted_count": today_count_after,
-                "items": resolved_upload_items,
-                "step_logs": step_logs
-            })
-            return
-        else:
-            err_upload = upload_res.get("error", "Lỗi trong quá trình đăng clip")
-            send_telegram_notification(
-                f"❌ <b>[LỖI ĐĂNG VIDEO TIKTOK]</b>\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"👤 <b>Tài khoản:</b> @{acc_name}\n"
-                f"⚠️ <b>Chi tiết lỗi:</b> {err_upload}\n"
-                f"⏰ <b>Thời gian:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-            self.send_json({
-                "success": False,
-                "error": err_upload,
-                "step_logs": step_logs
-            }, status=500)
-            return
+        res = execute_tiktok_publish(body_data)
+        status_code = 200 if res.get("success") else (400 if (res.get("daily_quota_reached") or res.get("ip_blocked")) else 500)
+        self.send_json(res, status=status_code)
 
     def do_GET(self):
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
+
+        if parsed.path == "/api/autopilot/status":
+            self.send_json({
+                "is_running": AUTOPILOT_RUNNING,
+                "state": AUTOPILOT_STATE
+            })
+            return
+
+        if parsed.path == "/api/heartbeat":
+            global LAST_HEARTBEAT
+            LAST_HEARTBEAT = time.time()
+            self.send_json({"status": "ok"})
+            return
 
         # Root path serves UI directly
         if parsed.path in ["", "/"]:
@@ -681,21 +851,25 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
 
         # API: Progress & Logs
         if parsed.path == "/api/progress":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
             data = {
                 "is_running": IS_RUNNING,
+                "is_publishing": PUBLISHING_LOCK.locked() or LAST_PUBLISHING_STATE.get("is_busy", False) or AUTOPILOT_RUNNING,
+                "is_autopilot_running": AUTOPILOT_RUNNING,
+                "autopilot_state": AUTOPILOT_STATE,
+                "publishing_state": LAST_PUBLISHING_STATE,
                 "percentage": PROGRESS_PERCENT,
                 "current_task": CURRENT_TASK,
-                "logs": LOG_MESSAGES[-40:]
+                "logs": LOG_MESSAGES[-120:]
             }
-            self.wfile.write(json.dumps(data).encode("utf-8"))
+            self.send_json(data)
             return
 
         # API: Finished Results
         if parsed.path == "/api/results":
-            dest = query.get("dest", [os.path.join(BASE_DIR, "Tiktok_Builder_Output")])[0]
+            acc_dest = load_accounts_data().get("dest_path", os.path.join(BASE_DIR, "output_product"))
+            dest = query.get("dest", [acc_dest])[0]
+            if not dest:
+                dest = acc_dest
             data = scan_finished_results(dest)
             self.send_json(data)
             return
@@ -704,7 +878,7 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/accounts":
             source_path = query.get("source", [""])[0]
             data = load_accounts_data()
-            dest_path = data.get("dest_path", os.path.join(BASE_DIR, "Tiktok_Builder_Output"))
+            dest_path = data.get("dest_path", os.path.join(BASE_DIR, "output_product"))
             
             # Quét tổng số video thực tế (cả thô và thành phẩm) của mỗi kênh
             scan_res = scan_source_directory(source_path, dest_path)
@@ -1153,10 +1327,7 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
                 created = ensure_channel_folders(body_data)
                 for f in created:
                     log_message(f"📁 Tự động tạo thư mục: {f}")
-            self.send_response(200 if success else 500)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "saved" if success else "failed"}).encode("utf-8"))
+            self.send_json({"status": "saved" if success else "failed"}, status=(200 if success else 500))
             return
 
         # API: Select Local Folder via OS Picker
@@ -1197,23 +1368,15 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
             
             success, errors = delete_finished_result(item_path, title, channel, dest_path)
             log_message(f"🗑️ Đã xóa video thành phẩm: {title or os.path.basename(item_path)}")
-            
-            self.send_response(200 if success else 500)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({"success": success, "errors": errors, "title": title}).encode("utf-8"))
+            self.send_json({"success": success, "errors": errors, "title": title}, status=(200 if success else 500))
             return
 
         # API: Delete All Finished Results
         if parsed.path == "/api/delete_all_results":
-            dest_path = body_data.get("dest", os.path.join(BASE_DIR, "Tiktok_Builder_Output"))
+            dest_path = body_data.get("dest", os.path.join(BASE_DIR, "output_product"))
             success, errors = delete_all_finished_results(dest_path)
             log_message("🗑️ Đã xóa toàn bộ video thành phẩm trong thư mục đích.")
-            
-            self.send_response(200 if success else 500)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({"success": success, "errors": errors}).encode("utf-8"))
+            self.send_json({"success": success, "errors": errors}, status=(200 if success else 500))
             return
 
         # API: Toggle Posted status of a clip or specific part
@@ -1226,10 +1389,8 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
             part_label = body_data.get("part_label", None)
             
             success, res_val = toggle_publishing_clip_status(acc_name, clip_key, channel, title, posted, part_label=part_label)
-            self.send_response(200 if success else 400)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({"success": success, "posted": posted, "posted_at": res_val if success else "", "error": res_val if not success else ""}).encode("utf-8"))
+            invalidate_drive_caches()
+            self.send_json({"success": success, "posted": posted, "posted_at": res_val if success else "", "error": res_val if not success else ""}, status=(200 if success else 400))
             return
 
         # API: Change TikTok Account Target YouTube Channel
@@ -1238,23 +1399,19 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
             new_target = body_data.get("new_target_channel", "")
             
             success, err = change_account_target_channel(acc_name, new_target)
-            self.send_response(200 if success else 400)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({"success": success, "error": err if not success else ""}).encode("utf-8"))
+            invalidate_drive_caches()
+            self.send_json({"success": success, "error": err if not success else ""}, status=(200 if success else 400))
             return
 
         # API: Batch Toggle Posted status for multiple clips
-        if parsed.path == "/api/publishing/batch_toggle_post":
+        if parsed.path in ["/api/publishing/batch_toggle_post", "/api/publishing/batch_toggle"]:
             acc_name = body_data.get("account_name", "")
             clip_keys = body_data.get("clip_keys", [])
             posted = bool(body_data.get("posted", True))
             
             success, count = batch_toggle_publishing_clips(acc_name, clip_keys, posted)
-            self.send_response(200 if success else 400)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({"success": success, "count": count}).encode("utf-8"))
+            invalidate_drive_caches()
+            self.send_json({"success": success, "count": count}, status=(200 if success else 400))
             return
 
         # API: Sync Publishing History & Pending Queue
@@ -1345,10 +1502,7 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
             api_url = body_data.get("api_url", "")
             api_key = body_data.get("api_key", "")
             res = start_adspower_browser(profile_id, api_url, api_key)
-            self.send_response(200 if res.get("success") else 400)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps(res).encode("utf-8"))
+            self.send_json(res, status=(200 if res.get("success") else 400))
             return
 
         # API: Stop AdsPower Browser
@@ -1392,13 +1546,27 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/telegram/test":
             custom_msg = body_data.get("message", "🔔 *[TikTok Studio Pro]*\n✅ Kết nối Telegram Bot thành công! Hệ thống đã sẵn sàng nhận thông báo tự động.")
             success = send_telegram_notification(custom_msg)
-            self.send_response(200 if success else 400)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({
+            self.send_json({
                 "success": success,
                 "message": "Đã gửi thông báo Telegram thành công!" if success else "Không thể gửi Telegram. Vui lòng kiểm tra bot_token và chat_id."
-            }, ensure_ascii=False).encode("utf-8"))
+            }, status=(200 if success else 400))
+            return
+
+        # API: Server-side Native Auto-Pilot Publishing Pipeline (Đăng tự động tuần tự đa tài khoản siêu mượt)
+        if parsed.path == "/api/autopilot/start":
+            global AUTOPILOT_RUNNING
+            if AUTOPILOT_RUNNING:
+                self.send_json({"success": False, "error": "Auto-Pilot đang chạy rồi! Vui lòng chờ hoặc bấm Dừng trước khi chạy lại."}, status=400)
+                return
+            threading.Thread(target=run_autopilot_publishing_worker, args=(body_data,), daemon=True).start()
+            self.send_json({"success": True, "message": "Đã khởi chạy Auto-Pilot thành công trên máy chủ!"})
+            return
+
+        if parsed.path == "/api/autopilot/stop":
+            global AUTOPILOT_CANCEL_REQUESTED
+            AUTOPILOT_CANCEL_REQUESTED = True
+            log_message("⚠️ [Auto-Pilot Server] Nhận được tín hiệu dừng tiến trình từ người dùng...")
+            self.send_json({"success": True, "message": "Đã gửi tín hiệu dừng Auto-Pilot!"})
             return
 
         # API: Comprehensive Auto-Post to TikTok (HMA IP -> AdsPower Browser -> Multi-Tab Playwright Upload -> Update Status)
@@ -1442,6 +1610,7 @@ class DualStackServer(ThreadingHTTPServer):
     """Máy chủ HTTP hỗ trợ kết nối song song cả IPv4 (127.0.0.1) và IPv6 (localhost ::1)"""
     address_family = socket.AF_INET6
     daemon_threads = True
+    allow_reuse_address = True
 
     def server_bind(self):
         try:
@@ -1450,6 +1619,26 @@ class DualStackServer(ThreadingHTTPServer):
             pass
         super().server_bind()
 
+def kill_process_on_port(port):
+    """Tự động giải phóng cổng nếu bị kẹt tiến trình cũ"""
+    import subprocess
+    try:
+        cmd = f'powershell -Command "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }}"'
+        subprocess.run(cmd, shell=True, capture_output=True)
+    except Exception:
+        pass
+
+LAST_HEARTBEAT = time.time()
+
+def heartbeat_monitor():
+    while True:
+        time.sleep(30)
+        # Giữ máy chủ WebApp luôn hoạt động bền bỉ, không tự ngắt kết nối của người dùng khi rảnh
+        pass
+
+# Bắt đầu luồng kiểm tra heartbeat
+threading.Thread(target=heartbeat_monitor, daemon=True).start()
+
 def run_server():
     try:
         ensure_channel_folders()
@@ -1457,29 +1646,31 @@ def run_server():
         pass
         
     httpd = None
-    # Thử khởi động bằng DualStack IPv4 + IPv6
-    try:
-        httpd = DualStackServer(('::', PORT), StudioServerHandler)
-    except Exception:
-        # Fallback khởi động bằng IPv4 thông thường nếu Windows chưa bật IPv6
+    for attempt in range(2):
         try:
-            ThreadingHTTPServer.allow_reuse_address = False
-            httpd = ThreadingHTTPServer(('0.0.0.0', PORT), StudioServerHandler)
+            ThreadingHTTPServer.allow_reuse_address = True
+            httpd = ThreadingHTTPServer(('127.0.0.1', PORT), StudioServerHandler)
             httpd.daemon_threads = True
+            break
         except OSError:
-            try:
-                if sys.stdout is not None:
-                    print(f"ℹ️ Máy chủ đã đang hoạt động trên cổng {PORT}.")
-            except Exception:
-                pass
-            return
+                if attempt == 0:
+                    kill_process_on_port(PORT)
+                    time.sleep(1)
+                else:
+                    try:
+                        if sys.stdout is not None:
+                            print(f"ℹ️ Máy chủ đã đang hoạt động trên cổng {PORT}.")
+                    except Exception:
+                        pass
+                    return
 
-    try:
-        if sys.stdout is not None:
-            print(f"🎬 TikTok Studio Webform đang chạy tại: http://localhost:{PORT}")
-    except Exception:
-        pass
-    httpd.serve_forever()
+    if httpd:
+        try:
+            if sys.stdout is not None:
+                print(f"🎬 TikTok Studio Webform đang chạy tại: http://localhost:{PORT}")
+        except Exception:
+            pass
+        httpd.serve_forever()
 
 if __name__ == "__main__":
     run_server()
