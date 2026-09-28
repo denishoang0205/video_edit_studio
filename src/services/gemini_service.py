@@ -22,54 +22,179 @@ def get_active_gemini_key() -> str:
         pass
     return clean_api_key(os.environ.get("GEMINI_API_KEY", ""))
 
+# Danh sách ký tự tiếng Việt đặc trưng (không bao gồm các dấu tiếng Tây Ban Nha / Bồ Đào Nha)
+VIETNAMESE_UNIQUE_CHARS = set(
+    "ăằắẳẵặâầấẩẫậđĐêềếểễệơờớởỡợưừứửữự"
+    "ĂẰẮẲẴẶÂẦẤẨẪẬÊỀẾỂỄỆƠỜỚỞỠỢƯỪỨỬỮỰ"
+    "ảạẻẽẹỉĩịỏọồổỗộủụỳỷỹỵ"
+    "ẢẠẺẼẸỈĨỊỎỌỒỔỖỘỦỤỲỶỸỴ"
+)
+
+VIETNAMESE_COMMON_WORDS = [
+    "cái kết", "bạn nghĩ", "xem ngay", "kỷ lục", "đỉnh cao", "kỹ năng", 
+    "thần sầu", "thách đấu", "bài học", "sự thật", "không thể tin", "theo dõi",
+    "thả tim", "đừng quên", "phần", "tập", "siêu phẩm", "kịch tính", "hôm nay",
+    "cực căng", "đắt giá", "đoạn", "khoảnh khắc", "triệu view", "người", "nhé",
+    "xuhuong", "xu hướng", "kẻo lỡ", "xem tiếp", "trọn bộ", "câu chuyện",
+    "diễn biến", "tiêu đề", "của", "không", "được", "trong", "cho", "với", "này"
+]
+
+def contains_vietnamese(text: str) -> bool:
+    """Kiểm tra xem văn bản có chứa ký tự hoặc từ tiếng Việt nào không"""
+    if not text:
+        return False
+    if any(c in VIETNAMESE_UNIQUE_CHARS for c in text):
+        return True
+    low = f" {text.lower()} "
+    for w in VIETNAMESE_COMMON_WORDS:
+        if f" {w} " in low or w in low:
+            return True
+    return False
+
+def detect_video_language(video_title: str, channel_name: str = "") -> str:
+    """
+    Nhận diện ngôn ngữ mục tiêu của video:
+    - 'pt': Portuguese (Brazil, Nobru, v.v.)
+    - 'es': Spanish (Mexico, Latin, v.v.)
+    - 'en': English (US, UK, Global)
+    Tuyệt đối không bao giờ trả về tiếng Việt.
+    """
+    c_lower = str(channel_name).lower().strip()
+    if c_lower in ["nobru", "pizão", "pizao"]:
+        return "pt"
+    if c_lower in ["love island", "markwiens", "mark wiens", "mrbeast"]:
+        return "en"
+        
+    lower = f" {video_title} {channel_name} ".lower()
+    
+    # Portuguese indicators
+    pt_indicators = [
+        " do ", " da ", " dos ", " das ", " no ", " na ", " nos ", " nas ",
+        " para ", " com ", " mais ", " não ", " roubam ", " início ", " partida ", " vida ",
+        " passa ", " sensi ", " nobru ", " jogando ", " estratégia ", " pizado ", " piza0 ", " pizão "
+    ]
+    if any(w in lower for w in pt_indicators):
+        return "pt"
+        
+    # Spanish indicators (Hầu hết các kênh meme, roblox, free fire, drama Latin)
+    es_indicators = [
+        " el ", " la ", " los ", " las ", " de ", " en ", " y ", " que ", " por ", " un ", " una ",
+        " con ", " para ", " como ", " pero ", " más ", " mi ", " tu ", " su ", " es ",
+        "probé", "robé", "hice", "animé", "estilo", "juego", "conseguí", "cuenta", "mundo",
+        "morimos", "hermana", "mamá", "novio", "esposo", "suegra", "boda", "mujer", "hombre",
+        "mentira", "verdad", "reflexion", "historia", "refritos", "amiga", "vestido", "ladrón",
+        "cuñada", "familia", "triste", "peleó", "lección", "círculo", "último", "pato", "donato",
+        "desmentí", "mitos", "traicionaron", "encontré", "chicos", "chicas", "regalen", "soypato",
+        "neto", "grequito", "marian", "lópez", "mayfer", "relatos", "confesiones", "suco", "hectorino",
+        "¿", "¡", "á", "é", "í", "ó", "ú", "ñ"
+    ]
+    if any(w in lower for w in es_indicators):
+        return "es"
+        
+    # English indicators
+    en_indicators = [
+        " the ", " a ", " an ", " of ", " in ", " and ", " to ", " is ", " are ", " was ", " were ",
+        " with ", " for ", " on ", " at ", " from ", " by ", " about ", " into ", " through ",
+        " love island ", " mark wiens ", " islanders ", " villa ", " kiss ", " bad ",
+        " challenge ", " gameplay ", " review ", " guide ", " secret ", " epic ", " how to ",
+        " what ", " why ", " who ", " when ", " where ", " managed ", " capital ", " dividing "
+    ]
+    if any(w in lower for w in en_indicators):
+        return "en"
+        
+    return "es"
+
 def generate_smart_builtin_caption(video_title: str, channel_name: str = "", style: str = "viral") -> dict:
     """
     Bộ Sinh Caption & Hashtags Thông Minh Tích Hợp (Built-in NLP Engine):
     - Hoạt động 100% Offline / Độc lập, không cần bất kỳ API Key nào.
     - Nhận diện Game & Niche thông minh (Roblox, Free Fire, Drama, Meme, Gaming, Story...).
-    - Tự động tạo Hook cuốn hút + CTA + 6-8 Hashtags triệu view chuẩn SEO TikTok.
+    - TUYỆT ĐỐI KHÔNG TẠO HOOK / TIÊU ĐỀ BẰNG TIẾNG VIỆT: Tự động dùng tiếng Tây Ban Nha (Spanish)
+      hoặc tiếng Anh (English) / Bồ Đào Nha (Portuguese) chuẩn bản địa 100%.
     """
     clean_t = re.sub(r'#\S+', '', video_title).strip()
     clean_t = re.sub(r'\s*-\s*part\s*\d+', '', clean_t, flags=re.I).strip()
     clean_t = re.sub(r'[\\/*?:"<>|]', '', clean_t).strip()
+    
+    # Loại bỏ bất kỳ dấu vết tiếng Việt nếu tiêu đề gốc vô tình dính
+    if contains_vietnamese(clean_t):
+        clean_t = re.sub(r'[^\x00-\x7F]+', ' ', clean_t).strip()
+        
+    lang = detect_video_language(video_title, channel_name)
     if not clean_t:
-        clean_t = "Siêu phẩm kịch tính hôm nay"
+        clean_t = "Momento épico" if lang == "es" else ("Momento insano" if lang == "pt" else "Epic moment")
 
     lower = (video_title + " " + channel_name).lower()
     
-    # Nhận diện Niche & Bộ Hashtag tương ứng
-    if any(k in lower for k in ["roblox", "rivals", "blade ball", "bloxfruits", "pato", "romak", "baitomi"]):
-        tags = "#roblox #robloxstory #robloxedit #robloxmexico #robloxtiktok #gaming #fyp"
+    if lang == "es":
+        # SPANISH HOOKS & HASHTAGS (Chuẩn Tây Ban Nha / Mỹ Latinh)
+        if any(k in lower for k in ["roblox", "rivals", "blade ball", "bloxfruits", "pato", "romak", "baitomi"]):
+            tags = "#roblox #robloxstory #robloxedit #robloxmexico #robloxtiktok #gaming #fyp #parati"
+            hook_templates = [
+                f"{clean_t} 😱🔥 ¡El final que nadie esperaba!",
+                f"¡Nuevo récord en Roblox: {clean_t}! 🤯💥",
+                f"{clean_t} 👀 ¡El nivel de habilidad es insano!",
+                f"{clean_t} ✨ ¡No te lo puedes perder!"
+            ]
+        elif any(k in lower for k in ["free fire", "freefire", "suco", "donato", "hectorino", "ely2"]):
+            tags = "#freefire #freefirelatino #freefireclips #garenafreefire #freefirelover #gaming #fyp #parati"
+            hook_templates = [
+                f"{clean_t} 😱🔥 ¡Jugada maestra en Free Fire!",
+                f"Duelo épico: {clean_t} 🤯💥",
+                f"{clean_t} 🎯 ¡One shot legendario!",
+                f"{clean_t} ✨ ¡Mira esta increíble jugada!"
+            ]
+        elif any(k in lower for k in ["hermana", "mamá", "novio", "esposo", "suegra", "reflexion", "historia", "love", "amor", "marian"]):
+            tags = "#historia #reflexiones #historiasreales #drama #amor #viral #parati #fyp"
+            hook_templates = [
+                f"{clean_t} 💔🥺 La verdad detrás de esta historia...",
+                f"¡No lo vas a creer: {clean_t}! 😭✨",
+                f"{clean_t} 👀 Una lección para todos nosotros.",
+                f"{clean_t} 🎬 ¡Mira el desenlace completo!"
+            ]
+        else:
+            tags = "#viral #parati #fyp #foryou #trending #tiktok #viralvideo"
+            hook_templates = [
+                f"{clean_t} 😱🔥 ¡Tienes que ver este momento!",
+                f"Momento viral: {clean_t} 🤯✨",
+                f"{clean_t} 👀 ¿Qué opinas de esto?",
+                f"{clean_t} 🚀 ¡Dale like y sígueme para más!"
+            ]
+    elif lang == "pt":
+        # PORTUGUESE HOOKS & HASHTAGS (Brazil / Nobru)
+        tags = "#freefire #nobru #brasil #viral #fyp #foryou #trending #tiktok"
         hook_templates = [
-            f"{clean_t} 😱🔥 Cái kết không ai ngờ tới!",
-            f"Kỷ lục mới trong Roblox: {clean_t} 🤯💥",
-            f"{clean_t} 👀 Đỉnh cao kỹ năng là đây!",
-            f"{clean_t} ✨ Xem ngay kẻo lỡ!"
-        ]
-    elif any(k in lower for k in ["free fire", "freefire", "suco", "donato", "hectorino", "ely2"]):
-        tags = "#freefire #freefirelatino #freefireclips #garenafreefire #freefirelover #gaming #fyp"
-        hook_templates = [
-            f"{clean_t} 😱🔥 Pha xử lý thần sầu trong Free Fire!",
-            f"Thách đấu cực căng: {clean_t} 🤯💥",
-            f"{clean_t} 🎯 One shot đỉnh cao!",
-            f"{clean_t} ✨ Theo dõi để xem tiếp phần sau!"
-        ]
-    elif any(k in lower for k in ["hermana", "mamá", "novio", "esposo", "suegra", "reflexion", "historia", "love", "bạn trai", "mẹ chồng"]):
-        tags = "#historia #reflexiones #historiasreales #drama #amor #viral #parati"
-        hook_templates = [
-            f"{clean_t} 💔🥺 Sự thật đằng sau câu chuyện...",
-            f"Không thể tin được: {clean_t} 😭✨",
-            f"{clean_t} 👀 Bài học đắt giá cho tất cả chúng ta!",
-            f"{clean_t} 🎬 Theo dõi trọn bộ diễn biến!"
+            f"{clean_t} 😱🔥 O final que ninguém esperava!",
+            f"Momento insano: {clean_t} 🤯💥",
+            f"{clean_t} 👀 Assista até o final!",
+            f"{clean_t} 🚀 Deixe o like e siga para mais!"
         ]
     else:
-        tags = "#viral #trending #fyp #foryou #xuhuong #tiktok #viralvideo"
-        hook_templates = [
-            f"{clean_t} 😱🔥 Xem ngay phân đoạn kịch tính này!",
-            f"Khoảnh khắc triệu view: {clean_t} 🤯✨",
-            f"{clean_t} 👀 Bạn nghĩ sao về điều này?",
-            f"{clean_t} 🚀 Đừng quên thả tim và follow nhé!"
-        ]
+        # ENGLISH HOOKS & HASHTAGS (Global / US / UK)
+        if any(k in lower for k in ["roblox", "gaming", "game"]):
+            tags = "#roblox #robloxgames #gaming #gamingontiktok #fyp #viral #trending"
+            hook_templates = [
+                f"{clean_t} 😱🔥 The ending nobody expected!",
+                f"New record: {clean_t} 🤯💥",
+                f"{clean_t} 👀 Insane skills right here!",
+                f"{clean_t} ✨ Wait until the end!"
+            ]
+        elif any(k in lower for k in ["love", "story", "island", "relationship"]):
+            tags = "#loveisland #drama #viral #fyp #foryou #trending #tiktok"
+            hook_templates = [
+                f"{clean_t} 😱🔥 You won't believe what happened!",
+                f"Dramatic moment: {clean_t} 🤯✨",
+                f"{clean_t} 👀 What are your thoughts on this?",
+                f"{clean_t} 🎬 Watch till the very end!"
+            ]
+        else:
+            tags = "#viral #trending #fyp #foryou #foryoupage #tiktok #viralvideo"
+            hook_templates = [
+                f"{clean_t} 😱🔥 You need to see this moment!",
+                f"Viral moment: {clean_t} 🤯✨",
+                f"{clean_t} 👀 What do you think about this?",
+                f"{clean_t} 🚀 Like and follow for more!"
+            ]
 
     # Chọn hook phù hợp theo độ dài tiêu đề
     selected_caption = hook_templates[len(clean_t) % len(hook_templates)]
@@ -185,16 +310,29 @@ def test_gemini_api(api_key: str, model: str = "gemini-3.6-flash"):
 
 def generate_tiktok_caption(video_title: str, channel_name: str = "", api_key: str = None, model: str = None, style: str = "viral"):
     """
-    Sinh Caption và Hashtags triệu view cho TikTok với cơ chế Fallback Built-in 100% mượt mà
+    Sinh Caption và Hashtags triệu view cho TikTok với cơ chế Fallback Built-in 100% mượt mà.
+    TUYỆT ĐỐI KHÔNG TẠO HOOK HOẶC TIÊU ĐỀ BẰNG TIẾNG VIỆT:
+    Cố định 100% bằng ngôn ngữ gốc của video (tiếng Tây Ban Nha, tiếng Anh hoặc Bồ Đào Nha).
     """
     key = clean_api_key(api_key) or get_active_gemini_key()
+    lang = detect_video_language(video_title, channel_name)
+    target_lang_name = "Spanish" if lang == "es" else ("Portuguese" if lang == "pt" else "English")
     
     # 1. Thử gọi qua API nếu có Key hợp lệ và không chọn model 'builtin'
     if key and model != "builtin" and not key.startswith("AQ."):
-        prompt = f"""Bạn là chuyên gia sáng tạo nội dung TikTok. Tạo 1 Caption ngắn (dưới 80 từ, có emoji) và 5-7 Hashtags triệu view cho video TikTok sau:
-- Tiêu đề: {video_title}
-- Kênh/Chủ đề: {channel_name}
-Định dạng JSON thuần: {{"caption": "Nội dung caption 🔥", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5"}}"""
+        prompt = f"""You are a top viral TikTok content creator.
+Create 1 short viral TikTok caption (under 60 words, engaging hook, with emojis) and 5-7 viral hashtags for the following video:
+- Video Title: {video_title}
+- Channel/Topic: {channel_name}
+
+CRITICAL RULES:
+1. ABSOLUTELY NEVER USE VIETNAMESE. Under NO circumstances should any Vietnamese word or character appear.
+2. The caption MUST be written purely in {target_lang_name} to match the original video content.
+3. DO NOT include "Part 1", "Part 2", or any part numbers in the caption.
+4. Keep it engaging, natural, and high-retention.
+
+Output ONLY pure JSON format (no markdown code fences):
+{{"caption": "Viral hook and caption in {target_lang_name} 🔥", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5"}}"""
 
         raw_text = ""
         ok = False
@@ -203,7 +341,6 @@ def generate_tiktok_caption(video_title: str, channel_name: str = "", api_key: s
         elif key.startswith("sk-"):
             ok, _, raw_text, _ = call_openai_compatible_api(key, "gpt-4o-mini", prompt)
         elif key.startswith("AIzaSy"):
-            # Google AI Studio API Key
             target_m = model if (model and "3.6" not in model and model != "builtin") else "gemini-3-flash-preview"
             ok, _, raw_text, _ = call_single_gemini_model(key, target_m, prompt, timeout=3)
             if not ok:
@@ -213,14 +350,22 @@ def generate_tiktok_caption(video_title: str, channel_name: str = "", api_key: s
             try:
                 clean_json_str = re.sub(r'```json|```', '', raw_text).strip()
                 parsed = json.loads(clean_json_str)
-                return {
-                    "success": True,
-                    "engine": "Cloud AI",
-                    "caption": parsed.get("caption", video_title),
-                    "hashtags": parsed.get("hashtags", "#fyp #viral #trending")
-                }
+                cand_caption = parsed.get("caption", video_title).strip()
+                cand_hashtags = parsed.get("hashtags", "").strip()
+                
+                # BẢO VỆ TUYỆT ĐỐI CHỐNG TIẾNG VIỆT:
+                # Nếu AI vô tình sinh ra tiếng Việt, hủy bỏ ngay kết quả AI và chuyển sang Built-in NLP
+                if not contains_vietnamese(cand_caption) and not contains_vietnamese(cand_hashtags):
+                    if not cand_hashtags:
+                        cand_hashtags = "#viral #parati #fyp" if lang == "es" else "#viral #fyp #trending"
+                    return {
+                        "success": True,
+                        "engine": "Cloud AI",
+                        "caption": cand_caption,
+                        "hashtags": cand_hashtags
+                    }
             except Exception:
                 pass
 
-    # 2. Tự động dùng Built-in Smart NLP Engine (100% Hoạt động ngay, không cần Key)
+    # 2. Tự động dùng Built-in Smart NLP Engine (100% Hoạt động ngay, không tiếng Việt)
     return generate_smart_builtin_caption(video_title, channel_name, style)

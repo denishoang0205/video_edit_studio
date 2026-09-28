@@ -706,11 +706,11 @@ def process_and_split_video(
     duration = get_video_duration(actual_video_file)
     os.makedirs(video_out_dir, exist_ok=True)
     
-    # 1. Nhận diện Video Ngắn (Shorts)
-    is_short_video = is_short or (0 < duration <= 60.0)
+    # 1. Nhận diện Video Ngắn (Shorts / Video dưới 2 phút)
+    is_short_video = is_short or (0 < duration < 120.0)
     
     if is_short_video:
-        log_cb(f"⚡ [Video Ngắn] Thời lượng {duration:.1f}s <= 60s: Biên tập trọn vẹn 1 clip chuẩn...")
+        log_cb(f"⚡ [Video Ngắn/Short] Thời lượng {duration:.1f}s (< 2 phút): Biên tập trọn vẹn 1 clip chuẩn...")
         part_1_path = os.path.join(video_out_dir, f"{title} - part 1.mp4")
         if progress_cb:
             progress_cb(0, 1)

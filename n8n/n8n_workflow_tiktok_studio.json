@@ -48,20 +48,6 @@
     },
     {
       "parameters": {
-        "model": "gemini-1.5-flash",
-        "prompt": "Bạn là chuyên gia sáng tạo nội dung TikTok triệu view.\nHãy tạo 1 tiêu đề ngắn gọn (dưới 100 ký tự) và danh sách 5-7 hashtag viral (bắt đầu bằng #) cho video có tiêu đề gốc: \"{{ $json.title }}\" thuộc kênh: \"{{ $json.channel }}\".\n\nQUY TẮC QUAN TRỌNG:\n- Tuyệt đối KHÔNG chèn các từ như 'Part', 'Part 1', 'Phần', 'Tập' vào tiêu đề hay hashtag.\n- Viết tiếng Anh hoặc tiếng phù hợp với tệp khán giả kênh.\n\nĐịnh dạng trả về DUY NHẤT định dạng JSON (không kèm markdown):\n{\n  \"caption\": \"Tiêu đề ngắn thu hút kèm icon\",\n  \"hashtags\": \"#hashtag1 #hashtag2 #fyp #viral #trending\"\n}"
-      },
-      "id": "node-gemini-ai",
-      "name": "🤖 4. AI Gemini Sinh Caption Viral",
-      "type": "@n8n/n8n-nodes-langchain.googleGeminiChatModel",
-      "typeVersion": 1,
-      "position": [
-        920,
-        300
-      ]
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "http://localhost:8000/api/publishing/post_to_tiktok",
         "sendBody": true,
@@ -122,17 +108,6 @@
       ]
     },
     "🎯 3. Chọn Clip Tiếp Theo (Sạch Chữ Part)": {
-      "main": [
-        [
-          {
-            "node": "🤖 4. AI Gemini Sinh Caption Viral",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "🤖 4. AI Gemini Sinh Caption Viral": {
       "main": [
         [
           {

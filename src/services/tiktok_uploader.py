@@ -5,10 +5,12 @@ import re
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 def clean_caption_text(text):
-    """Làm sạch tiêu đề, loại bỏ hoàn toàn các chuỗi part 1, part 2, phần 1..."""
+    """Làm sạch tiêu đề, loại bỏ hoàn toàn các chuỗi part 1, part 2, phần 1, đuôi file .mp4..."""
     if not text:
         return ""
     cleaned = re.sub(r'[\s\-_\(\[\{]+(part|phần|tập)\s*[\d]+[\)\]\}]*', '', text, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\.(mp4|mov|mkv|avi|webm)$', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'[\s\-_\(\[\{]+(part|phần|tập)\s*[\d]+[\)\]\}]*', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
     return cleaned
 
@@ -119,11 +121,9 @@ def upload_multiple_videos_to_tiktok_cdp(
     for item in items:
         v_path = item.get("video_path") or item.get("file_path") or ""
         if v_path and os.path.exists(v_path):
-            valid_items.append({
-                "video_path": os.path.abspath(v_path),
-                "title": item.get("title", ""),
-                "part_label": item.get("part_label", "")
-            })
+            item_copy = dict(item)
+            item_copy["video_path"] = os.path.abspath(v_path)
+            valid_items.append(item_copy)
         else:
             log(f"⚠️ Cảnh báo: Không tìm thấy tệp video: {v_path}")
 
@@ -305,15 +305,25 @@ def upload_multiple_videos_to_tiktok_cdp(
             time.sleep(4)
 
             for i, (page, item) in enumerate(zip(pages, valid_items)):
-                # Điền Caption: Ưu tiên caption sinh bởi AI nếu có, ngược lại dùng raw_title + hashtags (đã làm sạch không kèm part)
+                # TUÂN THỦ NGHIÊM KHẮC: Tiêu đề và hook là GIỐNG TÊN VIDEO đặt trên channel (GỠ BỎ HOÀN TOÀN AI)
                 raw_title = clean_caption_text(item.get("title", "").strip())
+                if not raw_title and item.get("video_path"):
+                    raw_title = clean_caption_text(os.path.splitext(os.path.basename(item["video_path"]))[0])
+
                 override_caption = item.get("override_caption") or item.get("caption")
                 if override_caption:
-                    full_caption = clean_caption_text(override_caption.strip())
+                    caption_body = clean_caption_text(override_caption.strip())
                 else:
-                    full_caption = f"{raw_title} {hashtags.strip()}".strip() if hashtags else raw_title
+                    caption_body = raw_title
 
-                log(f"✍️ [Tab {i+1}/{total_tabs}] Đang điền tiêu đề: '{full_caption}' (nhanh tức thì)...")
+                # Ghép Hashtag của tài khoản nếu có
+                acc_tags = hashtags.strip() if hashtags else ""
+                if acc_tags:
+                    full_caption = f"{caption_body} {acc_tags}".strip()
+                else:
+                    full_caption = caption_body
+
+                log(f"✍️ [Tab {i+1}/{total_tabs}] Đang điền tiêu đề chuẩn kênh: '{full_caption}' (nhanh tức thì)...")
                 caption_filled = False
 
                 for attempt in range(20):

@@ -69,20 +69,6 @@
       },
       {
         "parameters": {
-          "model": "gemini-1.5-flash",
-          "prompt": "Bạn là chuyên gia sáng tạo nội dung TikTok triệu view.\nHãy tạo 1 tiêu đề ngắn gọn (dưới 100 ký tự) và danh sách 5-7 hashtag viral (bắt đầu bằng #) cho video có tiêu đề gốc: \"{{ $json.title }}\" thuộc kênh: \"{{ $json.channel }}\".\n\nQUY TẮC QUAN TRỌNG:\n- Tuyệt đối KHÔNG chèn các từ như 'Part', 'Part 1', 'Phần', 'Tập' vào tiêu đề hay hashtag.\n- Viết tiếng Anh hoặc tiếng phù hợp với tệp khán giả kênh.\n\nĐịnh dạng trả về DUY NHẤT định dạng JSON (không kèm markdown):\n{\n  \"caption\": \"Tiêu đề ngắn thu hút kèm icon\",\n  \"hashtags\": \"#hashtag1 #hashtag2 #fyp #viral #trending\"\n}"
-        },
-        "id": "node-gemini-ai-caption",
-        "name": "🤖 4. AI Gemini tạo Caption Viral (Không Part)",
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2,
-        "position": [
-          920,
-          400
-        ]
-      },
-      {
-        "parameters": {
           "method": "POST",
           "url": "http://localhost:8000/api/pipeline/auto_process_and_post",
           "sendBody": true,
@@ -104,7 +90,7 @@
       {
         "parameters": {
           "chatId": "6661216386",
-          "text": "=🎉 **[TikTok Studio Pro] ĐÃ ĐĂNG VIDEO THÀNH CÔNG!**\n━━━━━━━━━━━━━━━━━━━━\n👤 **Tài khoản:** @{{ $('🎯 3. Chọn Clip tiếp theo').item.json.account_name }}\n📺 **Kênh:** {{ $('🎯 3. Chọn Clip tiếp theo').item.json.channel }}\n🎬 **Tiêu đề:** {{ $('🎯 3. Chọn Clip tiếp theo').item.json.title }}\n✍️ **Caption:** {{ $('🤖 4. AI Gemini tạo Caption Viral (Không Part)').item.json.caption }}\n🏷️ **Hashtags:** {{ $('🤖 4. AI Gemini tạo Caption Viral (Không Part)').item.json.hashtags }}\n⏰ **Thời gian:** {{ $now.format('YYYY-MM-DD HH:mm:ss') }}\n━━━━━━━━━━━━━━━━━━━━\n✅ Trạng thái: Thành công 100%",
+          "text": "=🎉 **[TikTok Studio Pro] ĐÃ ĐĂNG VIDEO THÀNH CÔNG!**\n━━━━━━━━━━━━━━━━━━━━\n👤 **Tài khoản:** @{{ $('🎯 3. Chọn Clip tiếp theo').item.json.account_name }}\n📺 **Kênh:** {{ $('🎯 3. Chọn Clip tiếp theo').item.json.channel }}\n🎬 **Tiêu đề:** {{ $('🎯 3. Chọn Clip tiếp theo').item.json.title }}\n🏷️ **Hashtags:** {{ $('🎯 3. Chọn Clip cần đăng').item.json.hashtag_default || $('🎯 3. Chọn Clip tiếp theo').item.json.hashtag_default || '#fyp #viral' }}\n⏰ **Thời gian:** {{ $now.format('YYYY-MM-DD HH:mm:ss') }}\n━━━━━━━━━━━━━━━━━━━━\n✅ Trạng thái: Thành công 100%",
           "additionalFields": {
             "parse_mode": "Markdown"
           }
@@ -154,17 +140,6 @@
         ]
       },
       "🎯 3. Chọn Clip tiếp theo": {
-        "main": [
-          [
-            {
-              "node": "🤖 4. AI Gemini tạo Caption Viral (Không Part)",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "🤖 4. AI Gemini tạo Caption Viral (Không Part)": {
         "main": [
           [
             {
@@ -282,20 +257,6 @@
       },
       {
         "parameters": {
-          "model": "gemini-1.5-flash",
-          "prompt": "Bạn là chuyên gia tối ưu video TikTok triệu view.\nHãy tạo 1 tiêu đề ngắn gọn (dưới 100 ký tự) và 5-6 hashtag viral cho video: \"{{ $json.title }}\" thuộc kênh: \"{{ $json.channel }}\".\n\nQUY TẮC QUAN TRỌNG: Tuyệt đối KHÔNG chèn các từ như 'Part', 'Part 1', 'Phần', 'Tập' vào tiêu đề hay hashtag.\n\nTrả về DUY NHẤT định dạng JSON (không kèm markdown):\n{\n  \"caption\": \"Tiêu đề ngắn thu hút\",\n  \"hashtags\": \"#hashtag1 #hashtag2 #fyp #trending\"\n}"
-        },
-        "id": "node-gemini-nightly",
-        "name": "🤖 4. AI Gemini tạo Caption Ban Đêm (Không Part)",
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2,
-        "position": [
-          940,
-          420
-        ]
-      },
-      {
-        "parameters": {
           "method": "POST",
           "url": "http://localhost:8000/api/pipeline/auto_process_and_post",
           "sendBody": true,
@@ -317,7 +278,7 @@
       {
         "parameters": {
           "chatId": "6661216386",
-          "text": "=🌙 **[TikTok Nightly Bot] ĐÃ ĐĂNG VIDEO THÀNH CÔNG LÚC ĐÊM!**\n━━━━━━━━━━━━━━━━━━━━\n👤 **Tài khoản:** @{{ $('🎯 3. Chọn Clip cần đăng').item.json.account_name }}\n📺 **Kênh:** {{ $('🎯 3. Chọn Clip cần đăng').item.json.channel }}\n🎬 **Clip:** {{ $('🎯 3. Chọn Clip cần đăng').item.json.title }}\n✍️ **Caption AI:** {{ $('🤖 4. AI Gemini tạo Caption Ban Đêm (Không Part)').item.json.caption }}\n🏷️ **Hashtags:** {{ $('🤖 4. AI Gemini tạo Caption Ban Đêm (Không Part)').item.json.hashtags }}\n⏰ **Thời gian đăng:** {{ $now.format('YYYY-MM-DD HH:mm:ss') }}\n━━━━━━━━━━━━━━━━━━━━\n💤 Máy tính sẽ tự động tắt sau 15 phút để bảo vệ máy.",
+          "text": "=🌙 **[TikTok Nightly Bot] ĐÃ ĐĂNG VIDEO THÀNH CÔNG LÚC ĐÊM!**\n━━━━━━━━━━━━━━━━━━━━\n👤 **Tài khoản:** @{{ $('🎯 3. Chọn Clip cần đăng').item.json.account_name }}\n📺 **Kênh:** {{ $('🎯 3. Chọn Clip cần đăng').item.json.channel }}\n🎬 **Clip:** {{ $('🎯 3. Chọn Clip cần đăng').item.json.title }}\n🏷️ **Hashtags:** {{ $('🎯 3. Chọn Clip cần đăng').item.json.hashtag_default || '#fyp #viral' }}\n⏰ **Thời gian đăng:** {{ $now.format('YYYY-MM-DD HH:mm:ss') }}\n━━━━━━━━━━━━━━━━━━━━\n💤 Máy tính sẽ tự động tắt sau 15 phút để bảo vệ máy.",
           "additionalFields": {
             "parse_mode": "Markdown"
           }
@@ -396,17 +357,6 @@
         ]
       },
       "🎯 3. Chọn Clip cần đăng": {
-        "main": [
-          [
-            {
-              "node": "🤖 4. AI Gemini tạo Caption Ban Đêm (Không Part)",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "🤖 4. AI Gemini tạo Caption Ban Đêm (Không Part)": {
         "main": [
           [
             {

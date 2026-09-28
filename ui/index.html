@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Montserrat:wght@600;700;800&family=Be+Vietnam+Pro:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=50">
+    <link rel="stylesheet" href="style.css?v=57">
 </head>
 <body class="theme-system">
     <div class="app-shell">
@@ -86,6 +86,10 @@
                     <button class="tab-link" data-tab="tab-config" id="tab-btn-config">
                         <i class="fa-solid fa-sliders nav-icon text-secondary"></i>
                         <span class="nav-text">Settings</span>
+                    </button>
+                    <button class="tab-link" data-tab="tab-logs" id="tab-btn-logs">
+                        <i class="fa-solid fa-terminal nav-icon text-accent"></i>
+                        <span class="nav-text">Logs</span>
                     </button>
                 </div>
             </nav>
@@ -468,6 +472,59 @@
             </section>
         </div>
 
+        <!-- Tab: Real-time Processing Logs -->
+        <div id="tab-logs" class="tab-content">
+            <section class="panel logs-full-panel">
+                <div class="panel-header logs-panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-terminal text-accent"></i>
+                        <div>
+                            <h3>Real-time Processing Console</h3>
+                            <span class="sub-text-hint">Theo dõi chi tiết tiến trình render video, trạng thái batch và logs hệ thống</span>
+                        </div>
+                    </div>
+                    <div class="logs-header-actions">
+                        <div class="queue-status" id="render-status-indicator">
+                            <span class="dot idle"></span>
+                            <span id="render-status-text">Waiting...</span>
+                        </div>
+                        <button type="button" class="btn btn-xs btn-outline" id="btn-copy-terminal-logs" title="Sao chép toàn bộ logs vào clipboard">
+                            <i class="fa-solid fa-copy"></i> Copy Logs
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline" id="btn-clear-terminal-logs" title="Xóa màn hình console">
+                            <i class="fa-solid fa-trash-can"></i> Clear Console
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline" id="btn-toggle-autoscroll-logs" title="Bật/Tắt tự động cuộn xuống cuối log">
+                            <i class="fa-solid fa-arrow-down-short-wide"></i> Auto-Scroll: ON
+                        </button>
+                    </div>
+                </div>
+
+                <div class="progress-bar-container logs-progress-area">
+                    <div class="progress-info">
+                        <span id="progress-current-task">Idle (No active tasks)</span>
+                        <span id="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <div class="terminal-logs-toolbar">
+                    <div class="logs-toolbar-left">
+                        <span class="logs-badge-live"><i class="fa-solid fa-circle-dot"></i> Live Terminal Output</span>
+                        <span class="logs-subtitle-meta">Đồng bộ tự động theo thời gian thực</span>
+                    </div>
+                    <div class="logs-toolbar-right">
+                        <span id="terminal-logs-count" class="logs-count-badge">1 dòng</span>
+                    </div>
+                </div>
+
+                <div class="terminal-logs-window logs-page-terminal" id="terminal-logs-window">
+                    <div class="log-line text-muted">[Ready] Select videos on the left pane, configure settings, and click "START BATCH PROCESS".</div>
+                </div>
+            </section>
+        </div>
 
         <!-- Tab 0.1: YouTube Target Channels Manager -->
         <div id="tab-channels" class="tab-content">
@@ -724,49 +781,60 @@
                         <i class="fa-brands fa-tiktok text-accent"></i>
                         <h3>📱 TikTok Accounts Manager</h3>
                     </div>
-                    <button class="btn btn-primary btn-sm" id="btn-toggle-account-form">
-                        <i class="fa-solid fa-plus"></i> Add New Account
-                    </button>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button class="btn btn-secondary btn-sm" id="btn-sync-adspower-accounts" title="Đồng bộ toàn bộ tài khoản từ AdsPower (kể cả tài khoản được share)">
+                            <i class="fa-solid fa-arrows-rotate text-primary"></i> Sync from AdsPower
+                        </button>
+                        <button class="btn btn-primary btn-sm" id="btn-toggle-account-form">
+                            <i class="fa-solid fa-plus"></i> Add New Account
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Add Account Form (Collapsible) -->
                 <div class="config-form-body hidden" id="account-form-area" style="padding: 20px; border-bottom: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.05);">
                     <div class="form-row">
-                        <div class="form-col">
+                        <div class="form-col" style="flex: 1.5;">
                             <label class="sub-label">TikTok Username (account_name)</label>
                             <input type="text" id="input-acc-username" class="form-input" placeholder="e.g. soypato.t4">
                         </div>
-                        <div class="form-col">
-                            <label class="sub-label">Password (password)</label>
-                            <div class="input-icon-wrapper" style="width: 100%;">
-                                <input type="password" id="input-acc-password" class="form-input" placeholder="Account password" style="width: 100%; padding-right: 35px;">
-                                <i class="fa-solid fa-eye-slash btn-toggle-pw" id="btn-toggle-input-pw" style="cursor: pointer; position: absolute; right: 12px; left: auto;"></i>
+                        <div class="form-col" style="flex: 1.5;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label class="sub-label">
+                                    <i class="fa-solid fa-bolt text-accent"></i> Chọn Profile AdsPower
+                                </label>
+                                <button type="button" class="btn-link-xs" id="btn-refresh-adspower-profiles" style="background:none; border:none; color:var(--primary); font-size:11px; cursor:pointer; text-decoration:underline;">
+                                    <i class="fa-solid fa-arrows-rotate"></i> Nạp lại
+                                </button>
                             </div>
+                            <select id="select-acc-adspower-quick" class="form-select">
+                                <option value="">-- Chọn profile AdsPower có sẵn --</option>
+                            </select>
                         </div>
-                        <div class="form-col">
-                            <label class="sub-label">Registered Email (mail)</label>
-                            <input type="email" id="input-acc-email" class="form-input" placeholder="e.g. name@gmail.com">
+                        <div class="form-col" style="flex: 1;">
+                            <label class="sub-label">AdsPower ID / Serial</label>
+                            <input type="text" id="input-acc-adspower" class="form-input" placeholder="e.g. k09abc1 hoặc 41">
                         </div>
-                        <div class="form-col">
-                            <label class="sub-label">Recovery Email (mail_confirm)</label>
-                            <input type="email" id="input-acc-email-confirm" class="form-input" placeholder="e.g. backup@gmail.com">
+                        <div class="form-col" style="flex: 1;">
+                            <label class="sub-label">AdsPower Group</label>
+                            <input type="text" id="input-acc-group" class="form-input" placeholder="e.g. Share-0909 hoặc Default">
                         </div>
                     </div>
 
                     <div class="form-row" style="margin-top: 12px;">
-                        <div class="form-col">
-                            <label class="sub-label">Original IP (original_ip)</label>
-                            <input type="text" id="input-acc-ip-orig" class="form-input" placeholder="e.g. 192.168.1.1">
+                        <div class="form-col" style="flex: 1;">
+                            <label class="sub-label">IP / Proxy</label>
+                            <input type="text" id="input-acc-ip" class="form-input" placeholder="e.g. 15.220.184.112">
                         </div>
-                        <div class="form-col">
-                            <label class="sub-label">Nurtured IP (build_up_ip)</label>
-                            <input type="text" id="input-acc-ip-build" class="form-input" placeholder="e.g. 45.132.22.18">
-                        </div>
-                        <div class="form-col">
+                        <div class="form-col" style="flex: 1;">
                             <label class="sub-label">Creation Date (created_date)</label>
-                            <input type="date" id="input-acc-date" class="form-input">
+                            <input type="text" id="input-acc-date" class="form-input" placeholder="YYYY-MM-DD">
                         </div>
-                        <div class="form-col">
+                        <div class="form-col" style="flex: 1;">
+                            <label class="sub-label">Email (mail)</label>
+                            <input type="email" id="input-acc-email" class="form-input" placeholder="e.g. name@gmail.com">
+                        </div>
+                        <div class="form-col" style="flex: 1.5;">
                             <label class="sub-label">Target YouTube Channel (channel_name)</label>
                             <select id="input-acc-target" class="form-select">
                                 <option value="">Select YouTube channel...</option>
@@ -786,28 +854,6 @@
                         </div>
                     </div>
 
-                    <div class="form-row" style="margin-top: 12px;">
-                        <div class="form-col" style="flex: 1;">
-                            <label class="sub-label">
-                                <i class="fa-solid fa-bolt text-accent"></i> Liên kết Profile AdsPower (user_id hoặc serial)
-                            </label>
-                            <input type="text" id="input-acc-adspower" class="form-input" placeholder="e.g. k09abc1 hoặc serial 1">
-                        </div>
-                        <div class="form-col" style="flex: 1;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <label class="sub-label">
-                                    <i class="fa-solid fa-list-check text-primary"></i> Chọn nhanh từ AdsPower
-                                </label>
-                                <button type="button" class="btn-link-xs" id="btn-refresh-adspower-profiles" style="background:none; border:none; color:var(--primary); font-size:11px; cursor:pointer; text-decoration:underline;">
-                                    <i class="fa-solid fa-arrows-rotate"></i> Nạp lại
-                                </button>
-                            </div>
-                            <select id="select-acc-adspower-quick" class="form-select">
-                                <option value="">-- Chọn profile AdsPower có sẵn --</option>
-                            </select>
-                        </div>
-                    </div>
-
                     <div class="form-group" style="margin-top: 12px;">
                         <label class="sub-label">Notes (note)</label>
                         <input type="text" id="input-acc-note" class="form-input" placeholder="Add notes...">
@@ -824,22 +870,21 @@
                     <table class="dashboard-table">
                         <thead>
                             <tr>
-                                <th width="50">No.</th>
+                                <th width="40">No.</th>
                                 <th>Account Name</th>
-                                <th>Password</th>
-                                <th>Mail / Confirm</th>
-                                <th>AdsPower & IP Vị Trí</th>
+                                <th>AdsPower Group</th>
+                                <th>Profile & IP</th>
                                 <th>Target YouTube Channel</th>
                                 <th>Created Date</th>
                                 <th>Hashtags & Notes</th>
-                                <th width="120" style="text-align: center;">Actions</th>
+                                <th width="100" style="text-align: center;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="accounts-table-body">
 
                             <!-- Loaded dynamically via JS -->
                             <tr>
-                                <td colspan="9" class="table-empty">
+                                <td colspan="8" class="table-empty">
                                     <i class="fa-solid fa-circle-notch fa-spin"></i> Loading accounts list...
                                 </td>
                             </tr>
@@ -1277,6 +1322,9 @@
                                 <i class="fa-solid fa-circle-check"></i>
                                 <span>Selected: <strong id="selected-count-badge">0</strong> vids</span>
                             </div>
+                            <button type="button" class="btn btn-xs btn-outline hidden" id="btn-studio-view-logs" onclick="navigateToTab('tab-logs')" title="Xem chi tiết tiến trình trong tab Logs" style="display: none; gap: 6px; align-items: center; font-weight: 700;">
+                                <i class="fa-solid fa-terminal"></i> Logs: <span id="studio-mini-progress">0%</span>
+                            </button>
                             <button class="btn-header-start" id="btn-start-processing" title="Bắt đầu xuất hàng loạt video đã chọn">
                                 <i class="fa-solid fa-bolt"></i> START BATCH PROCESS
                             </button>
@@ -1566,33 +1614,7 @@
                 </div>
             </section>
 
-            <!-- Queue Progress Section (Placed under editor in Tab 2) -->
-            <section class="panel queue-progress-panel" style="margin-top: 16px; min-height: 200px;">
-                <div class="panel-header">
-                    <div class="panel-title-group">
-                        <i class="fa-solid fa-bolt text-accent"></i>
-                        <h3>Real-time Processing Console (Render Logs & Status)</h3>
-                    </div>
-                    <div class="queue-status" id="render-status-indicator">
-                        <span class="dot idle"></span>
-                        <span id="render-status-text">Waiting...</span>
-                    </div>
-                </div>
 
-                <div class="progress-bar-container">
-                    <div class="progress-info">
-                        <span id="progress-current-task">Idle (No active tasks)</span>
-                        <span id="progress-percentage">0%</span>
-                    </div>
-                    <div class="progress-track">
-                        <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
-                    </div>
-                </div>
-
-                <div class="terminal-logs-window" id="terminal-logs-window">
-                    <div class="log-line text-muted">[Ready] Select videos on the left pane, configure settings, and click "START BATCH PROCESS".</div>
-                </div>
-            </section>
         </div>
 
         <!-- Tab 3: Finished Products & Output Section -->
@@ -1604,11 +1626,14 @@
                             <i class="fa-solid fa-circle-check text-success"></i>
                             <div>
                                 <h3>Finished Library</h3>
-                                <span class="sub-text-hint">Sorted by: Pending TikTok uploads first ➔ Uploaded clips after ➔ Newest on top</span>
+                                <span class="sub-text-hint">Phân theo Kênh YouTube ➔ Kênh & Video biên tập gần nhất xếp lên trước</span>
                             </div>
                             <span class="badge badge-primary" id="finished-total-badge" style="font-size: 11px; margin-left: 6px;">0 videos</span>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <button class="btn btn-sm btn-outline" id="btn-toggle-all-finished-channels" title="Thu gọn / Mở rộng tất cả các kênh" onclick="toggleAllFinishedChannels()">
+                                <i class="fa-solid fa-layer-group"></i> <span id="text-toggle-all-finished-channels">Thu Gọn Tất Cả</span>
+                            </button>
                             <button class="btn btn-sm btn-outline" id="btn-refresh-finished" title="Reload list">
                                 <i class="fa-solid fa-arrows-rotate"></i> Reload
                             </button>
@@ -1664,7 +1689,10 @@
                             <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">Automated video publishing ➔ HMA IP Switch ➔ AdsPower Chrome ➔ TikTok Studio ➔ Telegram Report ➔ Auto Shutdown</p>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" class="btn btn-xs btn-outline hidden" id="btn-autopilot-view-logs" onclick="navigateToTab('tab-logs')" title="Xem chi tiết Console trong tab Logs" style="font-weight: 700; display: none; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-terminal text-accent"></i> Logs: <span id="autopilot-mini-progress">0%</span>
+                        </button>
                         <button type="button" class="btn btn-outline" id="btn-page-open-n8n" style="font-weight: 700;">
                             <i class="fa-solid fa-arrow-up-right-from-square"></i> Open n8n Dashboard
                         </button>
@@ -1710,119 +1738,137 @@
                 </div>
             </div>
 
-            <!-- 2-Column Grid: Queue on Left, Execution Console & Options on Right -->
-            <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px;">
-                <!-- Column Left: Pending Queue Table -->
-                <section class="panel">
-                    <div class="panel-header">
-                        <div class="panel-title-group">
-                            <i class="fa-solid fa-list-check text-primary"></i>
-                            <h3>Hàng Đợi Xuất Bản (Pending Clips Queue)</h3>
-                        </div>
-                        <div style="display: flex; gap: 6px;">
-                            <button type="button" class="btn btn-xs btn-outline" id="btn-page-sync-history" style="font-weight: 700; color: var(--primary);">
-                                <i class="fa-solid fa-rotate text-primary"></i> Đồng bộ Lịch Sử
-                            </button>
-                            <button type="button" class="btn btn-xs btn-outline" id="btn-page-refresh-queue">
-                                <i class="fa-solid fa-arrows-rotate"></i> Quét lại
-                            </button>
-                        </div>
+            <!-- 1. Horizontal Automation Plugins Row -->
+            <section class="panel autopilot-plugins-panel" style="margin-bottom: 16px;">
+                <div class="panel-header" style="padding: 12px 20px; border-bottom: 1px solid var(--border-color);">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-sliders text-accent"></i>
+                        <h3 style="font-size: 14px; font-weight: 800;">Cấu Hình Tự Động Hóa (Automation Plugins)</h3>
                     </div>
-
-                    <!-- Account Selector Box -->
-                    <div style="padding: 12px 14px; background: rgba(0,0,0,0.03); border-bottom: 1px solid var(--border-color);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <i class="fa-solid fa-user-check text-primary" style="font-size: 13px;"></i>
-                                <span style="font-size: 12px; font-weight: 700;">Chọn tài khoản cần đăng:</span>
-                                <span class="badge badge-primary" id="autopilot-selected-acc-badge" style="font-size: 11px;">Tất cả</span>
-                            </div>
-                            <div style="display: flex; gap: 6px;">
-                                <button type="button" class="btn btn-xs btn-outline" id="btn-page-acc-select-all">Chọn tất cả</button>
-                                <button type="button" class="btn btn-xs btn-outline" id="btn-page-acc-deselect-all">Bỏ chọn</button>
-                            </div>
-                        </div>
-                        <div id="autopilot-page-accounts-list" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 90px; overflow-y: auto;">
-                            <!-- Dynamically generated account chips -->
-                        </div>
-                    </div>
-
-                    <div class="table-scroll-area" style="max-height: 380px; overflow-y: auto;">
-                        <table class="dashboard-table">
-                            <thead>
-                                <tr>
-                                    <th width="40">STT</th>
-                                    <th>Kênh & Tên Clip</th>
-                                    <th width="90">Part</th>
-                                    <th width="120">Tài khoản đích</th>
-                                    <th width="65" style="text-align: center;">IP</th>
-                                    <th width="105" style="text-align: center;">Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tab-autopilot-table-body">
-                                <tr><td colspan="6" class="table-empty">Đang tải danh sách clip chờ đăng...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <!-- Column Right: Options & Live Console -->
-                <div style="display: flex; flex-direction: column; gap: 14px;">
-                    <!-- Options Card -->
-                    <section class="panel" style="padding: 16px;">
-                        <h3 style="font-size: 14px; margin-bottom: 12px; font-weight: 800;"><i class="fa-solid fa-sliders text-accent"></i> Cấu Hình Tự Động Hóa:</h3>
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <label class="toggle-card" style="padding: 8px 12px; margin: 0;">
-                                <input type="checkbox" id="tab-opt-ai" checked>
-                                <span class="toggle-slider"></span>
-                                <div class="toggle-info">
-                                    <strong>AI Gemini Tự Sinh Caption</strong>
-                                    <span style="font-size: 11px;">Tạo tiêu đề & hashtag viral triệu view</span>
-                                </div>
-                            </label>
-                            <label class="toggle-card" style="padding: 8px 12px; margin: 0;">
-                                <input type="checkbox" id="tab-opt-hma" checked>
-                                <span class="toggle-slider"></span>
-                                <div class="toggle-info">
-                                    <strong>Tự Đổi IP HMA VPN</strong>
-                                    <span style="font-size: 11px;">Theo đúng quốc gia tài khoản mục tiêu</span>
-                                </div>
-                            </label>
-                            <label class="toggle-card" style="padding: 8px 12px; margin: 0; border-color: rgba(239, 68, 68, 0.3);">
-                                <input type="checkbox" id="tab-opt-shutdown">
-                                <span class="toggle-slider"></span>
-                                <div class="toggle-info">
-                                    <strong style="color: #ef4444;">Tự Động Tắt Máy Khi Xong (Shutdown)</strong>
-                                    <span style="font-size: 11px;">Hẹn giờ tắt máy tính sau 15 phút</span>
-                                </div>
-                            </label>
-                        </div>
-                    </section>
-
-                    <!-- Real-time Console Panel -->
-                    <section class="panel" style="flex: 1; display: flex; flex-direction: column;">
-                        <div class="panel-header">
-                            <div class="panel-title-group">
-                                <i class="fa-solid fa-terminal text-success"></i>
-                                <h3>Console Thực Thi Thời Gian Thực</h3>
-                            </div>
-                            <span class="badge badge-secondary" id="tab-autopilot-status-badge">Sẵn sàng</span>
-                        </div>
-                        <div style="padding: 12px; flex: 1; display: flex; flex-direction: column; gap: 10px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size: 12px; font-weight: 700;" id="tab-autopilot-current-task">Chờ kích hoạt</span>
-                                <span style="font-size: 12px; font-weight: 800; color: var(--primary);" id="tab-autopilot-progress-percent">0%</span>
-                            </div>
-                            <div style="background: rgba(0,0,0,0.1); height: 8px; border-radius: 4px; overflow: hidden;">
-                                <div id="tab-autopilot-progress-bar" style="height: 100%; width: 0%; background: var(--primary); transition: width 0.3s ease;"></div>
-                            </div>
-                            <div id="tab-autopilot-logs" style="background: rgba(0,0,0,0.9); color: #22c55e; font-family: monospace; font-size: 11px; padding: 10px; border-radius: 6px; height: 180px; overflow-y: auto; line-height: 1.5; border: 1px solid var(--border-color); flex: 1;">
-                                <div class="log-line text-muted">[Sẵn sàng] Bấm "BẮT ĐẦU CHẠY PIPELINE" để khởi động chu trình tự động.</div>
-                            </div>
-                        </div>
-                    </section>
+                    <span style="font-size: 11px; color: var(--text-secondary);">Thiết lập các tùy chọn trước khi bấm START PIPELINE</span>
                 </div>
-            </div>
+                <div class="autopilot-plugins-grid">
+                    <label class="autopilot-plugin-card">
+                        <input type="checkbox" id="tab-opt-ai" checked>
+                        <span class="toggle-slider"></span>
+                        <div class="plugin-info">
+                            <strong><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> AI Gemini Tự Sinh Caption</strong>
+                            <span>Tạo tiêu đề & hashtag viral triệu view</span>
+                        </div>
+                    </label>
+                    <label class="autopilot-plugin-card">
+                        <input type="checkbox" id="tab-opt-hma" checked>
+                        <span class="toggle-slider"></span>
+                        <div class="plugin-info">
+                            <strong><i class="fa-solid fa-shield-halved text-success"></i> Tự Đổi IP HMA VPN</strong>
+                            <span>Theo đúng quốc gia tài khoản mục tiêu</span>
+                        </div>
+                    </label>
+                    <label class="autopilot-plugin-card card-shutdown">
+                        <input type="checkbox" id="tab-opt-shutdown">
+                        <span class="toggle-slider"></span>
+                        <div class="plugin-info">
+                            <strong class="text-danger"><i class="fa-solid fa-power-off"></i> Tự Động Tắt Máy (Shutdown)</strong>
+                            <span>Hẹn giờ tắt máy tính an toàn sau 15 phút khi xong</span>
+                        </div>
+                    </label>
+                </div>
+            </section>
+
+            <!-- 2. Full-Width Accounts & Queue Management Panel -->
+            <section class="panel autopilot-accounts-panel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <i class="fa-solid fa-users-gear text-primary"></i>
+                        <div>
+                            <h3>Danh Sách Tài Khoản & Hàng Đợi Xuất Bản</h3>
+                            <span class="sub-text-hint">Chọn tài khoản để đăng clip tự động, lọc theo Group tương tự Account Management</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-xs btn-outline" id="btn-page-sync-history" style="font-weight: 700; color: var(--primary);">
+                            <i class="fa-solid fa-rotate text-primary"></i> Đồng bộ Lịch Sử
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline" id="btn-page-refresh-queue">
+                            <i class="fa-solid fa-arrows-rotate"></i> Quét lại
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Toolbar: Filter by Group, Status, Search, and Batch Select Actions -->
+                <div class="autopilot-toolbar-area">
+                    <div class="autopilot-filter-controls">
+                        <!-- Group Filter -->
+                        <div class="filter-field">
+                            <label for="autopilot-filter-group"><i class="fa-solid fa-layer-group"></i> Group:</label>
+                            <select id="autopilot-filter-group" class="form-select select-sm">
+                                <option value="all">Tất cả Groups</option>
+                            </select>
+                        </div>
+
+                        <!-- Status Filter -->
+                        <div class="filter-field">
+                            <label for="autopilot-filter-status"><i class="fa-solid fa-filter"></i> Trạng thái:</label>
+                            <select id="autopilot-filter-status" class="form-select select-sm">
+                                <option value="all">Tất cả tài khoản</option>
+                                <option value="has_clips" selected>Có video sẵn sàng (&gt; 0)</option>
+                                <option value="completed">Đã hoàn thành (0 clip)</option>
+                            </select>
+                        </div>
+
+                        <!-- Search Box -->
+                        <div class="search-field">
+                            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                            <input type="text" id="autopilot-search-account" class="form-input input-sm" placeholder="Tìm tên account, kênh YouTube...">
+                            <button type="button" id="btn-clear-autopilot-search" class="btn-clear-search hidden">&times;</button>
+                        </div>
+                    </div>
+
+                    <!-- Batch Selection & Accordion Controls -->
+                    <div class="autopilot-actions-controls">
+                        <span class="badge badge-primary" id="autopilot-selected-acc-badge">Đã chọn: 0/0 tài khoản (0 clip)</span>
+                        <div class="button-group-sm">
+                            <button type="button" class="btn btn-xs btn-outline" id="btn-page-acc-select-all" title="Chọn tất cả tài khoản đang hiển thị">
+                                <i class="fa-solid fa-check-double"></i> Chọn tất cả
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-success" id="btn-page-acc-select-has-clips" title="Chỉ chọn những tài khoản đang có video sẵn sàng (>0 clip)">
+                                <i class="fa-solid fa-circle-check"></i> Chọn có clip
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-danger" id="btn-page-acc-select-none" title="Bỏ chọn tất cả tài khoản">
+                                <i class="fa-solid fa-xmark"></i> Bỏ chọn
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline" id="btn-toggle-expand-all-accs" title="Mở rộng / Thu gọn chi tiết video của tất cả tài khoản">
+                                <i class="fa-solid fa-chevron-down"></i> Mở rộng tất cả
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Accounts Table -->
+                <div class="table-scroll-area autopilot-table-wrapper" style="max-height: 560px; overflow-y: auto;">
+                    <table class="dashboard-table autopilot-accounts-table">
+                        <thead>
+                            <tr>
+                                <th width="45" style="text-align: center;">
+                                    <label class="custom-checkbox custom-checkbox-inline">
+                                        <input type="checkbox" id="chk-autopilot-master">
+                                        <span class="checkmark"></span>
+                                    </label>
+                                </th>
+                                <th>Tài khoản TikTok</th>
+                                <th>Nhóm (Group)</th>
+                                <th>Kênh YouTube Nguồn</th>
+                                <th width="160">Số Video Sẵn Sàng</th>
+                                <th width="85" style="text-align: center;">Quốc Gia / IP</th>
+                                <th width="140" style="text-align: center;">Chi tiết Video</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tab-autopilot-accounts-table-body">
+                            <tr><td colspan="7" class="table-empty"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải danh sách tài khoản và hàng đợi...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </div>
         <!-- End of all tab contents -->
         </div>
@@ -2164,6 +2210,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=115"></script>
+    <script src="script.js?v=124"></script>
 </body>
 </html>

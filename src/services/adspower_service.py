@@ -3,8 +3,95 @@ import urllib.parse
 import urllib.error
 import json
 import time
+import datetime
 
 DEFAULT_ADSPOWER_URL = "http://local.adspower.net:50325"
+
+def format_adspower_time(ts):
+    """Định dạng timestamp thành ngày giờ dễ đọc (YYYY-MM-DD HH:mm)"""
+    if not ts:
+        return ""
+    try:
+        ts_int = int(ts)
+        # Nếu là timestamp mili-giây
+        if ts_int > 100000000000:
+            ts_int = ts_int // 1000
+        return datetime.datetime.fromtimestamp(ts_int).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return str(ts)
+
+def parse_profile_item(item):
+    """Trích xuất và chuẩn hóa đầy đủ thông tin từ một profile AdsPower"""
+    raw_created = item.get("created_time", "")
+    created_date = format_adspower_time(raw_created)
+    raw_last_open = item.get("last_open_time", "")
+    last_open_date = format_adspower_time(raw_last_open)
+    
+    group_name = item.get("group_name") or "Default"
+    is_shared = bool("share" in str(group_name).lower() or item.get("group_id") not in ("0", 0, "", None))
+    
+    name = str(item.get("name") or item.get("username", "")).replace("\n", " ").strip()
+    
+    return {
+        "user_id": str(item.get("user_id", "")).strip(),
+        "serial_number": str(item.get("serial_number", "")).strip(),
+        "name": name,
+        "group_id": str(item.get("group_id", "")).strip(),
+        "group_name": group_name,
+        "is_shared": is_shared,
+        "ip": str(item.get("ip", "")).strip(),
+        "country": str(item.get("ip_country") or item.get("country", "")).strip().upper(),
+        "created_time": raw_created,
+        "created_date": created_date,
+        "last_open_time": raw_last_open,
+        "last_open_date": last_open_date,
+        "remark": str(item.get("remark", "")).strip()
+    }
+
+def get_adspower_profiles(api_url=DEFAULT_ADSPOWER_URL, api_key="", page=1, page_size=100, fetch_all=True):
+    """
+    Lấy danh sách các hồ sơ (Profiles / Environments) trên AdsPower,
+    bao gồm cả hồ sơ tự tạo và hồ sơ được chia sẻ từ người khác (Shared Profiles).
+    Tự động phân trang để lấy trọn vẹn 100% profiles.
+    """
+    base_url = clean_api_url(api_url)
+    all_profiles = []
+    current_page = page
+    total_profiles = 0
+    
+    while True:
+        params = urllib.parse.urlencode({"page": current_page, "page_size": page_size})
+        url = f"{base_url}/api/v1/user/list?{params}"
+        
+        res = _make_request(url, api_key, timeout=10)
+        if res.get("code") != 0:
+            if not all_profiles:
+                return {
+                    "success": False,
+                    "error": res.get("msg", "Lỗi khi lấy danh sách profile AdsPower"),
+                    "profiles": []
+                }
+            break
+            
+        data = res.get("data", {})
+        raw_list = data.get("list", [])
+        total_profiles = data.get("total", len(raw_list))
+        
+        for item in raw_list:
+            all_profiles.append(parse_profile_item(item))
+            
+        # Dừng nếu không muốn fetch_all hoặc đã nạp hết tất cả profile
+        if not fetch_all or len(all_profiles) >= total_profiles or len(raw_list) < page_size:
+            break
+            
+        current_page += 1
+        time.sleep(1.0) # Tuân thủ rate-limit 1 req/s của AdsPower
+        
+    return {
+        "success": True,
+        "profiles": all_profiles,
+        "total": total_profiles or len(all_profiles)
+    }
 
 def get_default_adspower_config():
     try:
@@ -75,39 +162,6 @@ def check_adspower_status(api_url=DEFAULT_ADSPOWER_URL, api_key=""):
     return {
         "connected": False,
         "message": res.get("msg", "Không thể kết nối tới AdsPower. Hãy đảm bảo ứng dụng AdsPower đang mở và Local API đã được bật.")
-    }
-
-def get_adspower_profiles(api_url=DEFAULT_ADSPOWER_URL, api_key="", page=1, page_size=100):
-    """
-    Lấy danh sách các hồ sơ (Profiles / Environments) trên AdsPower
-    """
-    base_url = clean_api_url(api_url)
-    params = urllib.parse.urlencode({"page": page, "page_size": page_size})
-    url = f"{base_url}/api/v1/user/list?{params}"
-    
-    res = _make_request(url, api_key, timeout=8)
-    if res.get("code") == 0:
-        raw_list = res.get("data", {}).get("list", [])
-        profiles = []
-        for item in raw_list:
-            profiles.append({
-                "user_id": item.get("user_id", ""),
-                "serial_number": str(item.get("serial_number", "")),
-                "name": item.get("name", item.get("username", "")),
-                "group_name": item.get("group_name", "Default"),
-                "ip": item.get("ip", ""),
-                "country": item.get("country", ""),
-                "remark": item.get("remark", "")
-            })
-        return {
-            "success": True,
-            "profiles": profiles,
-            "total": res.get("data", {}).get("total", len(profiles))
-        }
-    return {
-        "success": False,
-        "error": res.get("msg", "Lỗi khi lấy danh sách profile AdsPower"),
-        "profiles": []
     }
 
 def resolve_profile_identifier(profile_identifier, api_url=DEFAULT_ADSPOWER_URL, api_key=""):

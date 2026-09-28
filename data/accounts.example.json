@@ -1,4 +1,4 @@
-﻿{
+{
   "source_path": "",
   "dest_path": "",
   "youtube_channels": [
@@ -13,12 +13,12 @@
   "tiktok_accounts": [
     {
       "account_name": "sample_account",
-      "password": "PasswordExample123",
+      "adspower_id": "k1example",
+      "adspower_serial": "1",
+      "group_name": "Default",
+      "ip": "15.220.188.100",
       "mail": "sample@example.com",
-      "mail_confirm": "",
-      "original_ip": "US",
-      "build_up_ip": "US",
-      "created_date": "2026-01-01",
+      "created_date": "2026-01-01 12:00",
       "target_channel": "Sample Channel",
       "content": "Shorts / Gaming",
       "hashtag": "#viral #trending #fyp",

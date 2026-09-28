@@ -48,7 +48,8 @@ from src.services.drive_service import (
     delete_finished_result, delete_all_finished_results, invalidate_drive_caches,
     get_publishing_matrix, toggle_publishing_clip_status, change_account_target_channel, batch_toggle_publishing_clips,
     load_accounts_data, save_accounts_data, ensure_channel_folders,
-    load_settings, save_settings, get_pending_publishing_queue, get_account_daily_posted_count
+    load_settings, save_settings, get_pending_publishing_queue, get_account_daily_posted_count,
+    generate_video_id
 )
 from src.services.hma_service import (
     find_hma_executable, get_current_public_ip, connect_hma, change_ip_hma, disconnect_hma
@@ -56,7 +57,7 @@ from src.services.hma_service import (
 from src.services.adspower_service import (
     check_adspower_status, get_adspower_profiles, start_adspower_browser, stop_adspower_browser, is_browser_active
 )
-from src.services.tiktok_uploader import upload_video_to_tiktok_cdp, upload_multiple_videos_to_tiktok_cdp
+from src.services.tiktok_uploader import upload_video_to_tiktok_cdp, upload_multiple_videos_to_tiktok_cdp, clean_caption_text
 from src.services.video_processor import (
     get_video_duration, process_video_custom, split_video_custom,
     detect_video_highlights, process_and_split_video
@@ -278,8 +279,12 @@ def batch_worker(payload):
 
             # Kiểm tra file heatmap cache nếu có
             heatmap_data = None
-            heatmap_cand = os.path.splitext(actual_video_file)[0] + ".heatmap.json"
+            from config import TEMP_DIR
+            heatmap_cand = os.path.join(TEMP_DIR, f"{sanitize_filename(os.path.basename(actual_video_file))}.heatmap.json")
+            if not os.path.exists(heatmap_cand):
+                heatmap_cand = os.path.splitext(actual_video_file)[0] + ".heatmap.json"
             if os.path.exists(heatmap_cand):
+
                 try:
                     with open(heatmap_cand, "r", encoding="utf-8") as hf:
                         heatmap_data = json.load(hf)
@@ -310,8 +315,10 @@ def batch_worker(payload):
                 log_message(f"❌ Thất bại khi biên tập: {title}")
                 continue
 
-            # Ghi nhận trạng thái vào history
+            # Ghi nhận trạng thái vào history kèm ID unique duy nhất cho video
+            v_uid = generate_video_id(channel, title)
             history[title] = {
+                "video_id": v_uid,
                 "title": title,
                 "channel": channel,
                 "status": "edited",
@@ -320,17 +327,43 @@ def batch_worker(payload):
                 "parts_count": len(split_files)
             }
             save_history(history)
-            log_message(f"🎉 Hoàn thành xuất sắc: {title} ({len(split_files)} parts)")
 
-            # Xóa file video gốc & heatmap cache để tiết kiệm dung lượng đĩa
+            # Lưu file video_meta.json trong thư mục video
+            try:
+                meta_file_path = os.path.join(video_out_dir, "video_meta.json")
+                with open(meta_file_path, "w", encoding="utf-8") as mf:
+                    json.dump({
+                        "video_id": v_uid,
+                        "channel": channel,
+                        "title": title,
+                        "parts_count": len(split_files),
+                        "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
+                    }, mf, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+
+            log_message(f"🎉 Hoàn thành xuất sắc: {title} ({len(split_files)} parts) [ID: {v_uid}]")
+
+            # Xóa file video gốc, heatmap cache & file phụ đề tạm đi kèm để tiết kiệm dung lượng đĩa
             if actual_video_file and os.path.exists(actual_video_file):
                 try:
                     os.remove(actual_video_file)
                     log_message(f"🗑️ Đã xóa tệp video gốc: {os.path.basename(actual_video_file)}")
                     if os.path.exists(heatmap_cand):
                         os.remove(heatmap_cand)
+                    # Dọn dẹp sạch các file phụ đề .vtt/.srt đi kèm trong thư mục nguồn
+                    base_raw = os.path.splitext(actual_video_file)[0]
+                    dir_raw = os.path.dirname(actual_video_file)
+                    for ext in ['.vtt', '.en.vtt', '.en-orig.vtt', '.en-US.vtt', '.srt', '.en.srt']:
+                        cand_sub = base_raw + ext
+                        if os.path.exists(cand_sub):
+                            try:
+                                os.remove(cand_sub)
+                            except Exception:
+                                pass
                 except Exception as e:
                     log_message(f"⚠️ Lỗi khi xóa video gốc: {e}")
+
 
         PROGRESS_PERCENT = 100
         CURRENT_TASK = "Hoàn thành toàn bộ batch!"
@@ -440,11 +473,23 @@ def execute_tiktok_publish(body_data):
                     elif mp4s:
                         video_file = os.path.join(target_dir, mp4s[0])
 
+        # Tự động trích xuất Part X từ tên file nếu item_part bị rỗng
+        if not item_part and video_file:
+            m_part = re.search(r'part[\s_\-]*(\d+)', os.path.basename(video_file), re.I)
+            if m_part:
+                item_part = f"Part {m_part.group(1)}"
+
+        # Tự động kiến tạo clip_key nếu bị thiếu
+        if not item_clip_key and item_channel and item_title:
+            item_clip_key = f"{item_channel}/{item_title}"
+
+        item_vid = item.get("video_id") or generate_video_id(item_channel, item_title)
         if video_file and os.path.exists(video_file):
             resolved_upload_items.append({
                 "video_path": video_file,
+                "video_id": item_vid,
                 "title": item_title,
-                "override_caption": override_caption if override_caption else None,
+                "override_caption": item.get("override_caption") or (override_caption if override_caption else None),
                 "part_label": item_part,
                 "clip_key": item_clip_key,
                 "channel": item_channel
@@ -452,6 +497,60 @@ def execute_tiktok_publish(body_data):
 
     if not resolved_upload_items:
         return {"success": False, "error": f"Không tìm thấy tệp video nào hợp lệ để tải lên"}
+
+    # Pre-Upload Deduplication Safeguard: Kiểm tra theo quy tắc (Account ID + Video ID)
+    # Chỉ xem là đã đăng khi CHÍNH TÀI KHOẢN NÀY (@{acc_name}) đã từng đăng video_id đó.
+    target_posted_clips = target_acc.get("posted_clips", {})
+    filtered_upload_items = []
+    skipped_duplicates = []
+    
+    for item in resolved_upload_items:
+        i_key = item.get("clip_key", "")
+        i_part = item.get("part_label", "")
+        i_title = item.get("title", "")
+        i_chan = item.get("channel", "")
+        i_vid = item.get("video_id") or generate_video_id(i_chan, i_title)
+        
+        is_already_posted = False
+        post_rec = target_posted_clips.get(i_key, {})
+        if not post_rec:
+            for pk, pv in target_posted_clips.items():
+                if (pv.get("video_id") and pv.get("video_id") == i_vid) or \
+                   sanitize_filename(pk).lower() == sanitize_filename(i_key).lower() or \
+                   (pv.get("title") == i_title and sanitize_filename(pv.get("channel", "")).lower() == sanitize_filename(i_chan).lower()):
+                    post_rec = pv
+                    break
+        if post_rec:
+            if i_part:
+                p_stat = post_rec.get("parts_status", {})
+                if i_part in p_stat:
+                    is_already_posted = bool(p_stat[i_part].get("posted", False))
+                elif post_rec.get("posted") and not p_stat:
+                    is_already_posted = True
+                else:
+                    is_already_posted = False
+            else:
+                is_already_posted = bool(post_rec.get("posted", False))
+                
+        if is_already_posted:
+            skipped_duplicates.append(f"'{i_title}' ({i_part}) [Tài khoản @{acc_name} đã đăng]")
+        else:
+            filtered_upload_items.append(item)
+            
+    if skipped_duplicates:
+        for s_msg in skipped_duplicates:
+            log_message(f"   🛡️ [Chống trùng lặp tài khoản] Bỏ qua clip đã đăng: {s_msg}")
+            
+    if not filtered_upload_items:
+        log_message(f"🛑 [Pre-Upload Check] Toàn bộ video yêu cầu đã được tài khoản @{acc_name} đăng trước đó. Hủy đăng an toàn!")
+        return {
+            "success": True,
+            "count": 0,
+            "message": f"Toàn bộ video yêu cầu đã được tài khoản @{acc_name} đăng trước đó trên TikTok. Đã bỏ qua an toàn!",
+            "skipped_duplicates": skipped_duplicates
+        }
+        
+    resolved_upload_items = filtered_upload_items
 
     total_items = len(resolved_upload_items)
     log_message(f"🚀 [Multi-Tab Post] Bắt đầu quy trình đăng đồng thời {total_items} video trên {total_items} tab cho tài khoản @{acc_name}")
@@ -500,37 +599,16 @@ def execute_tiktok_publish(body_data):
     else:
         step_logs.append("HMA: Bỏ qua kiểm tra vị trí")
 
-    # 1.5. Tự động sinh Caption & Hashtags bằng AI Gemini trước khi mở trình duyệt
+    # 1.5. Thiết lập Tiêu đề & Hook chuẩn xác 100% theo tên video trên Channel (GỠ BỎ HOÀN TOÀN AI)
     effective_hashtags = override_hashtags if override_hashtags else target_acc.get("hashtag", "")
-    gemini_settings = settings.get("gemini", {})
-    gemini_key = gemini_settings.get("api_key", "").strip()
-    gemini_model = gemini_settings.get("model", "builtin")
-    gemini_style = gemini_settings.get("style", "viral")
-
-    if not override_caption:
-        from src.services.gemini_service import generate_tiktok_caption
-        from concurrent.futures import ThreadPoolExecutor
-        engine_label = "AI Cloud" if (gemini_key and not gemini_key.startswith("AQ.") and gemini_model != "builtin") else "Smart Built-in NLP"
-        log_message(f"🤖 [{engine_label}] Đang tạo sẵn Caption & Hashtags ({gemini_style}) cho {total_items} video...")
-
-        def process_caption(item):
-            ai_res = generate_tiktok_caption(
-                video_title=item.get("title", ""),
-                channel_name=item.get("channel", ""),
-                api_key=gemini_key,
-                model=gemini_model,
-                style=gemini_style
-            )
-            if ai_res.get("success"):
-                cap = ai_res.get("caption", "").strip()
-                tags = ai_res.get("hashtags", "").strip()
-                full_cap = f"{cap} {tags}".strip()
-                item["override_caption"] = full_cap
-                log_message(f"   ✨ [{ai_res.get('engine', 'AI')}]: \"{cap[:60]}...\"")
-                step_logs.append(f"AI Caption: {cap}")
-
-        with ThreadPoolExecutor(max_workers=min(total_items, 4)) as executor:
-            list(executor.map(process_caption, resolved_upload_items))
+    log_message(f"📝 [Tiêu đề Video] Đặt tiêu đề và hook theo đúng tên video gốc từ channel cho {total_items} video (Không dùng AI)...")
+    for item in resolved_upload_items:
+        raw_t = clean_caption_text(item.get("title", "").strip())
+        if override_caption:
+            item["override_caption"] = clean_caption_text(override_caption.strip())
+        else:
+            item["override_caption"] = raw_t
+        step_logs.append(f"Tiêu đề: {item['override_caption']}")
 
     # 2. Khởi chạy Profile AdsPower
     profile_id = target_acc.get("adspower_id") or target_acc.get("adspower_serial") or target_acc.get("account_name")
@@ -579,13 +657,18 @@ def execute_tiktok_publish(body_data):
     if upload_res.get("success"):
         actual_posted_items = upload_res.get("items", resolved_upload_items)
         for item in actual_posted_items:
+            effective_clip_key = item.get("clip_key") or clip_key or (f"{item.get('channel', channel)}/{item.get('title', title)}" if (item.get('channel') or channel) and (item.get('title') or title) else "")
+            effective_channel = item.get("channel") or channel or (os.path.dirname(effective_clip_key) if effective_clip_key else "")
+            effective_title = item.get("title") or title or (os.path.basename(effective_clip_key) if effective_clip_key else "")
+
             toggle_publishing_clip_status(
                 acc_name,
-                item.get("clip_key", clip_key),
-                item.get("channel", channel),
-                item.get("title", title),
+                clip_key=effective_clip_key,
+                channel=effective_channel,
+                title=effective_title,
                 posted=True,
-                part_label=item.get("part_label")
+                part_label=item.get("part_label"),
+                video_id=item.get("video_id") or generate_video_id(effective_channel, effective_title)
             )
 
         log_message(f"🎉 [4/4] Đã đăng đồng thời toàn bộ {len(actual_posted_items)} video thành công!")
@@ -701,7 +784,19 @@ def run_autopilot_publishing_worker(payload):
                 break
                 
             clips = accounts_map.get(acc_name, [])
-            batch_clips = clips[:3]
+            if not clips:
+                continue
+
+            # Kiểm tra hạn mức đăng trong ngày còn lại của tài khoản
+            settings = load_settings()
+            max_daily_posts = int(settings.get("tiktok_upload", {}).get("max_daily_posts_per_account", 3))
+            today_posted = get_account_daily_posted_count(acc_name)
+            remaining_quota = max(0, max_daily_posts - today_posted) if max_daily_posts > 0 else len(clips)
+            if remaining_quota <= 0:
+                log_message(f"   🎯 [Auto-Pilot] Tài khoản @{acc_name} đã đăng {today_posted}/{max_daily_posts} clip hôm nay (đạt giới hạn) -> Bỏ qua an toàn!")
+                continue
+
+            batch_clips = clips[:min(3, remaining_quota)]
             if not batch_clips:
                 continue
                 
@@ -990,6 +1085,14 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
             self.send_json(status_data)
             return
 
+        # API: YouTube Cookies Status
+        if parsed.path == "/api/youtube/cookies_status":
+            from src.services.youtube_downloader import get_cookies_status
+            status_data = get_cookies_status()
+            self.send_json(status_data)
+            return
+
+
         # API: YouTube Smart Channel Scanner (Legacy)
         if parsed.path == "/api/youtube/scan_channel":
             channel_url = query.get("url", [""])[0]
@@ -1226,6 +1329,18 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
             self.send_json({"success": True, "cleared_count": cleared})
             return
 
+        # API: Save YouTube Cookies (Netscape format)
+        if parsed.path == "/api/youtube/save_cookies":
+            content = body_data.get("cookies", "") or body_data.get("content", "")
+            if not content or len(content.strip()) < 10:
+                self.send_json({"success": False, "error": "Nội dung cookie trống hoặc quá ngắn"}, status=400)
+                return
+            from src.services.youtube_downloader import save_youtube_cookies
+            res = save_youtube_cookies(content)
+            self.send_json(res)
+            return
+
+
         # API: YouTube Auto Download Top Video(s)
         if parsed.path == "/api/youtube/auto_download":
             channel_url = body_data.get("channel_url", "")
@@ -1266,7 +1381,54 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
         # API: Open Folder in Explorer
         if parsed.path == "/api/open_folder":
             fpath = body_data.get("path", body_data.get("folder_path", ""))
-            log_message(f"📂 Yêu cầu mở thư mục: {fpath}")
+            base_dest = body_data.get("base_dest", "")
+            channel = body_data.get("channel", "")
+            title = body_data.get("title", "")
+
+            # 1. Nếu client truyền base_dest (đường link trả video kết quả được setting trên webapp)
+            if base_dest:
+                base_dest = base_dest.strip().strip('"').strip("'")
+                
+                # Nếu là đường dẫn Web Google Drive
+                if base_dest.startswith("http://") or base_dest.startswith("https://"):
+                    import webbrowser
+                    webbrowser.open(base_dest)
+                    self.send_json({"status": "opened", "path": base_dest})
+                    return
+
+                from src.services.drive_service import resolve_google_drive_path
+                resolved_base = resolve_google_drive_path(base_dest)
+                if resolved_base and os.path.exists(resolved_base):
+                    base_dest = resolved_base
+
+                target_parts = [base_dest]
+                if channel:
+                    target_parts.append(channel)
+                if title:
+                    target_parts.append(title)
+                
+                target_path = os.path.normpath(os.path.join(*target_parts))
+
+                # Kiểm tra nếu chưa tồn tại, thử tìm theo biến thể sanitize_filename
+                if not os.path.exists(target_path):
+                    cand_parts = [base_dest]
+                    if channel:
+                        cand_parts.append(sanitize_filename(channel))
+                    if title:
+                        cand_parts.append(sanitize_filename(title))
+                    cand_path = os.path.normpath(os.path.join(*cand_parts))
+                    if os.path.exists(cand_path):
+                        target_path = cand_path
+                    else:
+                        # Tự động tạo thư mục nếu chưa tồn tại để sẵn sàng cho người dùng
+                        try:
+                            os.makedirs(target_path, exist_ok=True)
+                        except Exception:
+                            pass
+                
+                fpath = target_path
+
+            log_message(f"📂 Yêu cầu mở thư mục kết quả: {fpath}")
             if fpath:
                 fpath = fpath.strip().strip('"').strip("'")
                 
@@ -1285,6 +1447,13 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
                     if os.path.isfile(norm_path):
                         norm_path = os.path.dirname(norm_path)
                         
+                    if not os.path.exists(norm_path):
+                        # Thử tạo thư mục nếu chưa tồn tại
+                        try:
+                            os.makedirs(norm_path, exist_ok=True)
+                        except Exception:
+                            pass
+
                     if os.path.exists(norm_path):
                         if os.name == 'nt':
                             try:
@@ -1294,13 +1463,7 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
                         else:
                             subprocess.Popen(['xdg-open', norm_path])
                     else:
-                        # Thử tạo thư mục nếu chưa tồn tại
-                        try:
-                            os.makedirs(norm_path, exist_ok=True)
-                            if os.name == 'nt':
-                                os.startfile(norm_path)
-                        except Exception as e:
-                            log_message(f"❌ Không thể mở thư mục '{norm_path}': {e}")
+                        log_message(f"❌ Không thể mở thư mục '{norm_path}'")
                             
             self.send_json({"status": "opened", "path": fpath})
             return
@@ -1329,6 +1492,14 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
                     log_message(f"📁 Tự động tạo thư mục: {f}")
             self.send_json({"status": "saved" if success else "failed"}, status=(200 if success else 500))
             return
+
+        # API: Sync TikTok Accounts with AdsPower Local API
+        if parsed.path == "/api/accounts/sync_adspower":
+            from src.services.drive_service import sync_tiktok_accounts_with_adspower
+            res = sync_tiktok_accounts_with_adspower()
+            self.send_json(res, status=(200 if res.get("success") else 500))
+            return
+
 
         # API: Select Local Folder via OS Picker
         if parsed.path == "/api/select_folder":
@@ -1473,15 +1644,16 @@ class StudioServerHandler(SimpleHTTPRequestHandler):
             self.send_json({"success": success, "message": msg})
             return
 
-        # API: Generate Viral TikTok Caption & Hashtags using Gemini AI
+        # API: Caption & Hashtags (Tuân thủ nghiêm ngặt tên video trên Channel, không dùng AI)
         if parsed.path == "/api/ai/generate_caption":
-            from src.services.gemini_service import generate_tiktok_caption
             video_title = body_data.get("video_title", "TikTok Video")
-            channel_name = body_data.get("channel_name", "")
-            api_key = body_data.get("api_key", None)
-            model = body_data.get("model", "gemini-1.5-flash")
-            res = generate_tiktok_caption(video_title=video_title, channel_name=channel_name, api_key=api_key, model=model)
-            self.send_json(res)
+            clean_title = clean_caption_text(video_title)
+            self.send_json({
+                "success": True,
+                "engine": "Direct Channel Title (Strict No-AI)",
+                "caption": clean_title,
+                "hashtags": ""
+            })
             return
 
         # API: Test AdsPower Connection & Load Profiles

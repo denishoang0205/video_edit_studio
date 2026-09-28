@@ -18,9 +18,9 @@ if hasattr(sys.stdout, 'reconfigure'):
         pass
 
 try:
-    from src.core.config import BASE_DIR, DATA_DIR, VIDEO_DIR, OUTPUT_BASE_DIR, FFMPEG_EXE, COOKIES_FILE, BIN_DIR
+    from src.core.config import BASE_DIR, DATA_DIR, VIDEO_DIR, OUTPUT_BASE_DIR, FFMPEG_EXE, COOKIES_FILE, BIN_DIR, HISTORY_FILE
 except ImportError:
-    from config import BASE_DIR, DATA_DIR, VIDEO_DIR, OUTPUT_BASE_DIR, FFMPEG_EXE, COOKIES_FILE, BIN_DIR
+    from config import BASE_DIR, DATA_DIR, VIDEO_DIR, OUTPUT_BASE_DIR, FFMPEG_EXE, COOKIES_FILE, BIN_DIR, HISTORY_FILE
 
 DENO_EXE = os.path.join(BASE_DIR, "bin", "deno.exe")
 ARIA2C_EXE = os.path.join(BASE_DIR, "bin", "aria2c.exe")
@@ -96,55 +96,120 @@ def get_channel_clean_base_url(url):
     return url.rstrip('/')
 
 def get_existing_product_titles(custom_source_dir=None, custom_dest_dir=None):
-    """Thu thập toàn bộ tiêu đề video đã từng làm để tránh trùng lặp"""
-    existing = set()
-    history_file = os.path.join(BASE_DIR, "history.json")
+    """
+    Thu thập tiêu đề video:
+    - current: Video thực sự đang tồn tại trên đĩa (output_product hoặc input_sources)
+    - previously: Video đã từng tải / từng biên tập nhưng hiện không còn file trên đĩa (hoặc đã xóa trên webapp)
+    """
+    current = set()
+    previously = set()
+    history_file = HISTORY_FILE
     
-    # 1. Từ history.json
+    # 1. Từ output_product hoặc custom_dest_dir (Đang có sẵn thành phẩm trên đĩa)
+    dest_dir = custom_dest_dir or OUTPUT_BASE_DIR
+    if os.path.exists(dest_dir):
+        for root, dirs, files in os.walk(dest_dir):
+            for d in dirs:
+                current.add(d.strip().lower())
+                current.add(sanitize_filename(d).lower())
+            for f in files:
+                if f.endswith((".mp4", ".mkv", ".mov")):
+                    fname = os.path.splitext(f)[0].strip().lower()
+                    base_fname = re.sub(r'\s*-\s*part\s*\d+', '', fname)
+                    current.add(fname)
+                    current.add(base_fname)
+
+    # 2. Từ input_sources hoặc custom_source_dir (Đang có sẵn video gốc trên đĩa)
+    src_dir = custom_source_dir or VIDEO_DIR
+    if os.path.exists(src_dir):
+        for root, dirs, files in os.walk(src_dir):
+            for d in dirs:
+                current.add(d.strip().lower())
+                current.add(sanitize_filename(d).lower())
+            for f in files:
+                if f.endswith((".mp4", ".mkv", ".mov", ".webm")):
+                    fname = os.path.splitext(f)[0].strip().lower()
+                    current.add(fname)
+
+    # 3. Từ history.json (Kiểm tra lịch sử tải / biên tập)
     if os.path.exists(history_file):
         try:
             with open(history_file, "r", encoding="utf-8") as f:
                 hist = json.load(f)
                 for k, v in hist.items():
-                    title = v.get("title", "").strip().lower()
-                    if title:
-                        existing.add(title)
-                        existing.add(sanitize_filename(title).lower())
+                    title = ""
+                    vid_id = ""
+                    if isinstance(v, dict):
+                        title = v.get("title", "").strip().lower()
+                        vid_id = v.get("video_id", "").strip().lower()
+                    elif isinstance(v, str):
+                        title = v.strip().lower()
+
                     folder_name = k.split("/")[-1].strip().lower()
-                    if folder_name:
-                        existing.add(folder_name)
+                    identifiers = [x for x in [title, sanitize_filename(title).lower() if title else "", folder_name, vid_id] if x]
+
+                    for ident in identifiers:
+                        if ident in current:
+                            continue
+                        previously.add(ident)
         except Exception:
             pass
 
-    # 2. Từ output_product hoặc custom_dest_dir
-    dest_dir = custom_dest_dir or OUTPUT_BASE_DIR
-    if os.path.exists(dest_dir):
-        for root, dirs, files in os.walk(dest_dir):
-            for d in dirs:
-                existing.add(d.strip().lower())
-            for f in files:
-                if f.endswith((".mp4", ".mkv", ".mov")):
-                    fname = os.path.splitext(f)[0].strip().lower()
-                    base_fname = re.sub(r'\s*-\s*part\s*\d+', '', fname)
-                    existing.add(fname)
-                    existing.add(base_fname)
-
-    # 3. Từ input_sources hoặc custom_source_dir
-    src_dir = custom_source_dir or VIDEO_DIR
-    if os.path.exists(src_dir):
-        for root, dirs, files in os.walk(src_dir):
-            for d in dirs:
-                existing.add(d.strip().lower())
-            for f in files:
-                if f.endswith((".mp4", ".mkv", ".mov", ".webm")):
-                    fname = os.path.splitext(f)[0].strip().lower()
-                    existing.add(fname)
-
-    return existing
+    return current, previously
 
 # Bộ nhớ đệm cache cho kết quả quét kênh: {cache_key: (timestamp, raw_result_dict)}
 _CHANNEL_SCAN_CACHE = {}
 _SCAN_CACHE_TTL_SEC = 120  # Cache tồn tại 2 phút giúp chuyển kênh tức thì
+
+def get_resolved_cookie_file():
+    """Lấy file cookie YouTube: ưu tiên youtube_cookies.txt, dự phòng cookies.txt"""
+    yt_cookies = os.path.join(DATA_DIR, "youtube_cookies.txt")
+    if os.path.exists(yt_cookies) and os.path.getsize(yt_cookies) > 50:
+        return yt_cookies
+    if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 50:
+        return COOKIES_FILE
+    return None
+
+def get_cookies_status():
+    """Kiểm tra trạng thái file cookies YouTube hiện tại"""
+    yt_cookies = os.path.join(DATA_DIR, "youtube_cookies.txt")
+    legacy_cookies = COOKIES_FILE
+    
+    if os.path.exists(yt_cookies) and os.path.getsize(yt_cookies) > 50:
+        return {
+            "has_cookies": True,
+            "file": "youtube_cookies.txt",
+            "path": yt_cookies,
+            "size_bytes": os.path.getsize(yt_cookies),
+            "last_modified": os.path.getmtime(yt_cookies)
+        }
+    elif os.path.exists(legacy_cookies) and os.path.getsize(legacy_cookies) > 50:
+        return {
+            "has_cookies": True,
+            "file": "cookies.txt",
+            "path": legacy_cookies,
+            "size_bytes": os.path.getsize(legacy_cookies),
+            "last_modified": os.path.getmtime(legacy_cookies)
+        }
+    return {
+        "has_cookies": False,
+        "file": None,
+        "path": None,
+        "size_bytes": 0,
+        "last_modified": None
+    }
+
+def save_youtube_cookies(content: str):
+    """Lưu nội dung cookie YouTube (định dạng Netscape) vào data/youtube_cookies.txt"""
+    yt_cookies = os.path.join(DATA_DIR, "youtube_cookies.txt")
+    with open(yt_cookies, "w", encoding="utf-8") as f:
+        f.write(content.strip() + "\n")
+    safe_log(f"💾 Đã lưu file cookie YouTube thành công: {yt_cookies} ({os.path.getsize(yt_cookies)} bytes)")
+    return {
+        "success": True,
+        "path": yt_cookies,
+        "size_bytes": os.path.getsize(yt_cookies)
+    }
 
 def _fetch_playlist_entries(target_url, max_scan=40):
     """Hàm helper chạy yt-dlp flat playlist extraction tốc độ cao"""
@@ -159,10 +224,10 @@ def _fetch_playlist_entries(target_url, max_scan=40):
         "lazy_playlist": True,
         "extractor_args": {"youtube": {"player_client": ["web"]}}
     }
-    # Chỉ nạp cookies nếu có file youtube_cookies.txt riêng hợp lệ
-    yt_cookies = os.path.join(DATA_DIR, "youtube_cookies.txt")
-    if os.path.exists(yt_cookies) and os.path.getsize(yt_cookies) > 50:
-        ydl_opts["cookiefile"] = yt_cookies
+    cookie_f = get_resolved_cookie_file()
+    if cookie_f:
+        ydl_opts["cookiefile"] = cookie_f
+
         
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -213,7 +278,7 @@ def scan_channel_all_media(channel_url, channel_name="", min_views=0, max_durati
         video_entries, v_info = future_videos.result()
         short_entries, s_info = future_shorts.result()
 
-    existing_titles = get_existing_product_titles(custom_source_dir, custom_dest_dir)
+    current_titles, previous_titles = get_existing_product_titles(custom_source_dir, custom_dest_dir)
     detected_channel_name = channel_name or v_info.get("uploader") or s_info.get("uploader") or base_url.split("/")[-1].replace("@", "")
 
     # 1. Xử lý danh sách Video dài
@@ -239,15 +304,38 @@ def scan_channel_all_media(channel_url, channel_name="", min_views=0, max_durati
             continue
             
         title_sanitized = sanitize_filename(title)
-        is_downloaded = (
-            title.strip().lower() in existing_titles or 
-            title_sanitized.lower() in existing_titles or
-            vid_id.lower() in existing_titles
+        title_low = title.strip().lower()
+        san_low = title_sanitized.lower()
+        vid_low = vid_id.lower()
+
+        is_current = (
+            title_low in current_titles or 
+            san_low in current_titles or
+            vid_low in current_titles
         )
+        is_previous = (
+            not is_current and (
+                title_low in previous_titles or
+                san_low in previous_titles or
+                vid_low in previous_titles
+            )
+        )
+        
+        if is_current:
+            status = "downloaded"
+        elif is_previous:
+            status = "previously_downloaded"
+        else:
+            status = "ready"
         
         # Lấy thumbnail chất lượng tốt nhất
         thumbnails = e.get("thumbnails", [])
         thumb_url = thumbnails[-1].get("url") if thumbnails else f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
+        
+        # Gắn tag 'short' nếu video có thời lượng dưới 2 phút (< 120s), gắn tag 'long' nếu video trên 15 phút (> 900s)
+        is_short_duration = bool(duration and duration < 120)
+        is_long_duration = bool(duration and duration > 900)
+        video_tag = "short" if is_short_duration else ("long" if is_long_duration else "medium")
         
         parsed_videos.append({
             "id": vid_id,
@@ -260,9 +348,12 @@ def scan_channel_all_media(channel_url, channel_name="", min_views=0, max_durati
             "formatted_duration": format_duration(duration),
             "thumbnail": thumb_url,
             "channel": detected_channel_name,
-            "is_short": False,
-            "is_downloaded": is_downloaded,
-            "status": "downloaded" if is_downloaded else "ready"
+            "is_short": is_short_duration,
+            "is_long": is_long_duration,
+            "video_tag": video_tag,
+            "is_downloaded": is_current,
+            "is_previously_downloaded": is_previous,
+            "status": status
         })
 
     # 2. Xử lý danh sách Shorts
@@ -285,11 +376,29 @@ def scan_channel_all_media(channel_url, channel_name="", min_views=0, max_durati
             continue
             
         title_sanitized = sanitize_filename(title)
-        is_downloaded = (
-            title.strip().lower() in existing_titles or 
-            title_sanitized.lower() in existing_titles or
-            vid_id.lower() in existing_titles
+        title_low = title.strip().lower()
+        san_low = title_sanitized.lower()
+        vid_low = vid_id.lower()
+
+        is_current = (
+            title_low in current_titles or 
+            san_low in current_titles or
+            vid_low in current_titles
         )
+        is_previous = (
+            not is_current and (
+                title_low in previous_titles or
+                san_low in previous_titles or
+                vid_low in previous_titles
+            )
+        )
+        
+        if is_current:
+            status = "downloaded"
+        elif is_previous:
+            status = "previously_downloaded"
+        else:
+            status = "ready"
         
         thumbnails = e.get("thumbnails", [])
         thumb_url = thumbnails[-1].get("url") if thumbnails else f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
@@ -306,8 +415,11 @@ def scan_channel_all_media(channel_url, channel_name="", min_views=0, max_durati
             "thumbnail": thumb_url,
             "channel": detected_channel_name,
             "is_short": True,
-            "is_downloaded": is_downloaded,
-            "status": "downloaded" if is_downloaded else "ready"
+            "is_long": False,
+            "video_tag": "short",
+            "is_downloaded": is_current,
+            "is_previously_downloaded": is_previous,
+            "status": status
         })
 
     # Sắp xếp theo lượt xem giảm dần
@@ -335,11 +447,11 @@ def scan_and_filter_youtube_channel(channel_url, channel_name="", min_views=1000
     return []
 
 def cleanup_temporary_files(target_dir, base_title="", video_id=""):
-    """Dọn dẹp triệt để các file rác .part, .ytdl, .temp khi tải dở hoặc hoàn tất"""
+    """Dọn dẹp triệt để các file rác .part, .ytdl, .temp, .vtt, .srt khi tải dở hoặc hoàn tất"""
     if not os.path.exists(target_dir):
         return
     for f in os.listdir(target_dir):
-        is_temp = f.endswith(('.part', '.ytdl', '.temp')) or any(tag in f for tag in ['.f399.', '.f301.', '.f300.', '.f140.', '.f251.', '.f136.', '.f298.', '.f299.', '.f788.', '.f779.', '.f780.', '.f787.'])
+        is_temp = f.endswith(('.part', '.ytdl', '.temp', '.vtt', '.srt')) or any(tag in f for tag in ['.f399.', '.f301.', '.f300.', '.f140.', '.f251.', '.f136.', '.f298.', '.f299.', '.f788.', '.f779.', '.f780.', '.f787.'])
         if is_temp:
             matches = False
             if not base_title and not video_id:
@@ -348,8 +460,9 @@ def cleanup_temporary_files(target_dir, base_title="", video_id=""):
                 matches = True
             elif video_id and video_id.lower() in f.lower():
                 matches = True
-            elif f.endswith(('.part', '.ytdl', '.temp')):
+            elif f.endswith(('.part', '.ytdl', '.temp', '.vtt', '.srt')):
                 matches = True
+
                 
             if matches:
                 try:
@@ -431,12 +544,11 @@ def download_youtube_video(video_url, channel_name, video_title=None, preferred_
         "quiet": False,
         "overwrites": True,
         "no_continue": False,
-        "writesubtitles": True,
-        "writeautomaticsub": True,
-        "subtitleslangs": ["en", "en-US", "en-orig"],
-        "subtitlesformat": "vtt/srt/best",
+        "writesubtitles": False,
+        "writeautomaticsub": False,
         "progress_hooks": [yt_progress_hook],
     }
+
     
     if os.path.exists(FFMPEG_EXE):
         base_ydl_opts["ffmpeg_location"] = FFMPEG_EXE
@@ -445,6 +557,11 @@ def download_youtube_video(video_url, channel_name, video_title=None, preferred_
     if os.path.exists(DENO_EXE):
         base_ydl_opts["js_runtimes"] = {"deno": {"path": DENO_EXE}}
         base_ydl_opts["remote_components"] = ["ejs:github"]
+
+    cookie_file_to_use = get_resolved_cookie_file()
+    if cookie_file_to_use:
+        base_ydl_opts["cookiefile"] = cookie_file_to_use
+        safe_log(f"🍪 Nạp cookie YouTube từ: {os.path.basename(cookie_file_to_use)}")
 
     start_time = time.time()
     res_info = None
@@ -455,8 +572,6 @@ def download_youtube_video(video_url, channel_name, video_title=None, preferred_
     # ----------------------------------------------------
     ydl_opts_tier1 = dict(base_ydl_opts)
     ydl_opts_tier1["format"] = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
-    if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
-        ydl_opts_tier1["cookiefile"] = COOKIES_FILE
         
     try:
         with yt_dlp.YoutubeDL(ydl_opts_tier1) as ydl:
@@ -589,20 +704,35 @@ def download_youtube_video(video_url, channel_name, video_title=None, preferred_
                     final_file = cand_path
                     break
 
-    # Lưu thông tin heatmap nếu có
+    # Lưu thông tin heatmap vào thư mục temp (không lưu vào input_sources để thư mục chỉ chứa duy nhất file mp4)
     try:
         heatmap_data = res_info.get("heatmap") if res_info else None
         if heatmap_data and final_file:
-            heatmap_file = os.path.splitext(final_file)[0] + ".heatmap.json"
+            from config import TEMP_DIR
+            os.makedirs(TEMP_DIR, exist_ok=True)
+            heatmap_file = os.path.join(TEMP_DIR, f"{sanitize_filename(os.path.basename(final_file))}.heatmap.json")
             with open(heatmap_file, "w", encoding="utf-8") as hf:
                 json.dump(heatmap_data, hf)
     except Exception:
         pass
 
+
     # Kiểm tra tính hợp lệ của file mp4 cuối cùng (lớn hơn 500KB)
     is_valid_mp4 = bool(final_file and os.path.exists(final_file) and final_file.endswith('.mp4') and (os.path.getsize(final_file) > 500 * 1024))
     
+    # Đảm bảo chỉ giữ lại duy nhất tệp .mp4 trong thư mục tải về, xóa sạch mọi file phụ đề nếu có
+    if is_valid_mp4 and final_file:
+        base_target = os.path.splitext(final_file)[0]
+        for sub_ext in ['.vtt', '.en.vtt', '.en-orig.vtt', '.en-US.vtt', '.srt', '.en.srt']:
+            sf = base_target + sub_ext
+            if os.path.exists(sf):
+                try:
+                    os.remove(sf)
+                except Exception:
+                    pass
+
     if not is_valid_mp4:
+
         cleanup_temporary_files(target_channel_dir, requested_sanitized, video_id)
         with DOWNLOAD_TASKS_LOCK:
             if task_id in DOWNLOAD_TASKS:

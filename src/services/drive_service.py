@@ -9,6 +9,8 @@ import time
 import datetime
 import subprocess
 
+import hashlib
+
 def sanitize_filename(name):
     """Xóa các ký tự không hợp lệ trong tên file/thư mục Windows và dấu chấm/khoảng trắng cuối tên"""
     if not name:
@@ -19,6 +21,18 @@ def sanitize_filename(name):
             break
     sanitized = re.sub(r'[\\/*?:"<>|]', "", name).strip()
     return re.sub(r'\.+$', '', sanitized).strip()
+
+def generate_video_id(channel, title):
+    """
+    Sinh ID unique duy nhất cho mỗi video dựa trên channel và title.
+    Định dạng: vid_<10 ký tự hash>
+    Đảm bảo 1 video luôn có đúng 1 ID cố định, nhất quán giữa mọi tiến trình.
+    """
+    clean_c = sanitize_filename(str(channel or "")).strip().lower()
+    clean_t = sanitize_filename(str(title or "")).strip().lower()
+    raw = f"{clean_c}/{clean_t}"
+    h = hashlib.md5(raw.encode("utf-8")).hexdigest()[:10]
+    return f"vid_{h}"
 
 from config import HISTORY_FILE, ACCOUNTS_FILE, SETTINGS_FILE, VIDEO_DIR, OUTPUT_BASE_DIR
 
@@ -133,6 +147,91 @@ def invalidate_drive_caches():
     _CACHE_SCAN_SOURCE.clear()
     _CACHE_FINISHED_RESULTS.clear()
 
+def get_clip_disk_part_labels(channel, title, dest_path=None):
+    """
+    Lấy danh sách các label part ('Part 1', 'Part 2',...) thực tế trên đĩa của một video.
+    Đảm bảo việc xét duyệt video đã đăng chỉ hoàn tất khi 100% các part trên đĩa đã đăng.
+    """
+    try:
+        if not dest_path:
+            acc_d = load_accounts_data()
+            dest_path = acc_d.get("dest_path", "")
+            if not dest_path or not os.path.exists(dest_path):
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                candidates = [
+                    OUTPUT_BASE_DIR,
+                    os.path.join(base_dir, "output_product"),
+                    os.path.join(base_dir, "storage", "outputs"),
+                    os.path.join(base_dir, "Tiktok_Builder_Output")
+                ]
+                for cand in candidates:
+                    if cand and os.path.exists(cand):
+                        dest_path = cand
+                        break
+
+        resolved_dest = resolve_google_drive_path(dest_path)
+        if not resolved_dest or not os.path.exists(resolved_dest):
+            return []
+
+        c_chan = str(channel or "").strip()
+        c_title = str(title or "").strip()
+
+        # Thử tìm trực tiếp thư mục theo các quy ước đường dẫn
+        candidates = [
+            os.path.join(resolved_dest, c_chan, c_title),
+            os.path.join(resolved_dest, sanitize_filename(c_chan), sanitize_filename(c_title))
+        ]
+        target_dir = None
+        for cand in candidates:
+            if os.path.isdir(cand):
+                target_dir = cand
+                break
+
+        # Nếu không thấy theo đường dẫn trực tiếp, quét đệ quy các folder
+        if not target_dir:
+            san_chan = sanitize_filename(c_chan).lower()
+            san_title = sanitize_filename(c_title).lower()
+            for root, dirs, files in os.walk(resolved_dest):
+                folder_name = os.path.basename(os.path.dirname(root)) or os.path.basename(root)
+                video_title = os.path.basename(root)
+                if ((sanitize_filename(folder_name).lower() == san_chan or not san_chan) and
+                    sanitize_filename(video_title).lower() == san_title):
+                    target_dir = root
+                    break
+
+        if not target_dir or not os.path.isdir(target_dir):
+            return []
+
+        files = os.listdir(target_dir)
+        mp4_files = [f for f in files if f.endswith('.mp4')]
+        if not mp4_files:
+            return []
+
+        full_vid = [f for f in mp4_files if f.startswith('edited_') or 'edited_full' in f]
+        candidate_parts = [
+            f for f in mp4_files 
+            if f not in full_vid 
+            and f.lower() != 'original.mp4' 
+            and not f.startswith('original_')
+            and not f.endswith('-original.mp4')
+        ]
+
+        def get_part_sort_key_internal(filename):
+            match = re.search(r'part[_\s\-]*(\d+)', filename, re.IGNORECASE)
+            if match:
+                return (0, int(match.group(1)), filename)
+            ts_match = re.search(r'-(\d\d)\.(\d\d)\.(\d\d)', filename)
+            if ts_match:
+                sec = int(ts_match.group(1))*3600 + int(ts_match.group(2))*60 + int(ts_match.group(3))
+                return (1, sec, filename)
+            return (2, 0, filename)
+
+        sorted_parts = sorted(candidate_parts, key=get_part_sort_key_internal)
+        return [f"Part {idx + 1}" for idx in range(len(sorted_parts))]
+    except Exception as e:
+        print(f"Lỗi get_clip_disk_part_labels ({channel}/{title}): {e}")
+        return []
+
 def scan_finished_results(dest_path=None, force=False):
     """
     Quét các video thành phẩm đã xuất trong thư mục đích.
@@ -178,6 +277,11 @@ def scan_finished_results(dest_path=None, force=False):
 
     def check_clip_tiktok_status(c_channel, c_title):
         """Kiểm tra clip hoặc các parts đã được đăng lên tài khoản TikTok nào chưa"""
+        matched_acc = ""
+        matched_at = ""
+        matched_parts_status = {}
+        is_clip_posted = False
+
         for acc in tiktok_accounts:
             acc_name = acc.get("account_name", "")
             posted_clips = acc.get("posted_clips", {})
@@ -190,9 +294,20 @@ def scan_finished_results(dest_path=None, force=False):
                     (sanitize_filename(pv_chan) == sanitize_filename(c_channel) and sanitize_filename(pv_title) == sanitize_filename(c_title)) or
                     (sanitize_filename(pk) == sanitize_filename(f"{c_channel}/{c_title}")) or
                     (sanitize_filename(pv_title) == sanitize_filename(c_title))):
+                    
+                    p_stat = pv.get("parts_status", {})
+                    if p_stat:
+                        matched_parts_status.update(p_stat)
+                    if pv.get("posted_at") and not matched_at:
+                        matched_at = pv.get("posted_at")
+                    if not matched_acc:
+                        matched_acc = acc_name
+
                     if pv.get("posted"):
+                        is_clip_posted = True
                         return True, acc_name, pv.get("posted_at", ""), pv.get("parts_status", {})
-        return False, "", "", {}
+
+        return is_clip_posted, matched_acc, matched_at, matched_parts_status
 
     results = []
     try:
@@ -227,6 +342,29 @@ def scan_finished_results(dest_path=None, force=False):
                 mtime = max(file_mtimes) if file_mtimes else os.path.getmtime(root)
                 created_at_str = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
 
+                # Quản lý ID unique duy nhất cho mỗi video (lưu vào video_meta.json nếu chưa có)
+                vid_id = generate_video_id(folder_name, video_title)
+                meta_file = os.path.join(root, "video_meta.json")
+                if os.path.exists(meta_file):
+                    try:
+                        with open(meta_file, "r", encoding="utf-8") as mf:
+                            m_data = json.load(mf)
+                            if m_data.get("video_id"):
+                                vid_id = m_data["video_id"]
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        with open(meta_file, "w", encoding="utf-8") as mf:
+                            json.dump({
+                                "video_id": vid_id,
+                                "channel": folder_name,
+                                "title": video_title,
+                                "created_at": created_at_str
+                            }, mf, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+
                 # Kiểm tra trạng thái đã đăng TikTok
                 is_uploaded, posted_acc, posted_at, parts_status = check_clip_tiktok_status(folder_name, video_title)
 
@@ -251,13 +389,20 @@ def scan_finished_results(dest_path=None, force=False):
                     parts_list.append({
                         "name": p,
                         "label": part_label,
+                        "part_id": f"{vid_id}_p{idx + 1}",
                         "file_path": os.path.join(root, p),
                         "url": f"/video_stream?path={os.path.join(root, p)}",
                         "posted": p_posted,
                         "posted_at": p_posted_at
                     })
 
+                # QUY TẮC QUYẾT ĐỊNH: Nếu video có các parts thì CHỈ KHI 100% CÁC PARTS ĐÃ ĐĂNG
+                # thì video mới được coi là is_uploaded = True!
+                if parts_list:
+                    is_uploaded = all(p["posted"] for p in parts_list)
+
                 results.append({
+                    "video_id": vid_id,
                     "title": video_title,
                     "folder_name": folder_name,
                     "path": root,
@@ -288,6 +433,84 @@ def scan_finished_results(dest_path=None, force=False):
     }
     _CACHE_FINISHED_RESULTS[cache_key] = (now, res_data)
     return res_data
+
+
+_DURATION_CACHE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "storage", "video_durations.json")
+_DURATION_CACHE = {}
+_DURATION_CACHE_LOADED = False
+
+def load_duration_cache():
+    global _DURATION_CACHE, _DURATION_CACHE_LOADED
+    if not _DURATION_CACHE_LOADED:
+        if os.path.exists(_DURATION_CACHE_FILE):
+            try:
+                with open(_DURATION_CACHE_FILE, "r", encoding="utf-8") as f:
+                    _DURATION_CACHE = json.load(f)
+            except Exception:
+                _DURATION_CACHE = {}
+        _DURATION_CACHE_LOADED = True
+    return _DURATION_CACHE
+
+def save_duration_cache():
+    global _DURATION_CACHE
+    try:
+        os.makedirs(os.path.dirname(_DURATION_CACHE_FILE), exist_ok=True)
+        with open(_DURATION_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(_DURATION_CACHE, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+def format_duration(seconds):
+    if not seconds or seconds <= 0:
+        return "0:00"
+    m, s = divmod(int(seconds), 60)
+    h, m = divmod(m, 60)
+    if h > 0:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+def get_cached_duration(file_path):
+    if not file_path or not os.path.exists(file_path):
+        return 0.0, "0:00"
+    
+    target_file = file_path
+    if os.path.isdir(file_path):
+        try:
+            for f in os.listdir(file_path):
+                if f.lower().endswith(('.mp4', '.mkv', '.mov', '.avi', '.webm')):
+                    target_file = os.path.join(file_path, f)
+                    break
+        except Exception:
+            pass
+            
+    if not os.path.isfile(target_file):
+        return 0.0, "0:00"
+
+    cache = load_duration_cache()
+    try:
+        mtime = os.path.getmtime(target_file)
+        size = os.path.getsize(target_file)
+    except Exception:
+        return 0.0, "0:00"
+
+    cache_entry = cache.get(target_file)
+    if cache_entry and isinstance(cache_entry, dict) and cache_entry.get("mtime") == mtime and cache_entry.get("size") == size:
+        dur = cache_entry.get("duration", 0.0)
+        return dur, format_duration(dur)
+
+    try:
+        from src.services.video_processor import get_video_duration
+        dur = get_video_duration(target_file)
+    except Exception:
+        dur = 0.0
+
+    cache[target_file] = {
+        "mtime": mtime,
+        "size": size,
+        "duration": dur,
+        "duration_str": format_duration(dur)
+    }
+    return dur, format_duration(dur)
 
 
 def scan_source_directory(source_path, dest_path=None, force=False):
@@ -391,20 +614,26 @@ def scan_source_directory(source_path, dest_path=None, force=False):
                                         break
                             
                             if video_file_path:
+                                dur, dur_str = get_cached_duration(video_file_path)
                                 channel_map[matched_cname]["videos_dict"][v_title] = {
                                     "title": v_title,
                                     "path": video_file_path,
                                     "dir_path": sub_path,
+                                    "duration": dur,
+                                    "duration_str": dur_str,
                                     "edited": False,
                                     "is_finished_only": False
                                 }
                         # File video trực tiếp (vd: SoyPato / Video1.mp4)
                         elif sub.lower().endswith(('.mp4', '.mkv', '.mov', '.avi', '.webm')):
                             v_title = os.path.splitext(sub)[0]
+                            dur, dur_str = get_cached_duration(sub_path)
                             channel_map[matched_cname]["videos_dict"][v_title] = {
                                 "title": v_title,
                                 "path": sub_path,
                                 "dir_path": full_entry_path,
+                                "duration": dur,
+                                "duration_str": dur_str,
                                 "edited": False,
                                 "is_finished_only": False
                             }
@@ -444,10 +673,14 @@ def scan_source_directory(source_path, dest_path=None, force=False):
         if matched_vtitle:
             channel_map[matched_cname]["videos_dict"][matched_vtitle]["edited"] = True
         else:
+            f_path = finished_item.get("path", "")
+            dur, dur_str = get_cached_duration(f_path)
             channel_map[matched_cname]["videos_dict"][f_title] = {
                 "title": f_title,
-                "path": finished_item.get("path", ""),
-                "dir_path": finished_item.get("path", ""),
+                "path": f_path,
+                "dir_path": f_path,
+                "duration": dur,
+                "duration_str": dur_str,
                 "edited": True,
                 "is_finished_only": True
             }
@@ -488,10 +721,13 @@ def scan_source_directory(source_path, dest_path=None, force=False):
             channel_map[matched_cname]["videos_dict"][matched_vtitle]["edited"] = True
         elif h_out and os.path.exists(h_out):
             # Chỉ thêm khi thư mục output thực tế vẫn tồn tại trên đĩa
+            dur, dur_str = get_cached_duration(h_out)
             channel_map[matched_cname]["videos_dict"][h_title] = {
                 "title": h_title,
                 "path": h_out,
                 "dir_path": h_out,
+                "duration": dur,
+                "duration_str": dur_str,
                 "edited": True,
                 "is_finished_only": True
             }
@@ -507,6 +743,8 @@ def scan_source_directory(source_path, dest_path=None, force=False):
             "path": cdata["path"],
             "videos": v_list
         })
+
+    save_duration_cache()
 
     out_res = {"folders": result_folders, "source_path": source_path}
     _CACHE_SCAN_SOURCE[cache_key] = (now, out_res)
@@ -685,38 +923,62 @@ def delete_finished_result(item_path, title=None, channel=None, dest_path=None):
     for p_dir in parent_dirs_to_check:
         cleanup_empty_parent_folder(p_dir, stop_at_dir=resolved_dest)
 
-    # 4. Xóa dữ liệu video tương ứng trong history.json
+    # 4. Cập nhật dữ liệu video trong history.json thành "previously_downloaded" (ghi nhận đã từng tải)
     try:
         history = load_history()
-        keys_to_remove = []
+        keys_to_update = []
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for k, v in history.items():
             k_match = (title and (k == title or sanitize_filename(k) == sanitize_filename(title)))
             v_match = False
             if isinstance(v, dict):
                 v_title = v.get("title", "")
                 v_out = v.get("output_dir", "")
-                v_folder = v.get("folder", "")
+                v_folder = v.get("folder", "") or v.get("output_folder", "")
                 if title and (v_title == title or sanitize_filename(v_title) == sanitize_filename(title)):
                     v_match = True
                 elif item_path and (item_path in v_out or item_path in v_folder):
                     v_match = True
             if k_match or v_match:
-                keys_to_remove.append(k)
+                keys_to_update.append(k)
 
-        for k in keys_to_remove:
-            if k in history:
-                del history[k]
+        for k in keys_to_update:
+            if k in history and isinstance(history[k], dict):
+                history[k]["status"] = "previously_downloaded"
+                history[k]["is_deleted"] = True
+                history[k]["deleted_at"] = now_str
+            elif k in history:
+                history[k] = {
+                    "title": title or k,
+                    "channel": channel or "",
+                    "status": "previously_downloaded",
+                    "is_deleted": True,
+                    "deleted_at": now_str
+                }
 
-        if keys_to_remove:
+        # Nếu không có key nào khớp nhưng có title, ghi nhận mới với status previously_downloaded
+        if not keys_to_update and title:
+            new_k = f"{channel}/{title}" if channel else title
+            history[new_k] = {
+                "title": title,
+                "channel": channel or "",
+                "status": "previously_downloaded",
+                "is_deleted": True,
+                "deleted_at": now_str
+            }
+            keys_to_update.append(new_k)
+
+        if keys_to_update:
             save_history(history)
     except Exception as e:
         errors.append(f"Lỗi cập nhật history.json: {e}")
 
+    invalidate_drive_caches()
     return len(errors) == 0, errors
 
 def delete_all_finished_results(dest_path):
     """
-    Xóa toàn bộ nội dung thành phẩm trong thư mục đích và làm sạch history.json
+    Xóa toàn bộ nội dung thành phẩm trong thư mục đích và cập nhật history.json thành đã từng tải
     """
     resolved_dest = resolve_google_drive_path(dest_path)
     if not resolved_dest or not os.path.exists(resolved_dest):
@@ -732,12 +994,20 @@ def delete_all_finished_results(dest_path):
     except Exception as e:
         errors.append(f"Lỗi đọc thư mục đích: {e}")
 
-    # Xóa sạch lịch sử render
+    # Cập nhật toàn bộ lịch sử thành đã từng tải
     try:
-        save_history({})
+        history = load_history()
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for k, v in history.items():
+            if isinstance(v, dict):
+                v["status"] = "previously_downloaded"
+                v["is_deleted"] = True
+                v["deleted_at"] = now_str
+        save_history(history)
     except Exception as e:
         errors.append(f"Lỗi reset history.json: {e}")
 
+    invalidate_drive_caches()
     return len(errors) == 0, errors
 
 def ensure_channel_folders(data=None):
@@ -856,6 +1126,101 @@ def save_accounts_data(data):
         print(f"Error saving accounts: {e}")
         return False
 
+def sync_tiktok_accounts_with_adspower():
+    """
+    Đồng bộ dữ liệu tài khoản TikTok với AdsPower Local API:
+    - Bổ sung group_name, ip, country, created_date, adspower_serial, adspower_id, adspower_name
+    - Bỏ các trường cũ không cần thiết như password, mail_confirm, original_ip, build_up_ip
+    - Tự động nạp các profile mới xuất hiện từ AdsPower (kể cả profile được chia sẻ từ người khác)
+    """
+    from src.services.adspower_service import get_adspower_profiles
+    ads_res = get_adspower_profiles(fetch_all=True)
+    if not ads_res.get("success"):
+        return {"success": False, "error": ads_res.get("error", "Không thể lấy danh sách profiles từ AdsPower Local API")}
+        
+    ads_profiles = ads_res.get("profiles", [])
+    data = load_accounts_data()
+    tiktok_accs = data.get("tiktok_accounts", [])
+    
+    # Map AdsPower profiles by user_id, serial_number, and name
+    ads_by_id = {p["user_id"]: p for p in ads_profiles if p.get("user_id")}
+    ads_by_serial = {str(p["serial_number"]): p for p in ads_profiles if p.get("serial_number")}
+    ads_by_name = {p["name"].lower().replace("\n", " ").strip(): p for p in ads_profiles if p.get("name")}
+    
+    updated_accs = []
+    matched_adspower_ids = set()
+    
+    for acc in tiktok_accs:
+        u_id = acc.get("adspower_id", "")
+        s_num = str(acc.get("adspower_serial", ""))
+        a_name = acc.get("account_name", "").lower().strip()
+        
+        matched_p = ads_by_id.get(u_id) or ads_by_serial.get(s_num) or ads_by_name.get(a_name)
+        
+        new_acc = {
+            "account_name": acc.get("account_name", ""),
+            "adspower_id": acc.get("adspower_id", ""),
+            "adspower_serial": acc.get("adspower_serial", ""),
+            "adspower_name": acc.get("adspower_name", ""),
+            "group_name": acc.get("group_name", "Default"),
+            "ip": acc.get("ip", acc.get("build_up_ip", acc.get("original_ip", ""))),
+            "country": acc.get("country", ""),
+            "created_date": acc.get("created_date", ""),
+            "target_channel": acc.get("target_channel", ""),
+            "target_history": acc.get("target_history", []),
+            "content": acc.get("content", ""),
+            "hashtag": acc.get("hashtag", ""),
+            "note": acc.get("note", ""),
+            "mail": acc.get("mail", ""),
+            "posted_clips": acc.get("posted_clips", {})
+        }
+        
+        if matched_p:
+            new_acc["adspower_id"] = matched_p["user_id"]
+            new_acc["adspower_serial"] = matched_p["serial_number"]
+            new_acc["adspower_name"] = matched_p["name"]
+            new_acc["group_name"] = matched_p["group_name"]
+            new_acc["ip"] = matched_p["ip"] or new_acc["ip"]
+            new_acc["country"] = matched_p["country"] or new_acc["country"]
+            if matched_p.get("created_date"):
+                new_acc["created_date"] = matched_p["created_date"]
+            matched_adspower_ids.add(matched_p["user_id"])
+            
+        updated_accs.append(new_acc)
+        
+    # Tự động nạp thêm các profile AdsPower chưa có trong danh sách (kể cả profile được share)
+    for p in ads_profiles:
+        if p["user_id"] not in matched_adspower_ids:
+            clean_acc_name = p["name"]
+            new_acc = {
+                "account_name": clean_acc_name,
+                "adspower_id": p["user_id"],
+                "adspower_serial": p["serial_number"],
+                "adspower_name": p["name"],
+                "group_name": p["group_name"],
+                "ip": p["ip"],
+                "country": p["country"],
+                "created_date": p["created_date"],
+                "target_channel": "",
+                "target_history": [],
+                "content": "",
+                "hashtag": "#fyp #viral #trending",
+                "note": p.get("remark", ""),
+                "mail": "",
+                "posted_clips": {}
+            }
+            updated_accs.append(new_acc)
+            matched_adspower_ids.add(p["user_id"])
+            
+    data["tiktok_accounts"] = updated_accs
+    save_accounts_data(data)
+    return {
+        "success": True,
+        "total_accounts": len(updated_accs),
+        "synced_adspower_count": len(ads_profiles)
+    }
+
+
 def get_publishing_matrix(dest_path=None):
     """
     Tổng hợp ma trận liên kết giữa TikTok Accounts, Kênh YouTube mục tiêu, các video clips thành phẩm và trạng thái đăng.
@@ -964,11 +1329,15 @@ def get_publishing_matrix(dest_path=None):
                 if c_channel.lower() in current_target_aliases or sanitize_filename(c_channel).lower() in current_target_aliases or ch.lower() in current_target_aliases:
                     is_cur_target = True
 
-                # Kiểm tra trạng thái đã đăng
+                clip_vid_id = c.get("video_id") or generate_video_id(c_channel, c.get("title"))
+
+                # Kiểm tra trạng thái đã đăng cho CHÍNH TÀI KHOẢN NÀY (account_id + video_id)
                 post_info = posted_clips.get(clip_key, {})
                 if not post_info:
                     for pk, pv in posted_clips.items():
-                        if sanitize_filename(pk).lower() == sanitize_filename(clip_key).lower() or (pv.get("title") == c.get("title") and sanitize_filename(pv.get("channel", "")).lower() == sanitize_filename(c_channel).lower()):
+                        if (pv.get("video_id") and pv.get("video_id") == clip_vid_id) or \
+                           sanitize_filename(pk).lower() == sanitize_filename(clip_key).lower() or \
+                           (pv.get("title") == c.get("title") and sanitize_filename(pv.get("channel", "")).lower() == sanitize_filename(c_channel).lower()):
                             post_info = pv
                             break
                             
@@ -978,11 +1347,20 @@ def get_publishing_matrix(dest_path=None):
                 
                 # Nạp thông tin chi tiết từng part
                 parts_data = []
-                for idx, p in enumerate(c.get("parts", [])):
+                clip_parts = c.get("parts", [])
+                for idx, p in enumerate(clip_parts):
                     p_label = f"Part {idx + 1}"
                     p_stat = parts_status.get(p_label, {})
-                    p_is_posted = bool(p_stat.get("posted", False)) if parts_status else is_posted
-                    p_posted_at = p_stat.get("posted_at", posted_at) if parts_status else posted_at
+                    
+                    if p_stat:
+                        p_is_posted = bool(p_stat.get("posted", False))
+                        p_posted_at = p_stat.get("posted_at", "")
+                    elif is_posted and not parts_status:
+                        p_is_posted = True
+                        p_posted_at = posted_at
+                    else:
+                        p_is_posted = False
+                        p_posted_at = ""
                     
                     parts_data.append({
                         "name": p.get("name"),
@@ -994,11 +1372,13 @@ def get_publishing_matrix(dest_path=None):
                         "posted_at": p_posted_at
                     })
                 
-                # Nếu có parts_status, kiểm tra xem toàn bộ các part đã đăng hết chưa
-                if parts_data and parts_status:
+                # QUY TẮC CỐT LÕI: Nếu clip có các part trên đĩa, clip CHỈ ĐƯỢC ĐÁNH DẤU ĐÃ ĐĂNG
+                # khi và chỉ khi 100% TẤT CẢ các part đều đã đăng xong!
+                if parts_data:
                     is_posted = all(p["posted"] for p in parts_data)
                 
                 clips_feed.append({
+                    "video_id": clip_vid_id,
                     "key": clip_key,
                     "title": c.get("title"),
                     "channel": c_channel,
@@ -1009,6 +1389,8 @@ def get_publishing_matrix(dest_path=None):
                     "has_full": c.get("has_full", False),
                     "posted": is_posted,
                     "posted_at": posted_at,
+                    "mtime": c.get("mtime", 0),
+                    "created_at": c.get("created_at", ""),
                     "on_disk": True
                 })
                 
@@ -1032,14 +1414,20 @@ def get_publishing_matrix(dest_path=None):
                     "has_full": False,
                     "posted": True,
                     "posted_at": pval.get("posted_at", ""),
+                    "mtime": 0,
+                    "created_at": pval.get("posted_at", ""),
                     "on_disk": False
                 })
                 
-        # Sắp xếp clips: Ưu tiên kênh mục tiêu hiện tại lên trước (is_current_target True),
-        # Sau đó clip CHƯA đăng (posted False) lên trước clip ĐÃ đăng (posted True)
+        # Sắp xếp clips CHÍNH XÁC:
+        # 1. Ưu tiên kênh mục tiêu hiện tại lên trước (is_current_target True)
+        # 2. Clip CHƯA đăng (posted False) lên trước clip ĐÃ đăng (posted True)
+        # 3. Clip MỚI BIÊN TẬP NHẤT lên đầu theo mtime giảm dần (-mtime) để đảm bảo không đăng video cũ trước
+        # 4. Tiêu đề
         clips_feed.sort(key=lambda x: (
             0 if x.get("is_current_target") else 1,
             1 if x.get("posted") else 0,
+            -float(x.get("mtime") or 0),
             x.get("title", "")
         ))
 
@@ -1048,6 +1436,10 @@ def get_publishing_matrix(dest_path=None):
         pending_count = total_clips - posted_count
         rate = round((posted_count / total_clips * 100)) if total_clips > 0 else 0
         
+        # Tính thời gian biên tập gần nhất của các clip chưa đăng thuộc kênh mục tiêu
+        unposted_mtimes = [float(c.get("mtime", 0) or 0) for c in clips_feed if not c.get("posted") and c.get("is_current_target") and c.get("on_disk")]
+        max_unposted_mtime = max(unposted_mtimes) if unposted_mtimes else 0
+
         accounts_matrix.append({
             "account_name": acc_name,
             "password": acc.get("password", ""),
@@ -1061,7 +1453,9 @@ def get_publishing_matrix(dest_path=None):
             "hashtag": acc.get("hashtag", ""),
             "content": acc.get("content", ""),
             "note": acc.get("note", ""),
+            "posted_clips": posted_clips,
             "clips": clips_feed,
+            "max_unposted_mtime": max_unposted_mtime,
             "stats": {
                 "total": total_clips,
                 "posted": posted_count,
@@ -1077,10 +1471,23 @@ def get_publishing_matrix(dest_path=None):
         "dest_path": dest_path
     }
 
-def toggle_publishing_clip_status(account_name, clip_key, channel=None, title=None, posted=True, part_label=None):
+def toggle_publishing_clip_status(account_name, clip_key, channel=None, title=None, posted=True, part_label=None, video_id=None):
     """
     Cập nhật trạng thái Đã đăng / Chưa đăng cho 1 clip hoặc 1 part cụ thể của tài khoản TikTok
     """
+    # Tự động tái tạo clip_key nếu bị rỗng nhưng có channel và title
+    if not clip_key and channel and title:
+        clip_key = f"{channel}/{title}"
+
+    if not clip_key:
+        return False, "Thiếu clip_key hợp lệ"
+
+    # Chuẩn hóa part_label: e.g. "part 1" -> "Part 1"
+    if part_label:
+        m_p = re.search(r'part[\s_\-]*(\d+)', str(part_label), re.I)
+        if m_p:
+            part_label = f"Part {m_p.group(1)}"
+
     accounts_data = load_accounts_data()
     found = False
     now_str = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -1090,6 +1497,16 @@ def toggle_publishing_clip_status(account_name, clip_key, channel=None, title=No
             found = True
             if "posted_clips" not in acc:
                 acc["posted_clips"] = {}
+
+            # Dọn dẹp key rỗng "" nếu vô tình tồn tại trong account này
+            if "" in acc["posted_clips"]:
+                bogus = acc["posted_clips"].pop("")
+                b_chan = bogus.get("channel")
+                b_title = bogus.get("title")
+                if b_chan and b_title:
+                    b_key = f"{b_chan}/{b_title}"
+                    if b_key not in acc["posted_clips"]:
+                        acc["posted_clips"][b_key] = bogus
                 
             entry = acc["posted_clips"].get(clip_key, {})
             if not isinstance(entry, dict):
@@ -1097,86 +1514,176 @@ def toggle_publishing_clip_status(account_name, clip_key, channel=None, title=No
                 
             if "parts_status" not in entry:
                 entry["parts_status"] = {}
-                
+
+            eff_channel = entry.get("channel") or channel or (clip_key.split("/", 1)[0] if "/" in clip_key else "")
+            eff_title = entry.get("title") or title or (clip_key.split("/", 1)[1] if "/" in clip_key else clip_key)
+            disk_parts = get_clip_disk_part_labels(eff_channel, eff_title)
+
             if part_label:
                 # Cập nhật riêng cho part này
                 entry["parts_status"][part_label] = {
                     "posted": posted,
                     "posted_at": now_str if posted else ""
                 }
-                # Kiểm tra nếu tất cả các part đã đăng
-                all_posted = all(p.get("posted") for p in entry["parts_status"].values())
+                # Kiểm tra nếu tất cả các part trên đĩa đã đăng đủ 100%
+                if disk_parts:
+                    all_posted = (len(disk_parts) > 0) and all(entry["parts_status"].get(p, {}).get("posted") for p in disk_parts)
+                else:
+                    all_posted = all(p.get("posted") for p in entry["parts_status"].values()) if entry["parts_status"] else posted
+
                 entry["posted"] = all_posted
-                if posted and not entry.get("posted_at"):
-                    entry["posted_at"] = now_str
+                if all_posted:
+                    if not entry.get("posted_at"):
+                        entry["posted_at"] = now_str
+                else:
+                    # Nếu chưa đăng đủ tất cả các part, clip tổng BẮT BUỘC là posted=False
+                    entry["posted"] = False
             else:
                 # Cập nhật cho toàn bộ clip
                 entry["posted"] = posted
                 entry["posted_at"] = now_str if posted else ""
-                if posted:
-                    for pk in entry.get("parts_status", {}):
-                        entry["parts_status"][pk]["posted"] = True
-                        entry["parts_status"][pk]["posted_at"] = now_str
-                else:
-                    for pk in entry.get("parts_status", {}):
-                        entry["parts_status"][pk]["posted"] = False
-                        entry["parts_status"][pk]["posted_at"] = ""
+                target_parts = disk_parts or list(entry.get("parts_status", {}).keys())
+                for pk in target_parts:
+                    p_entry = entry["parts_status"].setdefault(pk, {})
+                    p_entry["posted"] = posted
+                    p_entry["posted_at"] = now_str if posted else ""
                         
-            entry["channel"] = channel or os.path.dirname(clip_key)
-            entry["title"] = title or os.path.basename(clip_key)
+            entry["channel"] = eff_channel
+            entry["title"] = eff_title
+            entry["video_id"] = video_id or entry.get("video_id") or generate_video_id(entry["channel"], entry["title"])
             acc["posted_clips"][clip_key] = entry
             break
             
     if found:
         save_accounts_data(accounts_data)
+        if posted:
+            sync_publishing_history_with_queue()
+        invalidate_drive_caches()
         return True, now_str if posted else ""
     return False, "Không tìm thấy tài khoản"
 
 def sync_publishing_history_with_queue():
     """
-    Quét và đối soát đồng bộ lịch sử đăng với hàng đợi:
-    1. Đảm bảo nếu một video hoặc part đã đăng, tất cả trạng thái liên quan đều được cập nhật nhất quán.
-    2. Tự động chuẩn hóa các clip key để không bị lặp clip đã hoàn thành.
+    Quét và đối soát đồng bộ lịch sử đăng cho từng tài khoản TikTok độc lập:
+    1. Chuẩn hóa video_id (ID unique duy nhất cho mỗi clip) cho tất cả các bản ghi.
+    2. Tự động di trú và dọn dẹp bất kỳ key rỗng nào ("") về đúng key f"{channel}/{title}".
+    3. Đảm bảo tính nhất quán giữa các part: nếu clip cha đã posted=True thì toàn bộ parts đều là đã đăng.
+       Nếu tất cả các part đều posted=True thì clip cha tự động chuyển thành posted=True.
+    4. TUYỆT ĐỐI KHÔNG ĐỒNG BỘ CHÉO GIỮA CÁC TÀI KHOẢN (Per-Account Isolation):
+       Mỗi tài khoản có lịch sử đăng riêng biệt theo cặp (account_id + video_id).
     """
     accounts_data = load_accounts_data()
+    dest_path = accounts_data.get("dest_path", os.path.join(os.path.dirname(os.path.abspath(__file__)), "output_product"))
+    scan = scan_finished_results(dest_path)
+    all_finished = scan.get("results", [])
+    
+    # Map tiêu đề / thư mục với danh sách part thực tế trên đĩa
+    clip_disk_parts = {}
+    for c in all_finished:
+        c_chan = c.get("folder_name", "")
+        c_title = c.get("title", "")
+        k = f"{c_chan}/{c_title}"
+        san_k = sanitize_filename(k).lower()
+        san_t = sanitize_filename(c_title).lower()
+        parts = [p.get("label") for p in c.get("parts", [])]
+        clip_disk_parts[san_k] = parts
+        clip_disk_parts[san_t] = parts
+
     changed = False
     synced_count = 0
 
+    # Di trú key rỗng, chuẩn hóa video_id và multi-part cho từng tài khoản độc lập
     for acc in accounts_data.get("tiktok_accounts", []):
-        posted_clips = acc.get("posted_clips", {})
+        posted_clips = acc.setdefault("posted_clips", {})
+        
+        # Tự động di trú key rỗng "" về key chuẩn channel/title
+        if "" in posted_clips:
+            bogus = posted_clips.pop("")
+            b_chan = bogus.get("channel")
+            b_title = bogus.get("title")
+            if b_chan and b_title:
+                b_key = f"{b_chan}/{b_title}"
+                if b_key not in posted_clips:
+                    posted_clips[b_key] = bogus
+                else:
+                    if isinstance(bogus, dict) and "parts_status" in bogus:
+                        target_ps = posted_clips[b_key].setdefault("parts_status", {})
+                        for pk, pv in bogus.get("parts_status", {}).items():
+                            if pv.get("posted"):
+                                target_ps[pk] = pv
+                                posted_clips[b_key]["posted"] = True
+            changed = True
+            synced_count += 1
+
         for clip_key, info in list(posted_clips.items()):
-            if not isinstance(info, dict):
+            if not clip_key or not isinstance(info, dict):
                 continue
             
+            c_chan = info.get("channel") or (clip_key.split("/", 1)[0] if "/" in clip_key else "")
+            c_title = info.get("title") or (clip_key.split("/", 1)[1] if "/" in clip_key else clip_key)
+            
+            # Gắn video_id unique nếu chưa có
+            if not info.get("video_id"):
+                info["video_id"] = generate_video_id(c_chan, c_title)
+                changed = True
+
             is_clip_posted = bool(info.get("posted", False))
-            parts_status = info.get("parts_status", {})
+            parts_status = info.setdefault("parts_status", {})
             now_str = info.get("posted_at") or time.strftime("%Y-%m-%d %H:%M:%S")
 
-            # Nếu clip cha đã posted nhưng các parts chưa được bật
-            if is_clip_posted and parts_status:
-                for p_k, p_v in parts_status.items():
-                    if isinstance(p_v, dict) and not p_v.get("posted"):
-                        p_v["posted"] = True
-                        p_v["posted_at"] = now_str
+            san_k = sanitize_filename(clip_key).lower()
+            san_t = sanitize_filename(c_title).lower()
+            disk_parts = clip_disk_parts.get(san_k) or clip_disk_parts.get(san_t) or []
+
+            if disk_parts:
+                # Clip có danh sách part trên đĩa:
+                # Khởi tạo entry cho các disk_parts nếu chưa có (mặc định posted=False)
+                for p_lbl in disk_parts:
+                    if p_lbl not in parts_status:
+                        parts_status[p_lbl] = {"posted": False, "posted_at": ""}
+                        changed = True
+
+                posted_parts_count = sum(1 for p_lbl in disk_parts if parts_status.get(p_lbl, {}).get("posted"))
+                all_parts_posted = (len(disk_parts) > 0 and posted_parts_count == len(disk_parts))
+
+                # TUYỆT ĐỐI KHÔNG tự tiện set tất cả disk_parts thành posted=True!
+                # Chỉ khi toàn bộ 100% các part đã đăng thì info["posted"] mới là True
+                if all_parts_posted:
+                    if not is_clip_posted:
+                        info["posted"] = True
+                        info["posted_at"] = now_str
+                        changed = True
+                        synced_count += 1
+                else:
+                    # Nếu chưa đăng đủ 100% số part, clip tổng BẮT BUỘC posted = False!
+                    if is_clip_posted:
+                        info["posted"] = False
                         changed = True
                         synced_count += 1
             elif parts_status:
-                # Nếu tất cả các part trong parts_status đều posted=True => clip posted = True
+                # Không có file trên đĩa nhưng có lịch sử parts cũ
                 if all(isinstance(p, dict) and p.get("posted") for p in parts_status.values()):
                     if not is_clip_posted:
                         info["posted"] = True
                         info["posted_at"] = now_str
                         changed = True
                         synced_count += 1
+                else:
+                    if is_clip_posted:
+                        info["posted"] = False
+                        changed = True
+                        synced_count += 1
 
     if changed:
         save_accounts_data(accounts_data)
+        invalidate_drive_caches()
     return synced_count
 
 
 def change_account_target_channel(account_name, new_target_channel):
     """
-    Thay đổi kênh YouTube mục tiêu cho tài khoản TikTok, tự động lưu kênh cũ vào target_history
+    Thay đổi kênh YouTube mục tiêu cho tài khoản TikTok, tự động lưu kênh cũ vào target_history,
+    và lập tức đồng bộ lịch sử để loại bỏ toàn bộ các clip cũ đã từng đăng của kênh mới.
     """
     accounts_data = load_accounts_data()
     found = False
@@ -1198,6 +1705,8 @@ def change_account_target_channel(account_name, new_target_channel):
             
     if found:
         save_accounts_data(accounts_data)
+        sync_publishing_history_with_queue()
+        invalidate_drive_caches()
         return True, None
     return False, "Không tìm thấy tài khoản"
 
@@ -1237,7 +1746,16 @@ def get_account_daily_posted_count(account_dict_or_name, target_date=None):
         
     acc = None
     if isinstance(account_dict_or_name, dict):
-        acc = account_dict_or_name
+        if "posted_clips" in account_dict_or_name:
+            acc = account_dict_or_name
+        else:
+            acc_name = account_dict_or_name.get("account_name", "")
+            if acc_name:
+                accounts_data = load_accounts_data()
+                for a in accounts_data.get("tiktok_accounts", []):
+                    if a.get("account_name", "").lower() == acc_name.lower():
+                        acc = a
+                        break
     elif isinstance(account_dict_or_name, str):
         accounts_data = load_accounts_data()
         for a in accounts_data.get("tiktok_accounts", []):
@@ -1252,7 +1770,7 @@ def get_account_daily_posted_count(account_dict_or_name, target_date=None):
     daily_count = 0
     
     for clip_key, clip_data in posted_clips.items():
-        if not isinstance(clip_data, dict):
+        if not clip_key or not isinstance(clip_data, dict):
             continue
         parts_status = clip_data.get("parts_status", {})
         if parts_status:
@@ -1291,14 +1809,21 @@ def get_pending_publishing_queue(account_name=None, channel_name=None, only_curr
         elif isinstance(account_name, str):
             allowed_accounts = {str(a).strip().lower() for a in account_name.split(",") if str(a).strip()}
     
-    for acc in matrix_data.get("accounts", []):
+    raw_accounts = matrix_data.get("accounts", [])
+    # Nếu không giới hạn tài khoản cụ thể, sắp xếp tài khoản có clip MỚI BIÊN TẬP NHẤT lên đầu để Auto-Pilot ưu tiên video vừa render hôm nay
+    if not allowed_accounts:
+        accounts_to_process = sorted(raw_accounts, key=lambda a: -float(a.get("max_unposted_mtime") or 0))
+    else:
+        accounts_to_process = raw_accounts
+
+    for acc in accounts_to_process:
         curr_acc_name = acc.get("account_name", "")
         if allowed_accounts and curr_acc_name.lower() not in allowed_accounts:
             continue
             
         # Kiểm tra giới hạn 3 clip / ngày của tài khoản
         if check_daily_limit and max_daily_posts > 0:
-            today_posted = get_account_daily_posted_count(acc, today_str)
+            today_posted = get_account_daily_posted_count(curr_acc_name, today_str)
             if today_posted >= max_daily_posts:
                 continue
             
@@ -1315,25 +1840,33 @@ def get_pending_publishing_queue(account_name=None, channel_name=None, only_curr
             if only_current_target and target_channel and sanitize_filename(clip_channel) != sanitize_filename(target_channel):
                 continue
                 
+            clip_vid = clip.get("video_id") or generate_video_id(clip_channel, clip.get("title", ""))
             parts = clip.get("parts", [])
             if parts:
-                for p in parts:
-                    if not p.get("posted"):
-                        pending_queue.append({
-                            "account_name": curr_acc_name,
-                            "channel": clip_channel,
-                            "title": clip.get("title", ""),
-                            "clip_key": clip.get("key", ""),
-                            "part_label": p.get("label", ""),
-                            "part_name": p.get("name", ""),
-                            "video_file": p.get("file_path", ""),
-                            "hashtag": acc.get("hashtag", ""),
-                            "target_ip": acc.get("build_up_ip") or acc.get("original_ip", ""),
-                            "adspower_id": acc.get("adspower_id") or acc.get("adspower_serial") or curr_acc_name,
-                            "parent_folder": clip.get("path", "")
-                        })
+                unposted_parts = [p for p in parts if not p.get("posted")]
+                if not unposted_parts:
+                    continue  # Bỏ qua nếu toàn bộ part đã đăng đủ
+                for p in unposted_parts:
+                    pending_queue.append({
+                        "account_name": curr_acc_name,
+                        "channel": clip_channel,
+                        "title": clip.get("title", ""),
+                        "video_id": clip_vid,
+                        "part_id": p.get("part_id") or f"{clip_vid}_{p.get('label', '')}",
+                        "clip_key": clip.get("key", ""),
+                        "part_label": p.get("label", ""),
+                        "part_name": p.get("name", ""),
+                        "video_file": p.get("file_path", ""),
+                        "hashtag": acc.get("hashtag", ""),
+                        "target_ip": acc.get("build_up_ip") or acc.get("original_ip", ""),
+                        "adspower_id": acc.get("adspower_id") or acc.get("adspower_serial") or curr_acc_name,
+                        "parent_folder": clip.get("path", ""),
+                        "mtime": clip.get("mtime", 0),
+                        "created_at": clip.get("created_at", "")
+                    })
             else:
-                if not clip.get("posted"):
+                if clip.get("posted"):
+                    continue
                     v_path = clip.get("path", "")
                     video_file = ""
                     if v_path and os.path.isdir(v_path):
@@ -1347,6 +1880,8 @@ def get_pending_publishing_queue(account_name=None, channel_name=None, only_curr
                         "account_name": curr_acc_name,
                         "channel": clip_channel,
                         "title": clip.get("title", ""),
+                        "video_id": clip_vid,
+                        "part_id": f"{clip_vid}_full",
                         "clip_key": clip.get("key", ""),
                         "part_label": "",
                         "part_name": "",
@@ -1354,7 +1889,9 @@ def get_pending_publishing_queue(account_name=None, channel_name=None, only_curr
                         "hashtag": acc.get("hashtag", ""),
                         "target_ip": acc.get("build_up_ip") or acc.get("original_ip", ""),
                         "adspower_id": acc.get("adspower_id") or acc.get("adspower_serial") or curr_acc_name,
-                        "parent_folder": clip.get("path", "")
+                        "parent_folder": clip.get("path", ""),
+                        "mtime": clip.get("mtime", 0),
+                        "created_at": clip.get("created_at", "")
                     })
                     
     return pending_queue

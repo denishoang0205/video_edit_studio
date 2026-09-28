@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAutoPilotHub();
     initDownloadVideoPipeline();
     initTikTokAnalyticsEngine();
+    initLogsControls();
     checkAndPollProgress();
 });
 
@@ -129,6 +130,10 @@ const TAB_HEADER_METADATA = {
     'tab-config': {
         title: 'Settings',
         subtitle: 'Cài đặt đường dẫn thư mục, AdsPower Local API, HMA VPN, Gemini AI và Telegram Bot'
+    },
+    'tab-logs': {
+        title: 'Logs & Console',
+        subtitle: 'Bảng điều khiển tiến trình thời gian thực, tiến độ render video và lịch sử terminal console'
     }
 };
 
@@ -537,8 +542,11 @@ function setupEventListeners() {
         const checkboxes = document.querySelectorAll('.video-checkbox');
         checkboxes.forEach(cb => {
             const isEdited = cb.dataset.edited === 'true';
-            // Chỉ áp dụng chọn/bỏ chọn cho các video chưa edit
-            if (!isEdited) {
+            const itemRow = cb.closest('.video-tree-item');
+            const folderGroup = cb.closest('.folder-group');
+            const isVisible = itemRow && itemRow.style.display !== 'none' && folderGroup && folderGroup.style.display !== 'none';
+            // Chỉ áp dụng chọn/bỏ chọn cho các video chưa edit đang hiển thị
+            if (!isEdited && isVisible) {
                 cb.checked = e.target.checked;
                 const path = cb.dataset.path;
                 if (e.target.checked) {
@@ -556,7 +564,10 @@ function setupEventListeners() {
             const checkboxes = document.querySelectorAll('.video-checkbox');
             checkboxes.forEach(cb => {
                 const isEdited = cb.dataset.edited === 'true';
-                if (!isEdited) {
+                const itemRow = cb.closest('.video-tree-item');
+                const folderGroup = cb.closest('.folder-group');
+                const isVisible = itemRow && itemRow.style.display !== 'none' && folderGroup && folderGroup.style.display !== 'none';
+                if (!isEdited && isVisible) {
                     cb.checked = true;
                     selectedVideos.add(cb.dataset.path);
                 }
@@ -780,26 +791,30 @@ function renderVideoTree(folders) {
     let totalVideosAcrossFolders = 0;
 
     folders.forEach(folder => {
-        const totalVids = folder.videos.length;
+        const totalVids = folder.videos ? folder.videos.length : 0;
         totalVideosAcrossFolders += totalVids;
-        const editedVids = folder.videos.filter(v => v.edited).length;
+        const editedVids = folder.videos ? folder.videos.filter(v => v.edited).length : 0;
+        const uneditedVids = totalVids - editedVids;
 
         const folderEl = document.createElement('div');
-        folderEl.className = 'folder-group';
+        folderEl.className = 'folder-group is-collapsed';
         folderEl.dataset.folderName = folder.name;
 
         folderEl.innerHTML = `
-            <div class="folder-header" title="Click to expand/collapse channel ${escapeHtml(folder.name)}">
+            <div class="folder-header" title="Nhấn để mở rộng / thu gọn danh sách video kênh ${escapeHtml(folder.name)}">
                 <div class="folder-left">
-                    <i class="fa-solid fa-folder-open text-primary folder-icon"></i>
+                    <i class="fa-solid fa-chevron-down folder-chevron"></i>
+                    <i class="fa-solid fa-folder folder-icon"></i>
                     <span class="folder-name-text">${escapeHtml(folder.name)}</span>
+                    <span class="folder-video-count-chip">${totalVids} video</span>
                 </div>
                 <div class="folder-right">
-                    <button type="button" class="btn-xs btn-outline-success btn-select-folder-all" title="Select / Deselect unedited videos in ${escapeAttr(folder.name)}">
-                        <i class="fa-solid fa-check"></i> Select Channel
+                    <button type="button" class="btn-select-folder-all" title="Chọn / Bỏ chọn toàn bộ video chưa edit trong kênh ${escapeAttr(folder.name)}">
+                        <i class="fa-solid fa-check"></i> Chọn Kênh
                     </button>
-                    <span class="badge ${editedVids === totalVids ? 'badge-success' : 'badge-info'}" style="font-size: 10px;">${editedVids}/${totalVids} Edited</span>
-                    <i class="fa-solid fa-chevron-down folder-chevron"></i>
+                    <span class="badge folder-count-badge ${editedVids === totalVids && totalVids > 0 ? 'badge-success' : (uneditedVids > 0 ? 'badge-warning' : 'badge-info')}">
+                        ${editedVids}/${totalVids} Đã edit
+                    </span>
                 </div>
             </div>
             <div class="folder-items-list"></div>
@@ -809,9 +824,11 @@ function renderVideoTree(folders) {
         if (btnSelectFolder) {
             btnSelectFolder.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const uneditedCheckboxes = folderEl.querySelectorAll('.video-checkbox[data-edited="false"]');
+                const uneditedCheckboxes = Array.from(folderEl.querySelectorAll('.video-tree-item.is-unedited .video-checkbox'))
+                    .filter(cb => cb.closest('.video-tree-item').style.display !== 'none');
+                
                 if (uneditedCheckboxes.length === 0) return;
-                let allChecked = Array.from(uneditedCheckboxes).every(cb => cb.checked);
+                let allChecked = uneditedCheckboxes.every(cb => cb.checked);
                 uneditedCheckboxes.forEach(cb => {
                     cb.checked = !allChecked;
                     if (!allChecked) {
@@ -826,15 +843,16 @@ function renderVideoTree(folders) {
 
         const listEl = folderEl.querySelector('.folder-items-list');
 
-        folder.videos.forEach(video => {
+        (folder.videos || []).forEach(video => {
             const itemEl = document.createElement('div');
             itemEl.className = `video-tree-item ${video.edited ? 'is-edited' : 'is-unedited'}`;
-            itemEl.dataset.videoTitle = video.title.toLowerCase();
-            itemEl.dataset.channelName = folder.name.toLowerCase();
+            itemEl.dataset.videoTitle = (video.title || '').toLowerCase();
+            itemEl.dataset.channelName = (folder.name || '').toLowerCase();
 
+            const durationFormatted = video.duration_str || '0:00';
             const badgeHtml = video.edited 
-                ? '<span class="badge-status edited"><i class="fa-solid fa-check"></i> Edited</span>'
-                : '<span class="badge-status unedited"><i class="fa-regular fa-circle"></i> Unedited</span>';
+                ? '<span class="badge-status edited"><i class="fa-solid fa-check"></i> Đã edit</span>'
+                : '<span class="badge-status unedited"><i class="fa-regular fa-circle"></i> Chưa edit</span>';
 
             itemEl.innerHTML = `
                 <div class="video-item-left">
@@ -842,9 +860,15 @@ function renderVideoTree(folders) {
                         <input type="checkbox" class="video-checkbox" data-path="${escapeAttr(video.path)}" data-title="${escapeAttr(video.title)}" data-edited="${video.edited}" data-channel="${escapeAttr(folder.name)}">
                         <span class="checkmark"></span>
                     </label>
+                    <i class="fa-solid fa-play-circle video-row-icon"></i>
                     <span class="video-title-truncate" title="${escapeAttr(video.title)}">${escapeHtml(video.title)}</span>
                 </div>
-                <div>${badgeHtml}</div>
+                <div class="video-item-right">
+                    <span class="video-duration-badge" title="Thời lượng video: ${durationFormatted}">
+                        <i class="fa-regular fa-clock"></i> ${durationFormatted}
+                    </span>
+                    ${badgeHtml}
+                </div>
             `;
 
             // Click row to preview title live
@@ -889,12 +913,21 @@ function renderVideoTree(folders) {
                                     video.edited = false;
                                     cb.dataset.edited = 'false';
                                     itemEl.className = 'video-tree-item is-unedited';
-                                    itemEl.querySelector('div:last-child').innerHTML = '<span class="badge-status unedited"><i class="fa-regular fa-circle"></i> Chưa edit</span>';
+                                    const statusWrapper = itemEl.querySelector('.video-item-right');
+                                    if (statusWrapper) {
+                                        statusWrapper.innerHTML = `
+                                            <span class="video-duration-badge" title="Thời lượng video: ${durationFormatted}">
+                                                <i class="fa-regular fa-clock"></i> ${durationFormatted}
+                                            </span>
+                                            <span class="badge-status unedited"><i class="fa-regular fa-circle"></i> Chưa edit</span>
+                                        `;
+                                    }
                                     fetchResults();
                                     selectedVideos.add(video.path);
                                     document.getElementById('preview-text-input').value = video.title;
                                     document.getElementById('canvas-banner-text').textContent = video.title.toUpperCase();
                                     updateSelectedCount();
+                                    applyVideoTreeFilters();
                                     showToast(`Đã xóa bản thành phẩm cũ của "${video.title}"`, 'success');
                                     return;
                                 }
@@ -924,8 +957,8 @@ function renderVideoTree(folders) {
             const icon = folderEl.querySelector('.folder-icon');
             if (icon) {
                 icon.className = folderEl.classList.contains('is-collapsed') 
-                    ? 'fa-solid fa-folder text-muted folder-icon' 
-                    : 'fa-solid fa-folder-open text-primary folder-icon';
+                    ? 'fa-solid fa-folder folder-icon' 
+                    : 'fa-solid fa-folder-open folder-icon';
             }
         });
 
@@ -943,10 +976,11 @@ function renderVideoTree(folders) {
 
 function updateExplorerStats(folders) {
     let totalVideos = 0;
-    folders.forEach(f => totalVideos += f.videos.length);
+    (folders || []).forEach(f => totalVideos += (f.videos || []).length);
     const badge = document.getElementById('explorer-total-badge');
     if (badge) badge.textContent = `${totalVideos} Video`;
-    document.getElementById('selected-count-badge').textContent = selectedVideos.size;
+    const selBadge = document.getElementById('selected-count-badge');
+    if (selBadge) selBadge.textContent = selectedVideos.size;
 }
 
 function filterVideoTree(filter) {
@@ -958,17 +992,27 @@ function applyVideoTreeFilters() {
     const filter = currentVideoTreeFilter;
     const search = currentVideoTreeSearch.trim().toLowerCase();
     const folderGroups = document.querySelectorAll('.folder-group');
+    let totalVisibleVideos = 0;
 
     folderGroups.forEach(folderEl => {
         const items = folderEl.querySelectorAll('.video-tree-item');
+        const countBadge = folderEl.querySelector('.folder-count-badge');
+        const folderIcon = folderEl.querySelector('.folder-icon');
         let visibleCountInFolder = 0;
+        let totalUneditedInFolder = 0;
+        let totalEditedInFolder = 0;
 
         items.forEach(item => {
+            const isUnedited = item.classList.contains('is-unedited');
+            const isEdited = item.classList.contains('is-edited');
+            if (isUnedited) totalUneditedInFolder++;
+            if (isEdited) totalEditedInFolder++;
+
             let matchesStatus = true;
             if (filter === 'unedited') {
-                matchesStatus = item.classList.contains('is-unedited');
+                matchesStatus = isUnedited;
             } else if (filter === 'edited') {
-                matchesStatus = item.classList.contains('is-edited');
+                matchesStatus = isEdited;
             }
 
             let matchesSearch = true;
@@ -981,18 +1025,43 @@ function applyVideoTreeFilters() {
             if (matchesStatus && matchesSearch) {
                 item.style.display = 'flex';
                 visibleCountInFolder++;
+                totalVisibleVideos++;
             } else {
                 item.style.display = 'none';
             }
         });
 
-        // Hide empty folder group if no matching videos inside
+        // Ẩn kênh nếu không có video nào khớp với filter và search
         if (visibleCountInFolder > 0) {
             folderEl.style.display = 'block';
+
+            // Khi chọn filter Unedited hoặc Edited hoặc đang search: Tự động mở rộng kênh để người dùng nhìn thấy ngay danh sách video!
+            if (filter === 'unedited' || filter === 'edited' || search) {
+                folderEl.classList.remove('is-collapsed');
+                if (folderIcon) folderIcon.className = 'fa-solid fa-folder-open folder-icon';
+            }
+
+            if (countBadge) {
+                if (filter === 'unedited') {
+                    countBadge.textContent = `${visibleCountInFolder} Chưa edit`;
+                    countBadge.className = 'badge folder-count-badge badge-warning';
+                } else if (filter === 'edited') {
+                    countBadge.textContent = `${visibleCountInFolder} Đã edit`;
+                    countBadge.className = 'badge folder-count-badge badge-success';
+                } else {
+                    countBadge.textContent = `${totalEditedInFolder}/${items.length} Đã edit`;
+                    countBadge.className = `badge folder-count-badge ${totalEditedInFolder === items.length && items.length > 0 ? 'badge-success' : (totalUneditedInFolder > 0 ? 'badge-warning' : 'badge-info')}`;
+                }
+            }
         } else {
             folderEl.style.display = 'none';
         }
     });
+
+    const totalBadge = document.getElementById('explorer-total-badge');
+    if (totalBadge) {
+        totalBadge.textContent = `${totalVisibleVideos} Video`;
+    }
 }
 
 let explorerControlsInitialized = false;
@@ -1030,24 +1099,27 @@ function initExplorerControls() {
         });
     }
 
-    // 2. Toggle Collapse All Folders
+    // 2. Toggle Collapse / Expand All Folders
     const btnToggleAll = document.getElementById('btn-toggle-all-folders');
     if (btnToggleAll) {
-        let allCollapsed = false;
         btnToggleAll.addEventListener('click', () => {
-            allCollapsed = !allCollapsed;
             const folders = document.querySelectorAll('.folder-group');
+            const anyExpanded = Array.from(folders).some(f => !f.classList.contains('is-collapsed') && f.style.display !== 'none');
+            const shouldCollapse = anyExpanded;
+
             folders.forEach(f => {
                 const icon = f.querySelector('.folder-icon');
-                if (allCollapsed) {
+                if (shouldCollapse) {
                     f.classList.add('is-collapsed');
-                    if (icon) icon.className = 'fa-solid fa-folder text-muted folder-icon';
+                    if (icon) icon.className = 'fa-solid fa-folder folder-icon';
                 } else {
                     f.classList.remove('is-collapsed');
-                    if (icon) icon.className = 'fa-solid fa-folder-open text-primary folder-icon';
+                    if (icon) icon.className = 'fa-solid fa-folder-open folder-icon';
                 }
             });
-            btnToggleAll.title = allCollapsed ? 'Mở rộng tất cả thư mục' : 'Thu gọn tất cả thư mục';
+            btnToggleAll.innerHTML = shouldCollapse
+                ? '<i class="fa-solid fa-layer-group"></i> Mở Rộng Tất Cả'
+                : '<i class="fa-solid fa-layer-group"></i> Thu Gọn Tất Cả';
         });
     }
 
@@ -1219,15 +1291,15 @@ function actionStartEditFolder(folderName) {
     if (studioTabBtn) studioTabBtn.click();
 
     // 2. Select/Expand only that folder in explorer tree
-    const treeHeaders = document.querySelectorAll('.folder-header');
-    treeHeaders.forEach(header => {
-        const nameText = header.querySelector('.folder-left span').textContent.trim();
-        const listEl = header.nextElementSibling;
-        
+    const folderGroups = document.querySelectorAll('.folder-group');
+    folderGroups.forEach(folderEl => {
+        const nameText = folderEl.dataset.folderName || folderEl.querySelector('.folder-name-text')?.textContent.trim();
+        const icon = folderEl.querySelector('.folder-icon');
         if (nameText === folderName) {
-            listEl.classList.remove('hidden');
+            folderEl.classList.remove('is-collapsed');
+            if (icon) icon.className = 'fa-solid fa-folder-open folder-icon';
             // Check all unedited checkboxes inside this folder
-            const checkboxes = listEl.querySelectorAll('.video-checkbox');
+            const checkboxes = folderEl.querySelectorAll('.video-checkbox');
             checkboxes.forEach(cb => {
                 const isEdited = cb.dataset.edited === 'true';
                 if (!isEdited) {
@@ -1236,9 +1308,9 @@ function actionStartEditFolder(folderName) {
                 }
             });
         } else {
-            // Uncheck other folders to keep clean focus
-            listEl.classList.add('hidden');
-            const checkboxes = listEl.querySelectorAll('.video-checkbox');
+            folderEl.classList.add('is-collapsed');
+            if (icon) icon.className = 'fa-solid fa-folder folder-icon';
+            const checkboxes = folderEl.querySelectorAll('.video-checkbox');
             checkboxes.forEach(cb => {
                 cb.checked = false;
                 selectedVideos.delete(cb.dataset.path);
@@ -1417,10 +1489,23 @@ async function updateProgressUI(data) {
     const statusEl = document.getElementById('render-status-text');
     const statusIndicator = document.getElementById('render-status-indicator');
     const term = document.getElementById('terminal-logs-window');
+    const studioViewLogsBtn = document.getElementById('btn-studio-view-logs');
+    const studioMiniProgress = document.getElementById('studio-mini-progress');
 
     const perc = data.percentage || 0;
     if (percEl) percEl.textContent = `${perc}%`;
     if (fillEl) fillEl.style.width = `${perc}%`;
+
+    if (studioMiniProgress) studioMiniProgress.textContent = `${perc}%`;
+    if (studioViewLogsBtn) {
+        if (data.is_running) {
+            studioViewLogsBtn.style.display = 'inline-flex';
+            studioViewLogsBtn.classList.remove('hidden');
+        } else {
+            studioViewLogsBtn.style.display = 'none';
+            studioViewLogsBtn.classList.add('hidden');
+        }
+    }
 
     // Đồng bộ nút bấm & trạng thái với máy chủ trên từng nhịp
     setProcessState(Boolean(data.is_running));
@@ -1460,7 +1545,11 @@ async function updateProgressUI(data) {
             else if (l.includes('⚙️') || l.includes('▶️') || l.includes('🔍')) cls += ' log-info';
             return `<div class="${cls}">${escapeHtml(l)}</div>`;
         }).join('');
-        term.scrollTop = term.scrollHeight;
+        if (terminalAutoScroll) {
+            term.scrollTop = term.scrollHeight;
+        }
+        const logsCountEl = document.getElementById('terminal-logs-count');
+        if (logsCountEl) logsCountEl.textContent = `${data.logs.length} dòng`;
     }
 
     // Luôn luôn đồng bộ trạng thái Auto-Pilot Hub (Nút bấm, tiến độ, logs) trên từng nhịp polling
@@ -1642,76 +1731,180 @@ function renderFinishedLibrary() {
         container.innerHTML = `
             <div class="empty-finished-state">
                 <i class="fa-solid fa-filter-circle-xmark"></i>
-                <p>No finished videos found matching the current filter.</p>
+                <p>Không tìm thấy video thành phẩm nào khớp với bộ lọc hiện tại.</p>
             </div>
         `;
         return;
     }
 
-    const cardsHtml = filtered.map(item => {
-        // Status Badge
-        const statusBadgeHtml = item.is_uploaded
-            ? `<span class="badge-uploaded"><i class="fa-solid fa-circle-check"></i> Uploaded to TikTok ${item.posted_account ? '(@' + escapeHtml(item.posted_account) + ')' : ''}</span>`
-            : `<span class="badge-unuploaded"><i class="fa-solid fa-cloud-arrow-up"></i> Pending Upload</span>`;
-
-        // Time Badge
-        const timeBadgeHtml = item.created_at
-            ? `<span class="badge-time" title="Render / Modified Time"><i class="fa-regular fa-clock"></i> ${escapeHtml(item.created_at)}</span>`
-            : '';
-
-        // Tạo các nút part nhỏ để xem nhanh
-        let partsHtml = '';
-        if (item.parts && item.parts.length > 0) {
-            partsHtml = `
-                <div class="finished-parts-chips">
-                    ${item.parts.map((p, idx) => {
-                        const partIsPosted = p.posted || false;
-                        const partChipClass = `finished-part-chip ${partIsPosted ? 'is-posted' : ''}`;
-                        const partIcon = partIsPosted
-                            ? `<i class="fa-solid fa-check" style="font-size: 9px; color: #34d399;"></i>`
-                            : `<i class="fa-solid fa-play" style="font-size: 8px;"></i>`;
-                        const partTitle = `${escapeAttr(item.title)} - Part ${idx + 1} (${partIsPosted ? 'Posted' : 'Pending'})`;
-                        return `
-                            <button type="button" class="${partChipClass}" onclick="playFinishedVideo('${encodeURIComponent(p.url)}', '${partTitle}')" title="Preview ${escapeAttr(p.name)}">
-                                ${partIcon} Part ${idx + 1}
-                            </button>
-                        `;
-                    }).join('')}
-                </div>
-            `;
+    // 1. Phân nhóm video theo từng Kênh YouTube
+    const channelMap = new Map();
+    filtered.forEach(item => {
+        const channelName = item.folder_name || 'Khác';
+        if (!channelMap.has(channelName)) {
+            let channelPath = '';
+            if (item.path) {
+                const norm = item.path.replace(/\\/g, '/');
+                const lastSlash = norm.lastIndexOf('/');
+                if (lastSlash > 0) {
+                    channelPath = norm.substring(0, lastSlash);
+                }
+            }
+            channelMap.set(channelName, {
+                channel: channelName,
+                channelPath: channelPath,
+                videos: [],
+                maxMtime: 0,
+                latestCreatedAt: '',
+                totalParts: 0
+            });
         }
 
-        return `
-            <div class="finished-card ${item.is_uploaded ? 'is-uploaded' : 'is-unuploaded'}">
-                <div class="finished-info" style="flex: 1; min-width: 0;">
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <span class="finished-title" style="font-size: 13.5px; font-weight: 700; color: var(--text-primary);" title="${escapeAttr(item.title)}">
-                            ${escapeHtml(item.title)}
-                        </span>
-                        <span class="badge badge-neutral">
-                            ${escapeHtml(item.folder_name)}
-                        </span>
-                        ${statusBadgeHtml}
-                        ${timeBadgeHtml}
+        const grp = channelMap.get(channelName);
+        grp.videos.push(item);
+        grp.totalParts += (item.parts ? item.parts.length : 0);
+        const itemMtime = Number(item.mtime || 0);
+        if (itemMtime > grp.maxMtime) {
+            grp.maxMtime = itemMtime;
+            grp.latestCreatedAt = item.created_at || '';
+        }
+    });
+
+    // 2. Sắp xếp các kênh: Kênh có video edit gần đây nhất (mtime lớn nhất) xếp lên đầu
+    const sortedGroups = Array.from(channelMap.values()).sort((a, b) => b.maxMtime - a.maxMtime);
+
+    // 3. Bên trong mỗi kênh: Sắp xếp các video theo ngày edit gần nhất đứng trước
+    sortedGroups.forEach(grp => {
+        grp.videos.sort((a, b) => (Number(b.mtime || 0)) - (Number(a.mtime || 0)));
+    });
+
+    const groupsHtml = sortedGroups.map(grp => {
+        const channelCardsHtml = grp.videos.map(item => {
+            // Status Badge
+            const totalParts = (item.parts || []).length;
+            const postedParts = (item.parts || []).filter(p => p.posted).length;
+            let statusBadgeHtml = '';
+            if (item.is_uploaded) {
+                const partInfo = totalParts > 0 ? `(${totalParts}/${totalParts} parts)` : '';
+                statusBadgeHtml = `<span class="badge-uploaded"><i class="fa-solid fa-circle-check"></i> Đã đăng TikTok ${partInfo} ${item.posted_account ? '(@' + escapeHtml(item.posted_account) + ')' : ''}</span>`;
+            } else if (postedParts > 0) {
+                statusBadgeHtml = `<span class="badge-uploading" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; padding: 2px 8px; font-size: 11px; font-weight: 700;"><i class="fa-solid fa-spinner fa-spin-pulse"></i> Đang đăng (${postedParts}/${totalParts} parts) ${item.posted_account ? '(@' + escapeHtml(item.posted_account) + ')' : ''}</span>`;
+            } else {
+                statusBadgeHtml = `<span class="badge-unuploaded"><i class="fa-solid fa-cloud-arrow-up"></i> Chưa upload ${totalParts > 0 ? '(' + totalParts + ' parts)' : ''}</span>`;
+            }
+
+            // Time Badge
+            const timeBadgeHtml = item.created_at
+                ? `<span class="badge-time" title="Thời gian render / chỉnh sửa"><i class="fa-regular fa-clock"></i> ${escapeHtml(item.created_at)}</span>`
+                : '';
+
+            // Tạo các nút part nhỏ để xem nhanh
+            let partsHtml = '';
+            if (item.parts && item.parts.length > 0) {
+                partsHtml = `
+                    <div class="finished-parts-chips">
+                        ${item.parts.map((p, idx) => {
+                            const partIsPosted = p.posted || false;
+                            const partChipClass = `finished-part-chip ${partIsPosted ? 'is-posted' : ''}`;
+                            const partIcon = partIsPosted
+                                ? `<i class="fa-solid fa-check" style="font-size: 9px; color: #34d399;"></i>`
+                                : `<i class="fa-solid fa-play" style="font-size: 8px;"></i>`;
+                            const partTitle = `${escapeAttr(item.title)} - Part ${idx + 1} (${partIsPosted ? 'Posted' : 'Pending'})`;
+                            return `
+                                <button type="button" class="${partChipClass}" onclick="playFinishedVideo('${encodeURIComponent(p.url)}', '${partTitle}')" title="Xem trước ${escapeAttr(p.name)}">
+                                    ${partIcon} Part ${idx + 1}
+                                </button>
+                            `;
+                        }).join('')}
                     </div>
-                    ${partsHtml}
+                `;
+            }
+
+            return `
+                <div class="finished-card ${item.is_uploaded ? 'is-uploaded' : 'is-unuploaded'}">
+                    <div class="finished-info" style="flex: 1; min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span class="finished-title" style="font-size: 13.5px; font-weight: 700; color: var(--text-primary);" title="${escapeAttr(item.title)}">
+                                ${escapeHtml(item.title)}
+                            </span>
+                            ${statusBadgeHtml}
+                            ${timeBadgeHtml}
+                        </div>
+                        ${partsHtml}
+                    </div>
+                    <div class="finished-actions" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                        <span style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-right: 4px;">
+                            ${item.parts.length} parts
+                        </span>
+                        <button class="btn btn-sm btn-secondary" onclick="openFinishedVideoFolder('${escapeJs(grp.channel)}', '${escapeJs(item.title)}')" title="Mở thư mục video trong File Explorer">
+                            <i class="fa-solid fa-folder-open"></i> Thư mục
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteFinishedVideo('${escapeJs(item.path)}', '${escapeJs(item.title)}', '${escapeJs(item.folder_name)}')" title="Xóa video thành phẩm này">
+                            <i class="fa-solid fa-trash-can"></i> Xóa
+                        </button>
+                    </div>
                 </div>
-                <div class="finished-actions" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-right: 4px;">
-                        ${item.parts.length} videos
-                    </span>
-                    <button class="btn btn-sm btn-secondary" onclick="openOutputDirectory('${escapeAttr(item.path)}')" title="Open folder in File Explorer">
-                        <i class="fa-solid fa-folder-open"></i> Open Folder
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteFinishedVideo('${escapeAttr(item.path)}', '${escapeAttr(item.title)}', '${escapeAttr(item.folder_name)}')" title="Delete this finished video">
-                        <i class="fa-solid fa-trash-can"></i> Delete
-                    </button>
+            `;
+        }).join('');
+
+        return `
+            <div class="finished-channel-group" data-channel="${escapeAttr(grp.channel)}">
+                <div class="finished-channel-header" onclick="toggleFinishedChannelGroup(this)">
+                    <div class="finished-channel-left">
+                        <span class="finished-channel-icon"><i class="fa-brands fa-youtube"></i></span>
+                        <div class="finished-channel-info">
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <span class="finished-channel-name">${escapeHtml(grp.channel)}</span>
+                                <span class="badge badge-primary" style="font-size: 11px; padding: 2px 8px;">${grp.videos.length} videos</span>
+                                <span class="badge badge-neutral" style="font-size: 11px; padding: 2px 8px;">${grp.totalParts} parts</span>
+                            </div>
+                            <div class="finished-channel-meta">
+                                ${grp.latestCreatedAt ? `<span><i class="fa-regular fa-clock"></i> Mới edit: <strong>${escapeHtml(grp.latestCreatedAt)}</strong></span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="finished-channel-right" onclick="event.stopPropagation()">
+                        <button type="button" class="btn btn-xs btn-outline" onclick="openFinishedChannelFolder('${escapeJs(grp.channel)}')" title="Mở thư mục kênh ${escapeAttr(grp.channel)} trong Explorer">
+                            <i class="fa-solid fa-folder-open"></i> Thư mục kênh
+                        </button>
+                        <button type="button" class="btn btn-xs btn-ghost channel-collapse-btn" onclick="toggleFinishedChannelGroup(this.closest('.finished-channel-header'))" title="Thu gọn / Mở rộng kênh">
+                            <i class="fa-solid fa-chevron-down channel-chevron"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="finished-channel-items">
+                    ${channelCardsHtml}
                 </div>
             </div>
         `;
     }).join('');
 
-    container.innerHTML = cardsHtml;
+    container.innerHTML = groupsHtml;
+}
+
+function toggleFinishedChannelGroup(headerEl) {
+    if (!headerEl) return;
+    const group = headerEl.closest('.finished-channel-group');
+    if (group) {
+        group.classList.toggle('is-collapsed');
+    }
+}
+
+let allFinishedChannelsCollapsed = false;
+function toggleAllFinishedChannels() {
+    const groups = document.querySelectorAll('.finished-channel-group');
+    allFinishedChannelsCollapsed = !allFinishedChannelsCollapsed;
+    groups.forEach(g => {
+        if (allFinishedChannelsCollapsed) {
+            g.classList.add('is-collapsed');
+        } else {
+            g.classList.remove('is-collapsed');
+        }
+    });
+    const txt = document.getElementById('text-toggle-all-finished-channels');
+    if (txt) {
+        txt.textContent = allFinishedChannelsCollapsed ? 'Mở Rộng Tất Cả' : 'Thu Gọn Tất Cả';
+    }
 }
 
 async function deleteFinishedVideo(folderPath, videoTitle, channelName) {
@@ -1809,21 +2002,71 @@ function openLocalFile(filePath) {
     });
 }
 
-function openOutputDirectory(folderPath) {
-    let target = folderPath;
-    if (!target) {
-        target = document.getElementById('dest-drive-link')?.value?.trim() || accountsData.dest_path || 'D:/Antigravity/tiktok_running/output_product';
+function getCurrentDestinationDirectory() {
+    const inputVal = document.getElementById('dest-drive-link')?.value?.trim();
+    if (inputVal) return inputVal;
+    if (typeof accountsData !== 'undefined' && accountsData?.dest_path) {
+        return accountsData.dest_path.trim();
+    }
+    return 'D:/Antigravity/tiktok_running/output_product';
+}
+
+function openFinishedChannelFolder(channelName) {
+    const dest = getCurrentDestinationDirectory();
+    if (dest.startsWith('http://') || dest.startsWith('https://')) {
+        window.open(dest, '_blank');
+        return;
     }
     fetch('/api/open_folder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: target })
+        body: JSON.stringify({
+            base_dest: dest,
+            channel: channelName
+        })
+    });
+}
+
+function openFinishedVideoFolder(channelName, videoTitle) {
+    const dest = getCurrentDestinationDirectory();
+    if (dest.startsWith('http://') || dest.startsWith('https://')) {
+        window.open(dest, '_blank');
+        return;
+    }
+    fetch('/api/open_folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            base_dest: dest,
+            channel: channelName,
+            title: videoTitle
+        })
+    });
+}
+
+function openOutputDirectory(folderPath) {
+    let target = folderPath;
+    const dest = getCurrentDestinationDirectory();
+    if (!target) {
+        target = dest;
+    }
+    if (target.startsWith('http://') || target.startsWith('https://')) {
+        window.open(target, '_blank');
+        return;
+    }
+    fetch('/api/open_folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: target, base_dest: dest })
     });
 }
 
 // Bind methods to window for inline onclick handlers
 window.openLocalFile = openLocalFile;
 window.openOutputDirectory = openOutputDirectory;
+window.openFinishedChannelFolder = openFinishedChannelFolder;
+window.openFinishedVideoFolder = openFinishedVideoFolder;
+window.getCurrentDestinationDirectory = getCurrentDestinationDirectory;
 window.deleteFinishedVideo = deleteFinishedVideo;
 window.deleteAllFinishedVideos = deleteAllFinishedVideos;
 window.playFinishedVideo = playFinishedVideo;
@@ -2010,26 +2253,54 @@ function initAccountsManager() {
             }
         });
     }
-    
+
+    // Sync Accounts from AdsPower
+    const btnSyncAdsAccounts = document.getElementById('btn-sync-adspower-accounts');
+    if (btnSyncAdsAccounts) {
+        btnSyncAdsAccounts.addEventListener('click', async () => {
+            btnSyncAdsAccounts.disabled = true;
+            btnSyncAdsAccounts.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
+            try {
+                const res = await fetch('/api/accounts/sync_adspower', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`🎉 Đã đồng bộ thành công ${data.total_accounts} tài khoản từ AdsPower!`);
+                    await fetchAccountsData();
+                    if (typeof fetchPublishingMatrix === 'function') {
+                        fetchPublishingMatrix();
+                    }
+                    if (typeof fetchAdsPowerProfiles === 'function') {
+                        fetchAdsPowerProfiles(true);
+                    }
+                } else {
+                    alert('Lỗi khi đồng bộ từ AdsPower: ' + (data.error || 'Vui lòng kiểm tra lại ứng dụng AdsPower đang mở!'));
+                }
+            } catch (err) {
+                alert('Lỗi kết nối khi đồng bộ: ' + err.message);
+            } finally {
+                btnSyncAdsAccounts.disabled = false;
+                btnSyncAdsAccounts.innerHTML = '<i class="fa-solid fa-arrows-rotate text-primary"></i> Sync from AdsPower';
+            }
+        });
+    }
+
     // Save Account
     if (btnSaveAccount) {
         btnSaveAccount.addEventListener('click', async (e) => {
             e.preventDefault();
             const username = document.getElementById('input-acc-username')?.value?.trim() || '';
-            const password = document.getElementById('input-acc-password')?.value?.trim() || '';
             const email = document.getElementById('input-acc-email')?.value?.trim() || '';
-            const emailConfirm = document.getElementById('input-acc-email-confirm')?.value?.trim() || '';
-            const ipOrig = document.getElementById('input-acc-ip-orig')?.value?.trim() || '';
-            const ipBuild = document.getElementById('input-acc-ip-build')?.value?.trim() || '';
+            const ip = document.getElementById('input-acc-ip')?.value?.trim() || '';
+            const group = document.getElementById('input-acc-group')?.value?.trim() || 'Default';
             const adspowerId = document.getElementById('input-acc-adspower')?.value?.trim() || '';
-            const date = document.getElementById('input-acc-date')?.value || '';
+            const date = document.getElementById('input-acc-date')?.value?.trim() || '';
             const target = document.getElementById('input-acc-target')?.value || '';
             const hashtags = document.getElementById('input-acc-hashtags')?.value?.trim() || '';
             const content = document.getElementById('input-acc-content')?.value?.trim() || '';
             const note = document.getElementById('input-acc-note')?.value?.trim() || '';
             
-            if (!username || !password) {
-                alert('Vui lòng nhập đầy đủ Tên tài khoản và Mật khẩu!');
+            if (!username) {
+                alert('Vui lòng nhập Tên tài khoản TikTok (Username)!');
                 return;
             }
             
@@ -2040,12 +2311,12 @@ function initAccountsManager() {
                 accountsData.tiktok_accounts = accountsData.tiktok_accounts || [];
                 const newAcc = {
                     account_name: username,
-                    password: password,
-                    mail: email,
-                    mail_confirm: emailConfirm,
-                    original_ip: ipOrig,
-                    build_up_ip: ipBuild,
                     adspower_id: adspowerId,
+                    adspower_serial: '',
+                    adspower_name: username,
+                    group_name: group,
+                    ip: ip,
+                    mail: email,
                     created_date: date,
                     target_channel: target,
                     content: content,
@@ -2054,8 +2325,15 @@ function initAccountsManager() {
                 };
                 
                 if (editingAccountIdx > -1 && editingAccountIdx < accountsData.tiktok_accounts.length) {
+                    const oldAcc = accountsData.tiktok_accounts[editingAccountIdx];
+                    newAcc.posted_clips = oldAcc.posted_clips || {};
+                    newAcc.target_history = oldAcc.target_history || [];
+                    newAcc.adspower_serial = oldAcc.adspower_serial || '';
+                    newAcc.country = oldAcc.country || '';
                     accountsData.tiktok_accounts[editingAccountIdx] = newAcc;
                 } else {
+                    newAcc.posted_clips = {};
+                    newAcc.target_history = target ? [target] : [];
                     accountsData.tiktok_accounts.push(newAcc);
                 }
                 
@@ -2082,10 +2360,28 @@ function initAccountsManager() {
     const selectAdsQuick = document.getElementById('select-acc-adspower-quick');
     if (selectAdsQuick) {
         selectAdsQuick.addEventListener('change', () => {
-            const val = selectAdsQuick.value;
-            if (val) {
-                const inputAds = document.getElementById('input-acc-adspower');
-                if (inputAds) inputAds.value = val;
+            const selectedOpt = selectAdsQuick.selectedOptions[0];
+            if (selectedOpt && selectedOpt.dataset.profile) {
+                try {
+                    const p = JSON.parse(selectedOpt.dataset.profile);
+                    const inputAds = document.getElementById('input-acc-adspower');
+                    const inputGroup = document.getElementById('input-acc-group');
+                    const inputIp = document.getElementById('input-acc-ip');
+                    const inputDate = document.getElementById('input-acc-date');
+                    const inputUser = document.getElementById('input-acc-username');
+                    
+                    if (inputAds) inputAds.value = p.user_id || p.serial_number || '';
+                    if (inputGroup) inputGroup.value = p.group_name || 'Default';
+                    if (inputIp) inputIp.value = p.ip || '';
+                    if (inputDate && p.created_date) {
+                        inputDate.value = p.created_date;
+                    }
+                    if (inputUser && (!inputUser.value.trim() || editingAccountIdx === -1)) {
+                        inputUser.value = p.name || '';
+                    }
+                } catch (e) {
+                    console.error('Error parsing profile dataset:', e);
+                }
             }
         });
     }
@@ -2116,9 +2412,8 @@ function clearChannelForm() {
 
 function clearAccountForm() {
     const fields = [
-        'input-acc-username', 'input-acc-password', 'input-acc-email',
-        'input-acc-email-confirm', 'input-acc-ip-orig', 'input-acc-ip-build',
-        'input-acc-adspower', 'select-acc-adspower-quick', 'input-acc-date',
+        'input-acc-username', 'select-acc-adspower-quick', 'input-acc-adspower',
+        'input-acc-group', 'input-acc-ip', 'input-acc-date', 'input-acc-email',
         'input-acc-target', 'input-acc-hashtags', 'input-acc-content', 'input-acc-note'
     ];
     fields.forEach(id => {
@@ -2230,13 +2525,14 @@ function renderChannelsTable() {
 
 function renderAccountsTable() {
     const tbody = document.getElementById('accounts-table-body');
+    if (!tbody) return;
     tbody.innerHTML = '';
     
     const accounts = accountsData.tiktok_accounts || [];
     if (accounts.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="table-empty">No TikTok accounts configured.</td>
+                <td colspan="8" class="table-empty">No TikTok accounts configured. Click "Sync from AdsPower" or "Add New Account".</td>
             </tr>
         `;
         return;
@@ -2245,20 +2541,33 @@ function renderAccountsTable() {
     accounts.forEach((acc, idx) => {
         const tr = document.createElement('tr');
         
-        const mailDisplay = acc.mail 
-            ? `<div>${acc.mail}</div>${acc.mail_confirm ? `<div style="font-size: 11px; opacity:0.6;"><i class="fa-solid fa-reply"></i> ${acc.mail_confirm}</div>` : ''}` 
-            : '<span class="text-muted">-</span>';
-            
-        const adspowerDisplay = (acc.adspower_id || acc.adspower_serial)
-            ? `<div style="margin-top:3px;"><span class="badge-adspower" title="AdsPower Profile ID"><i class="fa-solid fa-bolt"></i> ${escapeHtml(acc.adspower_id || acc.adspower_serial)}</span></div>`
-            : `<div style="margin-top:3px;"><span style="font-size:10px; opacity:0.6;"><i class="fa-solid fa-bolt"></i> Auto</span></div>`;
+        // 1. Group Badge
+        const isShared = acc.is_shared || (acc.group_name && acc.group_name.toLowerCase().includes('share'));
+        const groupDisplay = acc.group_name
+            ? `<span class="badge ${isShared ? 'badge-primary' : 'badge-neutral'}" title="${isShared ? 'Shared Group: ' + escapeHtml(acc.group_name) : 'Local Group: ' + escapeHtml(acc.group_name)}" style="font-size: 11px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;">
+                <i class="fa-solid ${isShared ? 'fa-share-nodes' : 'fa-folder'}"></i> ${escapeHtml(acc.group_name)}
+               </span>`
+            : '<span class="text-muted" style="font-size: 11px;">-</span>';
 
-        const ipDisplay = `
-            <div><span class="badge-ip" title="Original IP"><i class="fa-solid fa-house"></i> ${acc.original_ip || 'No IP'}</span></div>
-            <div><span class="badge-ip" title="Nurtured IP"><i class="fa-solid fa-network-wired"></i> ${acc.build_up_ip || 'No IP'}</span></div>
-            ${adspowerDisplay}
+        // 2. Profile & IP
+        const serialText = acc.adspower_serial ? `#${acc.adspower_serial}` : '';
+        const idText = acc.adspower_id || '';
+        const profileTag = (serialText || idText)
+            ? `<div style="margin-bottom: 3px;"><span class="badge-adspower" title="AdsPower Profile ID"><i class="fa-solid fa-bolt"></i> ${escapeHtml(serialText ? `${serialText} (${idText})` : idText)}</span></div>`
+            : `<div style="margin-bottom: 3px;"><span style="font-size:10px; opacity:0.6;"><i class="fa-solid fa-bolt"></i> Auto</span></div>`;
+
+        const ipVal = acc.ip || acc.build_up_ip || acc.original_ip;
+        const countryVal = acc.country ? `[${acc.country.toUpperCase()}] ` : '';
+        const ipTag = ipVal
+            ? `<div><span class="badge-ip" title="IP Address / Proxy"><i class="fa-solid fa-network-wired"></i> ${escapeHtml(countryVal + ipVal)}</span></div>`
+            : `<div><span class="badge-ip" style="opacity: 0.5;" title="No IP"><i class="fa-solid fa-network-wired"></i> No IP</span></div>`;
+
+        const profileAndIpDisplay = `
+            ${profileTag}
+            ${ipTag}
         `;
         
+        // 3. Target YouTube Channel
         const matchingChan = (accountsData.youtube_channels || []).find(c => c.name === acc.target_channel);
         const chanUrl = matchingChan ? matchingChan.url : '';
         const targetChannelDisplay = chanUrl
@@ -2268,42 +2577,23 @@ function renderAccountsTable() {
         tr.innerHTML = `
             <td>${idx + 1}</td>
             <td>
-                <div style="font-weight: 700;">@${acc.account_name}</div>
-                ${acc.content ? `<div style="font-size:11px; color:var(--text-secondary);"><i class="fa-solid fa-tags"></i> ${acc.content}</div>` : ''}
+                <div style="font-weight: 700;">@${escapeHtml(acc.account_name)}</div>
+                ${acc.mail ? `<div style="font-size: 11px; opacity:0.7;"><i class="fa-regular fa-envelope"></i> ${escapeHtml(acc.mail)}</div>` : ''}
+                ${acc.content ? `<div style="font-size:11px; color:var(--text-secondary);"><i class="fa-solid fa-tags"></i> ${escapeHtml(acc.content)}</div>` : ''}
             </td>
-            <td>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <input type="password" class="table-pw-input" value="${acc.password}" disabled style="background:transparent; border:none; color:inherit; font-family:monospace; font-size:14px; width:100px; padding:0;">
-                    <i class="fa-solid fa-eye-slash btn-toggle-table-pw" style="cursor: pointer; opacity: 0.6; font-size: 13px;"></i>
-                </div>
-            </td>
-            <td>${mailDisplay}</td>
-            <td>${ipDisplay}</td>
+            <td>${groupDisplay}</td>
+            <td>${profileAndIpDisplay}</td>
             <td>${targetChannelDisplay}</td>
-            <td><span style="font-size: 11px; white-space:nowrap;">${acc.created_date || '-'}</span></td>
+            <td><span style="font-size: 11px; white-space:nowrap;"><i class="fa-regular fa-calendar-days text-muted" style="margin-right: 4px;"></i>${escapeHtml(acc.created_date || '-')}</span></td>
             <td>
-                ${acc.hashtag ? `<div style="font-size:11px; color:var(--primary); font-family:monospace; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${acc.hashtag}">${acc.hashtag}</div>` : ''}
-                ${acc.note ? `<div style="font-size:11px; opacity:0.7; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${acc.note}">${acc.note}</div>` : ''}
+                ${acc.hashtag ? `<div style="font-size:11px; color:var(--primary); font-family:monospace; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(acc.hashtag)}">${escapeHtml(acc.hashtag)}</div>` : ''}
+                ${acc.note ? `<div style="font-size:11px; opacity:0.7; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(acc.note)}">${escapeHtml(acc.note)}</div>` : ''}
             </td>
-            <td style="text-align: center;">
-                <button class="btn btn-outline btn-xs btn-edit-acc" data-index="${idx}" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;"><i class="fa-solid fa-pen"></i></button>
-                <button class="btn btn-danger btn-xs btn-delete-acc" data-index="${idx}" style="padding: 4px 8px; font-size: 11px; background: var(--danger);"><i class="fa-solid fa-trash"></i></button>
+            <td style="text-align: center; white-space: nowrap;">
+                <button class="btn btn-outline btn-xs btn-edit-acc" data-index="${idx}" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" title="Edit Account"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn btn-danger btn-xs btn-delete-acc" data-index="${idx}" style="padding: 4px 8px; font-size: 11px; background: var(--danger);" title="Delete Account"><i class="fa-solid fa-trash"></i></button>
             </td>
         `;
-        
-        const toggleIcon = tr.querySelector('.btn-toggle-table-pw');
-        const pwInput = tr.querySelector('.table-pw-input');
-        toggleIcon.addEventListener('click', () => {
-            if (pwInput.type === 'password') {
-                pwInput.type = 'text';
-                toggleIcon.classList.remove('fa-eye-slash');
-                toggleIcon.classList.add('fa-eye');
-            } else {
-                pwInput.type = 'password';
-                toggleIcon.classList.remove('fa-eye');
-                toggleIcon.classList.add('fa-eye-slash');
-            }
-        });
         
         tr.querySelector('.btn-edit-acc').addEventListener('click', () => {
             editAccount(idx);
@@ -2321,6 +2611,7 @@ function renderAccountsTable() {
 
 function updateTargetChannelDropdown() {
     const select = document.getElementById('input-acc-target');
+    if (!select) return;
     select.innerHTML = '<option value="">Select YouTube channel...</option>';
     
     const channels = accountsData.youtube_channels || [];
@@ -2336,17 +2627,22 @@ function editChannel(idx) {
     const chan = accountsData.youtube_channels[idx];
     editingChannelIdx = idx;
     
-    document.getElementById('input-channel-name').value = chan.name;
-    document.getElementById('input-channel-url').value = chan.url || '';
-    document.getElementById('input-channel-folder').value = chan.folder_name;
-    if (document.getElementById('input-channel-content')) {
-        document.getElementById('input-channel-content').value = chan.content || '';
-    }
+    const n = document.getElementById('input-channel-name');
+    const u = document.getElementById('input-channel-url');
+    const f = document.getElementById('input-channel-folder');
+    const c = document.getElementById('input-channel-content');
+    if (n) n.value = chan.name;
+    if (u) u.value = chan.url || '';
+    if (f) f.value = chan.folder_name;
+    if (c) c.value = chan.content || '';
     
     const formArea = document.getElementById('channel-form-area');
-    formArea.classList.remove('hidden');
-    document.getElementById('btn-toggle-channel-form').innerHTML = '<i class="fa-solid fa-xmark"></i> Close Form';
-    formArea.scrollIntoView({ behavior: 'smooth' });
+    if (formArea) {
+        formArea.classList.remove('hidden');
+        const btnToggle = document.getElementById('btn-toggle-channel-form');
+        if (btnToggle) btnToggle.innerHTML = '<i class="fa-solid fa-xmark"></i> Close Form';
+        formArea.scrollIntoView({ behavior: 'smooth' });
+    }
 }
 
 async function deleteChannel(idx) {
@@ -2361,25 +2657,44 @@ function editAccount(idx) {
     const acc = accountsData.tiktok_accounts[idx];
     editingAccountIdx = idx;
     
-    document.getElementById('input-acc-username').value = acc.account_name;
-    document.getElementById('input-acc-password').value = acc.password;
-    document.getElementById('input-acc-email').value = acc.mail || '';
-    document.getElementById('input-acc-email-confirm').value = acc.mail_confirm || '';
-    document.getElementById('input-acc-ip-orig').value = acc.original_ip || '';
-    document.getElementById('input-acc-ip-build').value = acc.build_up_ip || '';
-    if (document.getElementById('input-acc-adspower')) {
-        document.getElementById('input-acc-adspower').value = acc.adspower_id || acc.adspower_serial || '';
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val || '';
+    };
+
+    setVal('input-acc-username', acc.account_name);
+    setVal('input-acc-adspower', acc.adspower_id || acc.adspower_serial || '');
+    setVal('input-acc-group', acc.group_name || '');
+    setVal('input-acc-ip', acc.ip || acc.build_up_ip || acc.original_ip || '');
+    setVal('input-acc-date', acc.created_date || '');
+    setVal('input-acc-email', acc.mail || '');
+    setVal('input-acc-target', acc.target_channel || '');
+    setVal('input-acc-hashtags', acc.hashtag || '');
+    setVal('input-acc-content', acc.content || '');
+    setVal('input-acc-note', acc.note || '');
+
+    // Select AdsPower dropdown if matching
+    const selectAds = document.getElementById('select-acc-adspower-quick');
+    if (selectAds) {
+        let matched = false;
+        for (let i = 0; i < selectAds.options.length; i++) {
+            const opt = selectAds.options[i];
+            if (opt.value && (opt.value === acc.adspower_id || opt.value === String(acc.adspower_serial))) {
+                selectAds.selectedIndex = i;
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) selectAds.selectedIndex = 0;
     }
-    document.getElementById('input-acc-date').value = acc.created_date || '';
-    document.getElementById('input-acc-target').value = acc.target_channel || '';
-    document.getElementById('input-acc-hashtags').value = acc.hashtag || '';
-    document.getElementById('input-acc-content').value = acc.content || '';
-    document.getElementById('input-acc-note').value = acc.note || '';
     
     const formArea = document.getElementById('account-form-area');
-    formArea.classList.remove('hidden');
-    document.getElementById('btn-toggle-account-form').innerHTML = '<i class="fa-solid fa-xmark"></i> Close Form';
-    formArea.scrollIntoView({ behavior: 'smooth' });
+    if (formArea) {
+        formArea.classList.remove('hidden');
+        const btnToggle = document.getElementById('btn-toggle-account-form');
+        if (btnToggle) btnToggle.innerHTML = '<i class="fa-solid fa-xmark"></i> Close Form';
+        formArea.scrollIntoView({ behavior: 'smooth' });
+    }
 }
 
 async function deleteAccount(idx) {
@@ -2779,8 +3094,17 @@ function renderPublishingClipsFeed() {
             `;
         }
 
-        const postedTagHtml = clip.posted 
-            ? `<span class="pub-posted-tag"><i class="fa-solid fa-circle-check"></i> Đã đăng đủ part ${clip.posted_at ? `(${clip.posted_at})` : ''}</span>`
+        const totalPartsCount = (clip.parts || []).length;
+        const postedPartsCount = (clip.parts || []).filter(p => p.posted).length;
+        let postedTagHtml = '';
+        if (clip.posted) {
+            postedTagHtml = `<span class="pub-posted-tag"><i class="fa-solid fa-circle-check"></i> Đã đăng đủ part ${totalPartsCount > 0 ? '(' + totalPartsCount + '/' + totalPartsCount + ')' : ''} ${clip.posted_at ? `(${clip.posted_at})` : ''}</span>`;
+        } else if (postedPartsCount > 0) {
+            postedTagHtml = `<span class="pub-partial-tag" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; padding: 2px 8px; font-size: 11px; font-weight: 700;"><i class="fa-solid fa-spinner fa-spin-pulse"></i> Đang đăng (${postedPartsCount}/${totalPartsCount} part)</span>`;
+        }
+
+        const dateBadgeHtml = clip.created_at 
+            ? `<span class="badge" style="background: rgba(255,255,255,0.06); font-size: 11px; color: var(--text-secondary); border: 1px solid var(--border-color);"><i class="fa-regular fa-clock"></i> ${escapeHtml(clip.created_at)}</span>` 
             : '';
 
         row.innerHTML = `
@@ -2793,6 +3117,7 @@ function renderPublishingClipsFeed() {
                         <span class="pub-clip-title" title="${escapeAttr(clip.title)}">${escapeHtml(clip.title)}</span>
                         ${sourceBadgeHtml}
                         ${postedTagHtml}
+                        ${dateBadgeHtml}
                     </div>
                     ${partsHtml}
                 </div>
@@ -2805,11 +3130,9 @@ function renderPublishingClipsFeed() {
                 <button class="btn btn-sm btn-secondary" onclick="handleCopyCaptionForClip('${escapeAttr(clip.title)}')" title="Sao chép Tiêu đề clip + Hashtag tài khoản">
                     <i class="fa-regular fa-copy"></i> Copy Caption
                 </button>
-                ${clip.path ? `
-                    <button class="btn btn-sm btn-outline" onclick="openOutputDirectory('${escapeAttr(clip.path)}')" title="Mở thư mục chứa file">
-                        <i class="fa-solid fa-folder-open"></i>
-                    </button>
-                ` : ''}
+                <button class="btn btn-sm btn-outline" onclick="openFinishedVideoFolder('${escapeJs(clip.channel)}', '${escapeJs(clip.title)}')" title="Mở thư mục chứa file">
+                    <i class="fa-solid fa-folder-open"></i>
+                </button>
             </div>
         `;
 
@@ -3853,11 +4176,29 @@ function populateAdsPowerSelectDropdown(profiles) {
     if (!selectQuick) return;
 
     selectQuick.innerHTML = '<option value="">-- Chọn profile AdsPower có sẵn --</option>';
+    
+    // Group profiles by group_name
+    const groups = {};
     profiles.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.user_id || p.serial_number;
-        opt.textContent = `[#${p.serial_number}] ${p.name || 'Unnamed'} (${p.user_id})`;
-        selectQuick.appendChild(opt);
+        const g = p.group_name || 'Default';
+        if (!groups[g]) groups[g] = [];
+        groups[g].push(p);
+    });
+
+    Object.keys(groups).sort().forEach(groupName => {
+        const optgroup = document.createElement('optgroup');
+        const isShared = groupName.toLowerCase().includes('share');
+        optgroup.label = `${isShared ? '🤝 ' : '📁 '}Group: ${groupName} (${groups[groupName].length})`;
+        
+        groups[groupName].forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.user_id || p.serial_number;
+            const ipStr = p.ip ? ` - IP: ${p.ip}` : '';
+            opt.textContent = `[#${p.serial_number}] ${p.name || 'Unnamed'}${ipStr}`;
+            opt.dataset.profile = JSON.stringify(p);
+            optgroup.appendChild(opt);
+        });
+        selectQuick.appendChild(optgroup);
     });
 }
 
@@ -4234,13 +4575,17 @@ function showToast(message) {
 window.copyTextToClipboard = copyTextToClipboard;
 
 /* ==========================================================================
-   Auto-Pilot Pipeline Hub (All-in-One Automation & Nightly Scheduler)
+   Auto-Pilot Pipeline Hub (All-in-One Automation & Accounts Queue Table)
    ========================================================================== */
 let isAutopilotRunning = false;
 let autopilotCancelRequested = false;
 let pendingQueueRawCache = [];
 let pendingQueueFilteredCache = [];
-let selectedAutopilotAccounts = null; // null = all selected, or Set of account names
+let selectedAutopilotAccounts = null; // null: auto-select accounts with clips, or Set<string>
+let autopilotFilterGroup = 'all';
+let autopilotFilterStatus = 'all'; // 'all', 'has_clips', 'completed'
+let autopilotSearchQuery = '';
+let expandedAutopilotAccounts = new Set(); // Set of account_name strings whose accordion is expanded
 
 function initAutoPilotHub() {
     const btnOpenModal = document.getElementById('btn-open-autopilot-modal');
@@ -4258,29 +4603,134 @@ function initAutoPilotHub() {
     const btnRefreshPage = document.getElementById('btn-page-refresh-queue');
     const btnOpenN8nPage = document.getElementById('btn-page-open-n8n');
 
-    // Account Selector Buttons (Page & Modal)
+    // Toolbar Controls
+    const groupSelect = document.getElementById('autopilot-filter-group');
+    const statusSelect = document.getElementById('autopilot-filter-status');
+    const searchInput = document.getElementById('autopilot-search-account');
+    const btnClearSearch = document.getElementById('btn-clear-autopilot-search');
+
+    if (groupSelect) {
+        groupSelect.addEventListener('change', (e) => {
+            autopilotFilterGroup = e.target.value;
+            renderAutopilotUI();
+        });
+    }
+
+    if (statusSelect) {
+        statusSelect.addEventListener('change', (e) => {
+            autopilotFilterStatus = e.target.value;
+            renderAutopilotUI();
+        });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            autopilotSearchQuery = e.target.value.trim().toLowerCase();
+            if (btnClearSearch) {
+                btnClearSearch.classList.toggle('hidden', !autopilotSearchQuery);
+            }
+            renderAutopilotUI();
+        });
+    }
+
+    if (btnClearSearch) {
+        btnClearSearch.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            autopilotSearchQuery = '';
+            btnClearSearch.classList.add('hidden');
+            renderAutopilotUI();
+        });
+    }
+
+    // Master Checkbox
+    const chkMaster = document.getElementById('chk-autopilot-master');
+    if (chkMaster) {
+        chkMaster.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const visible = getVisibleAutopilotAccounts();
+            if (!selectedAutopilotAccounts) selectedAutopilotAccounts = new Set();
+            visible.forEach(acc => {
+                if (isChecked) {
+                    selectedAutopilotAccounts.add(acc.name);
+                } else {
+                    selectedAutopilotAccounts.delete(acc.name);
+                }
+            });
+            renderAutopilotUI();
+        });
+    }
+
+    // Batch Action Buttons
     const btnPageAccSelectAll = document.getElementById('btn-page-acc-select-all');
-    const btnPageAccDeselectAll = document.getElementById('btn-page-acc-deselect-all');
+    const btnPageAccSelectHasClips = document.getElementById('btn-page-acc-select-has-clips');
+    const btnPageAccSelectNone = document.getElementById('btn-page-acc-select-none');
+    const btnToggleExpandAll = document.getElementById('btn-toggle-expand-all-accs');
+
+    // Modal buttons (for backwards compatibility if modal opened)
     const btnModalAccSelectAll = document.getElementById('btn-modal-acc-select-all');
     const btnModalAccDeselectAll = document.getElementById('btn-modal-acc-deselect-all');
 
-    const handleSelectAll = () => {
-        const allAccs = Array.from(new Set(pendingQueueRawCache.map(i => i.account_name)));
-        selectedAutopilotAccounts = new Set(allAccs);
-        renderAutopilotUI();
-    };
+    if (btnPageAccSelectAll) {
+        btnPageAccSelectAll.addEventListener('click', () => {
+            const visible = getVisibleAutopilotAccounts();
+            if (!selectedAutopilotAccounts) selectedAutopilotAccounts = new Set();
+            visible.forEach(acc => selectedAutopilotAccounts.add(acc.name));
+            renderAutopilotUI();
+        });
+    }
 
-    const handleDeselectAll = () => {
-        selectedAutopilotAccounts = new Set();
-        renderAutopilotUI();
-    };
+    if (btnPageAccSelectHasClips) {
+        btnPageAccSelectHasClips.addEventListener('click', () => {
+            const visible = getVisibleAutopilotAccounts();
+            if (!selectedAutopilotAccounts) selectedAutopilotAccounts = new Set();
+            visible.forEach(acc => {
+                if (acc.clips.length > 0) {
+                    selectedAutopilotAccounts.add(acc.name);
+                } else {
+                    selectedAutopilotAccounts.delete(acc.name);
+                }
+            });
+            renderAutopilotUI();
+        });
+    }
 
-    if (btnPageAccSelectAll) btnPageAccSelectAll.addEventListener('click', handleSelectAll);
-    if (btnPageAccDeselectAll) btnPageAccDeselectAll.addEventListener('click', handleDeselectAll);
-    if (btnModalAccSelectAll) btnModalAccSelectAll.addEventListener('click', handleSelectAll);
-    if (btnModalAccDeselectAll) btnModalAccDeselectAll.addEventListener('click', handleDeselectAll);
+    if (btnPageAccSelectNone) {
+        btnPageAccSelectNone.addEventListener('click', () => {
+            selectedAutopilotAccounts = new Set();
+            renderAutopilotUI();
+        });
+    }
 
-    // Header Button -> Open Modal
+    if (btnToggleExpandAll) {
+        btnToggleExpandAll.addEventListener('click', () => {
+            const visibleWithClips = getVisibleAutopilotAccounts().filter(a => a.clips.length > 0);
+            if (visibleWithClips.length === 0) return;
+            const allExpanded = visibleWithClips.every(a => expandedAutopilotAccounts.has(a.name));
+            if (allExpanded) {
+                visibleWithClips.forEach(a => expandedAutopilotAccounts.delete(a.name));
+            } else {
+                visibleWithClips.forEach(a => expandedAutopilotAccounts.add(a.name));
+            }
+            renderAutopilotUI();
+        });
+    }
+
+    if (btnModalAccSelectAll) {
+        btnModalAccSelectAll.addEventListener('click', () => {
+            const allAccs = Array.from(new Set(pendingQueueRawCache.map(i => i.account_name)));
+            selectedAutopilotAccounts = new Set(allAccs);
+            renderAutopilotUI();
+        });
+    }
+
+    if (btnModalAccDeselectAll) {
+        btnModalAccDeselectAll.addEventListener('click', () => {
+            selectedAutopilotAccounts = new Set();
+            renderAutopilotUI();
+        });
+    }
+
+    // Modal Opening & Closing
     if (btnOpenModal && modal) {
         btnOpenModal.addEventListener('click', () => {
             modal.classList.remove('hidden');
@@ -4288,7 +4738,6 @@ function initAutoPilotHub() {
         });
     }
 
-    // Modal Close
     if (btnCloseModal && modal) {
         btnCloseModal.addEventListener('click', () => {
             if (isAutopilotRunning) {
@@ -4300,7 +4749,6 @@ function initAutoPilotHub() {
         });
     }
 
-    // Banner Button in Posting Tracker -> Switch to Auto-Pilot Tab
     if (btnBannerOpen) {
         btnBannerOpen.addEventListener('click', () => {
             const tabBtn = document.getElementById('tab-btn-autopilot');
@@ -4353,7 +4801,6 @@ function initAutoPilotHub() {
     if (btnStopModal) btnStopModal.addEventListener('click', stopAutopilotPipeline);
     if (btnStopPage) btnStopPage.addEventListener('click', stopAutopilotPipeline);
 
-    // Pre-load on init and sync button state with server
     syncAutopilotButtonState();
     loadAutopilotQueue();
 }
@@ -4370,6 +4817,7 @@ async function syncAutopilotButtonState() {
         const btnStartPage = document.getElementById('btn-page-start-autopilot');
         const btnStopPage = document.getElementById('btn-page-stop-autopilot');
         const statusBadgePage = document.getElementById('tab-autopilot-status-badge');
+        const miniBtn = document.getElementById('btn-autopilot-view-logs');
 
         if (isRunning) {
             if (btnStartModal) btnStartModal.classList.add('hidden');
@@ -4380,11 +4828,19 @@ async function syncAutopilotButtonState() {
                 statusBadgePage.textContent = 'Đang chạy...';
                 statusBadgePage.className = 'badge badge-primary';
             }
+            if (miniBtn) {
+                miniBtn.style.display = 'inline-flex';
+                miniBtn.classList.remove('hidden');
+            }
         } else {
             if (btnStartModal) btnStartModal.classList.remove('hidden');
             if (btnStopModal) btnStopModal.classList.add('hidden');
             if (btnStartPage) btnStartPage.classList.remove('hidden');
             if (btnStopPage) btnStopPage.classList.add('hidden');
+            if (miniBtn) {
+                miniBtn.style.display = 'none';
+                miniBtn.classList.add('hidden');
+            }
             if (statusBadgePage) {
                 if (data.state && (data.state.success_count > 0 || data.state.fail_count > 0)) {
                     statusBadgePage.textContent = 'Đã hoàn thành';
@@ -4398,147 +4854,224 @@ async function syncAutopilotButtonState() {
     } catch (e) {}
 }
 
+function buildAutopilotAccountsModel() {
+    const accClipsMap = {};
+    for (const item of pendingQueueRawCache) {
+        const acc = item.account_name;
+        if (!acc) continue;
+        if (!accClipsMap[acc]) accClipsMap[acc] = [];
+        accClipsMap[acc].push(item);
+    }
+
+    const map = new Map();
+    const registeredAccs = (typeof accountsData !== 'undefined' && accountsData.tiktok_accounts) || [];
+
+    registeredAccs.forEach(a => {
+        if (!a || !a.account_name) return;
+        const name = a.account_name;
+        map.set(name, {
+            name: name,
+            group_name: a.group_name || 'Default',
+            target_channel: a.target_channel || '',
+            target_ip: a.build_up_ip || a.country || a.ip || a.original_ip || 'US',
+            ads_id: a.adspower_id || a.serial_number || '',
+            clips: accClipsMap[name] || []
+        });
+    });
+
+    Object.keys(accClipsMap).forEach(name => {
+        if (!map.has(name)) {
+            const firstClip = accClipsMap[name][0] || {};
+            map.set(name, {
+                name: name,
+                group_name: 'Default',
+                target_channel: firstClip.channel || '',
+                target_ip: firstClip.target_ip || firstClip.country || 'US',
+                ads_id: '',
+                clips: accClipsMap[name]
+            });
+        }
+    });
+
+    return Array.from(map.values());
+}
+
+function getVisibleAutopilotAccounts() {
+    const allAccounts = buildAutopilotAccountsModel();
+    let list = allAccounts;
+
+    // 1. Group filter
+    if (autopilotFilterGroup && autopilotFilterGroup !== 'all') {
+        list = list.filter(a => a.group_name === autopilotFilterGroup);
+    }
+
+    // 2. Status filter
+    if (autopilotFilterStatus === 'has_clips') {
+        list = list.filter(a => a.clips.length > 0);
+    } else if (autopilotFilterStatus === 'completed') {
+        list = list.filter(a => a.clips.length === 0);
+    }
+
+    // 3. Search query
+    if (autopilotSearchQuery) {
+        list = list.filter(a =>
+            a.name.toLowerCase().includes(autopilotSearchQuery) ||
+            a.target_channel.toLowerCase().includes(autopilotSearchQuery) ||
+            (a.group_name && a.group_name.toLowerCase().includes(autopilotSearchQuery))
+        );
+    }
+
+    return list;
+}
+
 async function loadAutopilotQueue() {
     syncAutopilotButtonState();
     const queueBadgeModal = document.getElementById('autopilot-queue-badge');
     const queuePreviewModal = document.getElementById('autopilot-queue-preview');
     const queueCountPage = document.getElementById('tab-autopilot-queue-count');
     const accountsCountPage = document.getElementById('tab-autopilot-accounts-count');
-    const tableBodyPage = document.getElementById('tab-autopilot-table-body');
+    const tableBodyPage = document.getElementById('tab-autopilot-accounts-table-body');
 
     if (queueBadgeModal) queueBadgeModal.textContent = 'Đang quét...';
     if (queuePreviewModal) queuePreviewModal.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 10px;">Đang tải danh sách clip chờ đăng...</div>';
-    if (tableBodyPage) tableBodyPage.innerHTML = '<tr><td colspan="5" class="table-empty">Đang tải danh sách clip chờ đăng...</td></tr>';
+    if (tableBodyPage) tableBodyPage.innerHTML = '<tr><td colspan="7" class="table-empty"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải danh sách tài khoản và hàng đợi...</td></tr>';
 
     try {
+        if (typeof fetchAccountsData === 'function' && (!accountsData || !accountsData.tiktok_accounts || accountsData.tiktok_accounts.length === 0)) {
+            try { await fetchAccountsData(); } catch (e) {}
+        }
+
         const res = await fetch('/api/n8n/pending_clips?only_current_target=true');
         const data = await res.json();
         if (data.success) {
             pendingQueueRawCache = data.items || [];
             
-            // Lấy danh sách tất cả tài khoản
-            const allAccs = Array.from(new Set(pendingQueueRawCache.map(i => i.account_name)));
-            
-            // Nếu lần đầu tải, mặc định chọn tất cả
+            const allModels = buildAutopilotAccountsModel();
+            const accountsWithClips = allModels.filter(a => a.clips.length > 0).map(a => a.name);
+
+            // Mặc định ban đầu chọn tất cả tài khoản CÓ clip
             if (selectedAutopilotAccounts === null) {
-                selectedAutopilotAccounts = new Set(allAccs);
-            } else {
-                // Giữ lại các account hợp lệ
-                const validSet = new Set();
-                for (const acc of selectedAutopilotAccounts) {
-                    if (allAccs.includes(acc)) validSet.add(acc);
-                }
-                // Nếu chưa chọn nick nào mới, add các nick mới
-                for (const acc of allAccs) {
-                    if (!selectedAutopilotAccounts.has(acc) && selectedAutopilotAccounts.size === 0) {
-                        // Do nothing if user intentionally unselected all
-                    } else if (!selectedAutopilotAccounts.has(acc) && validSet.size > 0) {
-                        // Keep user selection
-                    }
-                }
+                selectedAutopilotAccounts = new Set(accountsWithClips.length > 0 ? accountsWithClips : allModels.map(a => a.name));
             }
 
             renderAutopilotUI();
+        } else {
+            if (tableBodyPage) tableBodyPage.innerHTML = `<tr><td colspan="7" style="color: #ef4444; text-align: center;">Lỗi tải hàng đợi: ${data.error || 'Lỗi không xác định'}</td></tr>`;
         }
     } catch (err) {
         if (queueBadgeModal) queueBadgeModal.textContent = 'Lỗi quét';
         if (queuePreviewModal) queuePreviewModal.innerHTML = `<div style="color: #ef4444; padding: 8px;">Lỗi kết nối: ${err.message}</div>`;
-        if (tableBodyPage) tableBodyPage.innerHTML = `<tr><td colspan="5" style="color: #ef4444; text-align: center;">Lỗi kết nối: ${err.message}</td></tr>`;
+        if (tableBodyPage) tableBodyPage.innerHTML = `<tr><td colspan="7" style="color: #ef4444; text-align: center;">Lỗi kết nối: ${err.message}</td></tr>`;
     }
 }
 
 function renderAutopilotUI() {
-    const queueBadgeModal = document.getElementById('autopilot-queue-badge');
-    const queuePreviewModal = document.getElementById('autopilot-queue-preview');
-    const queueCountPage = document.getElementById('tab-autopilot-queue-count');
-    const accountsCountPage = document.getElementById('tab-autopilot-accounts-count');
-    const tableBodyPage = document.getElementById('tab-autopilot-table-body');
-    const pageAccBadge = document.getElementById('autopilot-selected-acc-badge');
-    const modalAccBadge = document.getElementById('autopilot-modal-selected-acc-badge');
-    const pageAccList = document.getElementById('autopilot-page-accounts-list');
-    const modalAccList = document.getElementById('autopilot-modal-accounts-list');
+    const allModels = buildAutopilotAccountsModel();
+    if (!selectedAutopilotAccounts) selectedAutopilotAccounts = new Set();
 
-    // Thống kê tài khoản và clip từ toàn bộ danh sách tài khoản đã cấu hình
-    const registeredAccs = accountsData.tiktok_accounts || [];
-    const accStats = {};
-    
-    // Khởi tạo tất cả tài khoản đã cấu hình
-    registeredAccs.forEach(a => {
-        const name = a.account_name;
-        if (name) {
-            accStats[name] = { 
-                name: name, 
-                target_channel: a.target_channel || '', 
-                target_ip: a.build_up_ip || a.original_ip || 'US', 
-                count: 0 
-            };
+    // 1. Populate Group Filter Dropdown
+    const groupSelect = document.getElementById('autopilot-filter-group');
+    if (groupSelect) {
+        const groupsSet = new Set();
+        const groupCountMap = {};
+        allModels.forEach(a => {
+            const g = a.group_name || 'Default';
+            groupsSet.add(g);
+            groupCountMap[g] = (groupCountMap[g] || 0) + 1;
+        });
+
+        const groupsArr = Array.from(groupsSet).sort();
+        const currentVal = autopilotFilterGroup || 'all';
+
+        let optionsHtml = `<option value="all" ${currentVal === 'all' ? 'selected' : ''}>Tất cả Groups (${allModels.length})</option>`;
+        groupsArr.forEach(g => {
+            optionsHtml += `<option value="${escapeHtml(g)}" ${currentVal === g ? 'selected' : ''}>${escapeHtml(g)} (${groupCountMap[g]})</option>`;
+        });
+        groupSelect.innerHTML = optionsHtml;
+    }
+
+    const visibleAccounts = getVisibleAutopilotAccounts();
+
+    // 2. Master Checkbox State
+    const chkMaster = document.getElementById('chk-autopilot-master');
+    if (chkMaster) {
+        if (visibleAccounts.length === 0) {
+            chkMaster.checked = false;
+            chkMaster.indeterminate = false;
+        } else {
+            const selectedVisibleCount = visibleAccounts.filter(a => selectedAutopilotAccounts.has(a.name)).length;
+            if (selectedVisibleCount === visibleAccounts.length) {
+                chkMaster.checked = true;
+                chkMaster.indeterminate = false;
+            } else if (selectedVisibleCount > 0) {
+                chkMaster.checked = false;
+                chkMaster.indeterminate = true;
+            } else {
+                chkMaster.checked = false;
+                chkMaster.indeterminate = false;
+            }
+        }
+    }
+
+    // 3. Expand / Collapse All Button Label & Icon
+    const btnToggleExpandAll = document.getElementById('btn-toggle-expand-all-accs');
+    if (btnToggleExpandAll) {
+        const visibleWithClips = visibleAccounts.filter(a => a.clips.length > 0);
+        const isAllExpanded = visibleWithClips.length > 0 && visibleWithClips.every(a => expandedAutopilotAccounts.has(a.name));
+        if (isAllExpanded) {
+            btnToggleExpandAll.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Thu gọn tất cả';
+        } else {
+            btnToggleExpandAll.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Mở rộng tất cả';
+        }
+    }
+
+    // 4. Update Summary Badges & Hero Counts
+    let totalSelectedClips = 0;
+    allModels.forEach(a => {
+        if (selectedAutopilotAccounts.has(a.name)) {
+            totalSelectedClips += a.clips.length;
         }
     });
 
-    // Đếm số clip chờ đăng thực tế
-    for (const item of pendingQueueRawCache) {
-        const acc = item.account_name;
-        if (!accStats[acc]) {
-            accStats[acc] = { name: acc, target_channel: item.channel || '', target_ip: item.target_ip || 'US', count: 0 };
-        }
-        accStats[acc].count++;
+    const pageAccBadge = document.getElementById('autopilot-selected-acc-badge');
+    if (pageAccBadge) {
+        pageAccBadge.textContent = `Đã chọn: ${selectedAutopilotAccounts.size}/${allModels.length} tài khoản (${totalSelectedClips} clip)`;
     }
 
-    const allAccs = Object.keys(accStats);
-    const activeAccs = allAccs.filter(a => accStats[a].count > 0);
-    const completedAccs = allAccs.filter(a => accStats[a].count === 0);
+    const queueCountPage = document.getElementById('tab-autopilot-queue-count');
+    const accountsCountPage = document.getElementById('tab-autopilot-accounts-count');
+    if (queueCountPage) queueCountPage.textContent = `${totalSelectedClips} Clip`;
+    if (accountsCountPage) accountsCountPage.textContent = `${selectedAutopilotAccounts.size} Acc`;
 
-    if (selectedAutopilotAccounts === null) {
-        selectedAutopilotAccounts = new Set(activeAccs);
+    // 5. Update Modal UI (if present)
+    const queueBadgeModal = document.getElementById('autopilot-queue-badge');
+    const modalAccBadge = document.getElementById('autopilot-modal-selected-acc-badge');
+    const modalAccList = document.getElementById('autopilot-modal-accounts-list');
+    const queuePreviewModal = document.getElementById('autopilot-queue-preview');
+
+    if (queueBadgeModal) {
+        queueBadgeModal.textContent = `${totalSelectedClips} clip sẵn sàng`;
+        queueBadgeModal.className = totalSelectedClips > 0 ? 'badge badge-primary' : 'badge badge-secondary';
+    }
+    if (modalAccBadge) {
+        modalAccBadge.textContent = `${selectedAutopilotAccounts.size}/${allModels.length} tài khoản`;
     }
 
-    // 1. Render Account Chips (Bao gồm cả tài khoản có clip và tài khoản đã hoàn thành)
-    const renderChips = (container) => {
-        if (!container) return;
-        if (allAccs.length === 0) {
-            container.innerHTML = '<span style="font-size: 11px; color: var(--text-secondary);">Không có tài khoản nào được cấu hình.</span>';
-            return;
-        }
+    if (modalAccList) {
+        modalAccList.innerHTML = allModels.map(acc => {
+            const isSel = selectedAutopilotAccounts.has(acc.name);
+            return `
+                <button type="button" class="btn btn-xs ${isSel ? 'btn-primary' : 'btn-outline'}"
+                        data-autopilot-acc="${escapeHtml(acc.name)}"
+                        style="display: inline-flex; align-items: center; gap: 5px; font-weight: 700; border-radius: 6px; padding: 4px 8px; cursor: pointer;">
+                    <i class="fa-solid ${isSel ? 'fa-square-check text-success' : 'fa-square'}"></i>
+                    <span>@${escapeHtml(acc.name)}</span>
+                    <span class="badge ${isSel ? 'badge-info' : 'badge-secondary'}" style="font-size: 9.5px; padding: 1px 4px;">${acc.clips.length} clip</span>
+                </button>
+            `;
+        }).join('');
 
-        let html = '';
-        
-        // Nhóm có clip chờ đăng
-        if (activeAccs.length > 0) {
-            html += activeAccs.map(acc => {
-                const isSelected = selectedAutopilotAccounts.has(acc);
-                const info = accStats[acc];
-                return `
-                    <button type="button" class="btn btn-xs ${isSelected ? 'btn-primary' : 'btn-outline'}" 
-                            data-autopilot-acc="${escapeHtml(acc)}" 
-                            style="display: inline-flex; align-items: center; gap: 5px; font-weight: 700; border-radius: 6px; padding: 4px 10px; cursor: pointer; transition: all 0.15s ease;">
-                        <i class="fa-solid ${isSelected ? 'fa-square-check text-success' : 'fa-square'}" style="font-size: 12px;"></i>
-                        <span>@${escapeHtml(acc)}</span>
-                        ${info.target_channel ? `<span style="font-size: 10px; opacity: 0.75;">(${escapeHtml(info.target_channel)})</span>` : ''}
-                        <span class="badge ${isSelected ? 'badge-info' : 'badge-secondary'}" style="font-size: 10px; padding: 1px 5px;">${info.count} clip</span>
-                    </button>
-                `;
-            }).join('');
-        }
-
-        // Nhóm đã đăng xong toàn bộ clip
-        if (completedAccs.length > 0) {
-            html += completedAccs.map(acc => {
-                const info = accStats[acc];
-                return `
-                    <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; opacity: 0.55; background: rgba(255,255,255,0.04); border: 1px dashed var(--border-color); border-radius: 6px; padding: 4px 8px;">
-                        <i class="fa-solid fa-circle-check text-success" style="font-size: 11px;"></i>
-                        <span>@${escapeHtml(acc)}</span>
-                        ${info.target_channel ? `<span style="font-size: 10px;">(${escapeHtml(info.target_channel)})</span>` : ''}
-                        <span class="badge badge-secondary" style="font-size: 9.5px; padding: 1px 4px;">Đã xong</span>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        container.innerHTML = html;
-
-        // Attach click listeners to active chips
-        container.querySelectorAll('[data-autopilot-acc]').forEach(btn => {
+        modalAccList.querySelectorAll('[data-autopilot-acc]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const acc = btn.getAttribute('data-autopilot-acc');
                 if (selectedAutopilotAccounts.has(acc)) {
@@ -4549,35 +5082,14 @@ function renderAutopilotUI() {
                 renderAutopilotUI();
             });
         });
-    };
-
-    renderChips(pageAccList);
-    renderChips(modalAccList);
-
-    // Update account badge text
-    const accBadgeText = `${selectedAutopilotAccounts.size}/${allAccs.length} tài khoản (${activeAccs.length} có clip)`;
-    if (pageAccBadge) pageAccBadge.textContent = accBadgeText;
-    if (modalAccBadge) modalAccBadge.textContent = accBadgeText;
-
-    // 2. Filter queue by selected accounts
-    pendingQueueFilteredCache = pendingQueueRawCache.filter(i => selectedAutopilotAccounts.has(i.account_name));
-    const total = pendingQueueFilteredCache.length;
-
-    // Update Counts
-    if (queueCountPage) queueCountPage.textContent = `${total} Clip`;
-    if (accountsCountPage) accountsCountPage.textContent = `${selectedAutopilotAccounts.size} Acc`;
-
-    if (queueBadgeModal) {
-        queueBadgeModal.textContent = `${total} clip sẵn sàng`;
-        queueBadgeModal.className = total > 0 ? 'badge badge-primary' : 'badge badge-secondary';
     }
 
-    // Populate Modal Preview
     if (queuePreviewModal) {
-        if (total === 0) {
-            queuePreviewModal.innerHTML = '<div style="color: var(--text-secondary); padding: 8px; text-align: center;"><i class="fa-solid fa-circle-check text-success"></i> Không có clip nào cho các tài khoản được chọn (hoặc bạn chưa chọn tài khoản nào).</div>';
+        const filteredClips = pendingQueueRawCache.filter(i => selectedAutopilotAccounts.has(i.account_name));
+        if (filteredClips.length === 0) {
+            queuePreviewModal.innerHTML = '<div style="color: var(--text-secondary); padding: 8px; text-align: center;"><i class="fa-solid fa-circle-check text-success"></i> Không có clip nào cho các tài khoản được chọn.</div>';
         } else {
-            queuePreviewModal.innerHTML = pendingQueueFilteredCache.map((item, idx) => `
+            queuePreviewModal.innerHTML = filteredClips.map((item, idx) => `
                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.08); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
                     <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
                         <span style="font-weight: 700; color: var(--primary); font-size: 11px;">#${idx+1} [${escapeHtml(item.channel || '')}]</span>
@@ -4585,96 +5097,234 @@ function renderAutopilotUI() {
                         ${item.part_label ? `<span class="badge badge-info" style="font-size: 10px; margin-left: 4px;">${escapeHtml(item.part_label)}</span>` : ''}
                     </div>
                     <div style="font-size: 11px; color: var(--text-secondary);">
-                        👤 @<strong>${escapeHtml(item.account_name || '')}</strong> (IP: ${escapeHtml(item.target_ip || 'US')})
+                        👤 @<strong>${escapeHtml(item.account_name || '')}</strong>
                     </div>
                 </div>
             `).join('');
         }
     }
 
-    // Populate Full Page Table
-    if (tableBodyPage) {
-        if (total === 0) {
-            tableBodyPage.innerHTML = '<tr><td colspan="6" class="table-empty"><i class="fa-solid fa-circle-check text-success"></i> Không có clip nào cho các tài khoản được chọn (hoặc bạn chưa chọn tài khoản nào).</td></tr>';
-        } else {
-            tableBodyPage.innerHTML = pendingQueueFilteredCache.map((item, idx) => `
-                <tr>
-                    <td style="text-align: center; font-weight: 700;">${idx+1}</td>
-                    <td>
-                        <div style="font-size: 11px; color: var(--primary); font-weight: 700;">${escapeHtml(item.channel || '')}</div>
-                        <div style="font-weight: 700; font-size: 13px;">${escapeHtml(item.title || '')}</div>
+    // 6. Render Full Accounts Table Body
+    const tableBody = document.getElementById('tab-autopilot-accounts-table-body');
+    if (tableBody) {
+        if (visibleAccounts.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="7" class="table-empty"><i class="fa-solid fa-filter-circle-xmark"></i> Không tìm thấy tài khoản nào khớp với bộ lọc hoặc tìm kiếm.</td></tr>`;
+            return;
+        }
+
+        let rowsHtml = '';
+        visibleAccounts.forEach(acc => {
+            const isSelected = selectedAutopilotAccounts.has(acc.name);
+            const clipCount = acc.clips.length;
+            const isExpanded = expandedAutopilotAccounts.has(acc.name);
+            const safeAccId = acc.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+            // Main Row
+            rowsHtml += `
+                <tr class="acc-row-main ${isSelected ? 'is-selected' : ''}" data-acc-row="${escapeHtml(acc.name)}">
+                    <td style="text-align: center;">
+                        <label class="custom-checkbox custom-checkbox-inline" onclick="event.stopPropagation();">
+                            <input type="checkbox" class="chk-autopilot-acc" data-acc="${escapeHtml(acc.name)}" ${isSelected ? 'checked' : ''}>
+                            <span class="checkmark"></span>
+                        </label>
                     </td>
                     <td>
-                        ${item.part_label ? `<span class="badge badge-info">${escapeHtml(item.part_label)}</span>` : '<span class="text-muted">Full</span>'}
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--accent); flex-shrink: 0;">
+                                <i class="fa-brands fa-tiktok"></i>
+                            </div>
+                            <div>
+                                <strong style="font-size: 13px; color: var(--text-primary); cursor: pointer;" class="acc-name-clickable" data-acc="${escapeHtml(acc.name)}">@${escapeHtml(acc.name)}</strong>
+                                ${acc.ads_id ? `<div style="font-size: 10px; color: var(--text-muted);"><i class="fa-solid fa-cube"></i> AdsPower: ${escapeHtml(acc.ads_id)}</div>` : ''}
+                            </div>
+                        </div>
                     </td>
                     <td>
-                        <span style="font-weight: 800; color: var(--accent);">@${escapeHtml(item.account_name || '')}</span>
+                        <span class="badge badge-secondary" style="font-weight: 600; font-size: 11px;">
+                            <i class="fa-solid fa-layer-group" style="font-size: 10px;"></i> ${escapeHtml(acc.group_name)}
+                        </span>
+                    </td>
+                    <td>
+                        ${acc.target_channel ? `
+                            <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-primary);">
+                                <i class="fa-brands fa-youtube" style="color: #ef4444; font-size: 13px;"></i> ${escapeHtml(acc.target_channel)}
+                            </span>
+                        ` : `<span class="text-muted" style="font-size: 11px;">Chưa gán kênh</span>`}
+                    </td>
+                    <td>
+                        ${clipCount > 0 ? `
+                            <span class="badge badge-primary" style="font-size: 11.5px; font-weight: 700; padding: 3px 8px; display: inline-flex; align-items: center; gap: 5px;">
+                                <i class="fa-solid fa-film"></i> ${clipCount} clip sẵn sàng
+                            </span>
+                        ` : `
+                            <span class="badge badge-secondary" style="font-size: 11px; opacity: 0.75; display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="fa-solid fa-circle-check text-success"></i> 0 clip (Đã xong)
+                            </span>
+                        `}
                     </td>
                     <td style="text-align: center;">
-                        <span class="badge badge-primary">${escapeHtml(item.target_ip || 'US')}</span>
+                        <span class="badge badge-outline" style="font-weight: 700; font-size: 11px; letter-spacing: 0.5px;">${escapeHtml(acc.target_ip)}</span>
                     </td>
                     <td style="text-align: center;">
-                        <button type="button" class="btn btn-xs btn-success btn-mark-queue-posted"
-                                data-acc="${escapeHtml(item.account_name || '')}"
-                                data-key="${escapeHtml(item.clip_key || '')}"
-                                data-chan="${escapeHtml(item.channel || '')}"
-                                data-title="${escapeHtml(item.title || '')}"
-                                data-part="${escapeHtml(item.part_label || '')}"
-                                title="Đánh dấu đã đăng & ẩn khỏi hàng đợi"
-                                style="font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
-                            <i class="fa-solid fa-check"></i> Đã đăng
-                        </button>
+                        ${clipCount > 0 ? `
+                            <button type="button" class="btn-toggle-row-clips" data-acc="${escapeHtml(acc.name)}" title="Xem danh sách clip của tài khoản này">
+                                <span>${isExpanded ? 'Thu gọn' : `Xem ${clipCount} clip`}</span>
+                                <i class="fa-solid ${isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
+                            </button>
+                        ` : `
+                            <span class="text-muted" style="font-size: 11px;">Trống</span>
+                        `}
                     </td>
                 </tr>
-            `).join('');
+            `;
 
-            // Gắn sự kiện cho nút "Đã đăng"
-            tableBodyPage.querySelectorAll('.btn-mark-queue-posted').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const acc = btn.getAttribute('data-acc');
-                    const key = btn.getAttribute('data-key');
-                    const chan = btn.getAttribute('data-chan');
-                    const title = btn.getAttribute('data-title');
-                    const part = btn.getAttribute('data-part');
+            // Subrow with Nested Clips Table
+            if (clipCount > 0) {
+                rowsHtml += `
+                    <tr class="acc-subrow-clips ${isExpanded ? '' : 'is-collapsed'}" id="acc-subrow-${safeAccId}">
+                        <td colspan="7">
+                            <div class="nested-clips-box">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                    <span style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-list-check text-primary"></i> Hàng đợi video của <strong>@${escapeHtml(acc.name)}</strong> (${clipCount} video):
+                                    </span>
+                                    <span style="font-size: 11px; color: var(--text-secondary);">
+                                        Nguồn: <strong>${escapeHtml(acc.target_channel)}</strong> &bull; IP: <strong>${escapeHtml(acc.target_ip)}</strong>
+                                    </span>
+                                </div>
+                                <table class="nested-clips-table">
+                                    <thead>
+                                        <tr>
+                                            <th width="40" style="text-align: center;">#</th>
+                                            <th>Tiêu đề video</th>
+                                            <th width="100">Phân đoạn</th>
+                                            <th width="160">Thời gian tạo</th>
+                                            <th width="110" style="text-align: center;">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${acc.clips.map((clip, cIdx) => `
+                                            <tr>
+                                                <td style="text-align: center; font-weight: 700; color: var(--text-secondary);">${cIdx + 1}</td>
+                                                <td>
+                                                    <div style="font-weight: 600; font-size: 12px; color: var(--text-primary);">${escapeHtml(clip.title || '')}</div>
+                                                    <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 1px;">
+                                                        <i class="fa-brands fa-youtube" style="color: #ef4444; font-size: 10px;"></i> ${escapeHtml(clip.channel || '')}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    ${clip.part_label ? `<span class="badge badge-info" style="font-size: 10px;">${escapeHtml(clip.part_label)}</span>` : '<span class="text-muted" style="font-size: 10px;">Full</span>'}
+                                                </td>
+                                                <td style="font-size: 11px; color: var(--text-secondary);">
+                                                    ${clip.created_at ? `<i class="fa-regular fa-clock" style="font-size: 10px;"></i> ${escapeHtml(clip.created_at)}` : '<span class="text-muted">Mới tạo</span>'}
+                                                </td>
+                                                <td style="text-align: center;">
+                                                    <button type="button" class="btn btn-xs btn-outline-success btn-mark-queue-posted"
+                                                            data-acc="${escapeHtml(clip.account_name || acc.name)}"
+                                                            data-key="${escapeHtml(clip.clip_key || '')}"
+                                                            data-chan="${escapeHtml(clip.channel || '')}"
+                                                            data-title="${escapeHtml(clip.title || '')}"
+                                                            data-part="${escapeHtml(clip.part_label || '')}"
+                                                            title="Đánh dấu đã đăng & loại khỏi hàng đợi"
+                                                            style="font-size: 10.5px; padding: 2px 7px; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; cursor: pointer;">
+                                                        <i class="fa-solid fa-check"></i> Đã đăng
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+        });
+        tableBody.innerHTML = rowsHtml;
 
-                    btn.disabled = true;
-                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        // Attach Checkbox event listeners
+        tableBody.querySelectorAll('.chk-autopilot-acc').forEach(chk => {
+            chk.addEventListener('change', () => {
+                const acc = chk.getAttribute('data-acc');
+                if (chk.checked) {
+                    selectedAutopilotAccounts.add(acc);
+                } else {
+                    selectedAutopilotAccounts.delete(acc);
+                }
+                renderAutopilotUI();
+            });
+        });
 
-                    try {
-                        const res = await fetch('/api/publishing/toggle_post', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                account_name: acc,
-                                clip_key: key,
-                                channel: chan,
-                                title: title,
-                                posted: true,
-                                part_label: part || null
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            // Xóa clip khỏi danh sách hàng đợi ngay lập tức
-                            pendingQueueRawCache = pendingQueueRawCache.filter(i => 
-                                !(i.account_name === acc && i.channel === chan && i.title === title && (i.part_label || '') === (part || ''))
-                            );
-                            renderAutopilotUI();
-                            showToast(`✅ Đã đánh dấu @${acc}: '${title}' (${part || 'Full'}) là ĐÃ ĐĂNG!`);
-                        } else {
-                            btn.disabled = false;
-                            btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã đăng';
-                            showToast(`❌ Lỗi: ${data.error || 'Không thể lưu trạng thái'}`);
-                        }
-                    } catch (err) {
+        // Attach Toggle expand/collapse listeners
+        const toggleAccordion = (acc) => {
+            if (!acc) return;
+            if (expandedAutopilotAccounts.has(acc)) {
+                expandedAutopilotAccounts.delete(acc);
+            } else {
+                expandedAutopilotAccounts.add(acc);
+            }
+            renderAutopilotUI();
+        };
+
+        tableBody.querySelectorAll('.btn-toggle-row-clips').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleAccordion(btn.getAttribute('data-acc'));
+            });
+        });
+
+        tableBody.querySelectorAll('.acc-name-clickable').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleAccordion(el.getAttribute('data-acc'));
+            });
+        });
+
+        // Attach Mark-as-posted listener
+        tableBody.querySelectorAll('.btn-mark-queue-posted').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const acc = btn.getAttribute('data-acc');
+                const key = btn.getAttribute('data-key');
+                const chan = btn.getAttribute('data-chan');
+                const title = btn.getAttribute('data-title');
+                const part = btn.getAttribute('data-part');
+
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+                try {
+                    const res = await fetch('/api/publishing/toggle_post', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            account_name: acc,
+                            clip_key: key,
+                            channel: chan,
+                            title: title,
+                            posted: true,
+                            part_label: part || null
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        pendingQueueRawCache = pendingQueueRawCache.filter(i =>
+                            !(i.account_name === acc && i.channel === chan && i.title === title && (i.part_label || '') === (part || ''))
+                        );
+                        renderAutopilotUI();
+                        showToast(`✅ Đã đánh dấu @${acc}: '${title}' (${part || 'Full'}) là ĐÃ ĐĂNG!`);
+                    } else {
                         btn.disabled = false;
                         btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã đăng';
-                        showToast(`❌ Lỗi kết nối: ${err.message}`);
+                        showToast(`❌ Lỗi: ${data.error || 'Không thể lưu trạng thái'}`);
                     }
-                });
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã đăng';
+                    showToast(`❌ Lỗi kết nối: ${err.message}`);
+                }
             });
-        }
+        });
     }
 }
 
@@ -4684,8 +5334,8 @@ let lastAutopilotRunningState = false;
 function appendAutopilotLog(msg, type = 'info') {
     const timeStr = new Date().toLocaleTimeString();
     const containers = [
-        document.getElementById('autopilot-logs'),
-        document.getElementById('tab-autopilot-logs')
+        document.getElementById('terminal-logs-window'),
+        document.getElementById('autopilot-logs')
     ];
 
     containers.forEach(container => {
@@ -4699,15 +5349,23 @@ function appendAutopilotLog(msg, type = 'info') {
 
         logLine.textContent = `[${timeStr}] ${msg}`;
         container.appendChild(logLine);
-        container.scrollTop = container.scrollHeight;
+        if (typeof terminalAutoScroll === 'undefined' || terminalAutoScroll) {
+            container.scrollTop = container.scrollHeight;
+        }
     });
+
+    const term = document.getElementById('terminal-logs-window');
+    const logsCountEl = document.getElementById('terminal-logs-count');
+    if (logsCountEl && term) {
+        logsCountEl.textContent = `${term.children.length} dòng`;
+    }
 }
 
 function syncAutopilotLogsToTerminals(serverLogs) {
     if (!serverLogs || !serverLogs.length) return;
     const containers = [
-        document.getElementById('autopilot-logs'),
-        document.getElementById('tab-autopilot-logs')
+        document.getElementById('terminal-logs-window'),
+        document.getElementById('autopilot-logs')
     ];
 
     let hasNew = false;
@@ -4739,8 +5397,15 @@ function syncAutopilotLogsToTerminals(serverLogs) {
 
     if (hasNew) {
         containers.forEach(container => {
-            if (container) container.scrollTop = container.scrollHeight;
+            if (container && (typeof terminalAutoScroll === 'undefined' || terminalAutoScroll)) {
+                container.scrollTop = container.scrollHeight;
+            }
         });
+        const term = document.getElementById('terminal-logs-window');
+        const logsCountEl = document.getElementById('terminal-logs-count');
+        if (logsCountEl && term) {
+            logsCountEl.textContent = `${term.children.length} dòng`;
+        }
     }
 }
 
@@ -4752,6 +5417,7 @@ function setAutopilotRunningUI(isRunning) {
     const btnStopPage = document.getElementById('btn-page-stop-autopilot');
     const statusBadgePage = document.getElementById('tab-autopilot-status-badge');
     const execBoxModal = document.getElementById('autopilot-execution-box');
+    const miniBtn = document.getElementById('btn-autopilot-view-logs');
 
     if (isRunning) {
         if (execBoxModal) execBoxModal.classList.remove('hidden');
@@ -4763,11 +5429,19 @@ function setAutopilotRunningUI(isRunning) {
             statusBadgePage.textContent = 'Đang chạy...';
             statusBadgePage.className = 'badge badge-primary';
         }
+        if (miniBtn) {
+            miniBtn.style.display = 'inline-flex';
+            miniBtn.classList.remove('hidden');
+        }
     } else {
         if (btnStartModal) btnStartModal.classList.remove('hidden');
         if (btnStopModal) btnStopModal.classList.add('hidden');
         if (btnStartPage) btnStartPage.classList.remove('hidden');
         if (btnStopPage) btnStopPage.classList.add('hidden');
+        if (miniBtn) {
+            miniBtn.style.display = 'none';
+            miniBtn.classList.add('hidden');
+        }
     }
 }
 
@@ -4777,40 +5451,36 @@ function updateAutopilotProgressUI(data) {
     const isRunning = Boolean(data.is_autopilot_running);
     setAutopilotRunningUI(isRunning);
 
-    const progressBars = [
-        document.getElementById('autopilot-progress-bar'),
-        document.getElementById('tab-autopilot-progress-bar')
-    ];
-    const percentTexts = [
-        document.getElementById('autopilot-progress-percent'),
-        document.getElementById('tab-autopilot-progress-percent')
-    ];
-    const currentTasks = [
-        document.getElementById('autopilot-current-task'),
-        document.getElementById('tab-autopilot-current-task')
-    ];
-    const statusBadgePage = document.getElementById('tab-autopilot-status-badge');
-
     const percent = data.percentage || 0;
     const task = data.current_task || '';
     const autoState = data.autopilot_state || {};
     const successCount = autoState.success_count || 0;
 
+    const miniProgress = document.getElementById('autopilot-mini-progress');
+    if (miniProgress) miniProgress.textContent = `${percent}%`;
+
+    const progressFill = document.getElementById('progress-fill');
+    const progressPercent = document.getElementById('progress-percentage');
+    const progressTask = document.getElementById('progress-current-task');
     if (isRunning) {
-        progressBars.forEach(b => { if (b) b.style.width = `${percent}%`; });
-        percentTexts.forEach(p => { if (p) p.textContent = `${percent}%`; });
-        currentTasks.forEach(t => { if (t) t.textContent = task || 'Đang xử lý Auto-Pilot...'; });
+        if (progressFill) progressFill.style.width = `${percent}%`;
+        if (progressPercent) progressPercent.textContent = `${percent}%`;
+        if (progressTask) progressTask.textContent = task || 'Đang thực thi Auto-Pilot...';
     } else {
         if (percent >= 100 || successCount > 0) {
-            progressBars.forEach(b => { if (b) b.style.width = '100%'; });
-            percentTexts.forEach(p => { if (p) p.textContent = '100%'; });
-            currentTasks.forEach(t => { if (t) t.textContent = task || 'Hoàn tất Auto-Pilot!'; });
-            if (statusBadgePage) {
-                statusBadgePage.textContent = 'Đã hoàn thành';
-                statusBadgePage.className = 'badge badge-success';
-            }
+            if (progressFill) progressFill.style.width = '100%';
+            if (progressPercent) progressPercent.textContent = '100%';
+            if (progressTask) progressTask.textContent = task || 'Hoàn tất Auto-Pilot!';
         }
     }
+
+    // Modal progress
+    const modalBar = document.getElementById('autopilot-progress-bar');
+    const modalPercent = document.getElementById('autopilot-progress-percent');
+    const modalTask = document.getElementById('autopilot-current-task');
+    if (modalBar) modalBar.style.width = `${percent}%`;
+    if (modalPercent) modalPercent.textContent = `${percent}%`;
+    if (modalTask) modalTask.textContent = task || (isRunning ? 'Đang xử lý...' : 'Hoàn tất');
 
     // Tự động reload hàng đợi khi chuyển trạng thái từ đang chạy sang đã chạy xong
     if (lastAutopilotRunningState && !isRunning) {
@@ -4823,7 +5493,6 @@ function updateAutopilotProgressUI(data) {
     }
     lastAutopilotRunningState = isRunning;
 
-    // Stream logs vào terminal
     if (data.logs && data.logs.length > 0) {
         syncAutopilotLogsToTerminals(data.logs);
     }
@@ -4833,44 +5502,43 @@ async function startAutopilotPipeline() {
     if (pendingQueueRawCache.length === 0) {
         await loadAutopilotQueue();
     }
-    
-    if (!pendingQueueFilteredCache || pendingQueueFilteredCache.length === 0) {
-        alert('⚠️ Vui lòng chọn ít nhất 1 tài khoản có clip chờ xuất bản!');
+
+    const allModels = buildAutopilotAccountsModel();
+    if (!selectedAutopilotAccounts || selectedAutopilotAccounts.size === 0) {
+        alert('⚠️ Vui lòng chọn ít nhất 1 tài khoản để bắt đầu Auto-Pilot!');
+        return;
+    }
+
+    const selectedActiveAccs = allModels
+        .filter(a => selectedAutopilotAccounts.has(a.name) && a.clips.length > 0)
+        .map(a => a.name);
+
+    if (selectedActiveAccs.length === 0) {
+        alert('⚠️ Các tài khoản bạn chọn hiện tại không có clip nào sẵn sàng để đăng!\nVui lòng chọn các tài khoản có video (>0 clip).');
         return;
     }
 
     const optShutdown = (document.getElementById('autopilot-opt-shutdown')?.checked) ||
                         (document.getElementById('tab-opt-shutdown')?.checked) || false;
 
-    // Nhóm các clip theo từng tài khoản
-    const accountsGroupMap = new Map();
-    for (const item of pendingQueueFilteredCache) {
-        if (!accountsGroupMap.has(item.account_name)) {
-            accountsGroupMap.set(item.account_name, []);
-        }
-        accountsGroupMap.get(item.account_name).push(item);
-    }
-
-    const accountList = Array.from(accountsGroupMap.keys());
-    const totalAccounts = accountList.length;
-
-    // Reset log cache and set UI to running state immediately
+    // Reset log cache & clear terminals
     seenAutopilotLogKeys.clear();
-    const logsModal = document.getElementById('autopilot-logs');
-    const logsPage = document.getElementById('tab-autopilot-logs');
-    if (logsModal) logsModal.innerHTML = '';
-    if (logsPage) logsPage.innerHTML = '';
+    const modalLogs = document.getElementById('autopilot-logs');
+    if (modalLogs) modalLogs.innerHTML = '';
+    const mainTerm = document.getElementById('terminal-logs-window');
+    if (mainTerm) {
+        mainTerm.innerHTML = '<div class="log-line text-muted">[Auto-Pilot Console] Khởi tạo phiên làm việc mới...</div>';
+    }
 
     setAutopilotRunningUI(true);
 
-    appendAutopilotLog(`🚀 Bắt đầu quy trình Auto-Pilot Multi-Tab (${totalAccounts} tài khoản đã chọn - Mở 1 Chrome 3 tab/nick)...`, 'info');
+    appendAutopilotLog(`🚀 Bắt đầu quy trình Auto-Pilot Pipeline cho ${selectedActiveAccs.length} tài khoản đã chọn (${selectedActiveAccs.join(', ')})...`, 'info');
 
-    // 1. Khởi chạy Native Auto-Pilot trên máy chủ
     try {
         const startRes = await fetch('/api/autopilot/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accounts: accountList, auto_submit: true })
+            body: JSON.stringify({ accounts: selectedActiveAccs, auto_submit: true, auto_shutdown: optShutdown })
         });
         const startData = await startRes.json();
         if (!startData.success) {
@@ -4884,11 +5552,10 @@ async function startAutopilotPipeline() {
         return;
     }
 
-    appendAutopilotLog('⚡ Auto-Pilot đã được bàn giao cho máy chủ thực thi liên tục không ngừng nghỉ...', 'success');
+    appendAutopilotLog('⚡ Auto-Pilot đã được chuyển giao cho máy chủ thực thi liên tục. Bạn có thể theo dõi chi tiết tại tab Logs...', 'success');
 
-    // Kích hoạt ngay vòng lặp polling toàn cục
-    checkAndPollProgress();
-    startPollingProgress();
+    if (typeof checkAndPollProgress === 'function') checkAndPollProgress();
+    if (typeof startPollingProgress === 'function') startPollingProgress();
 }
 
 async function stopAutopilotPipeline() {
@@ -4900,7 +5567,6 @@ async function stopAutopilotPipeline() {
         await fetch('/api/system/cancel_shutdown', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     } catch (e) {}
 
-    // Lập tức hoàn trả nút bấm về trạng thái START PIPELINE
     setAutopilotRunningUI(false);
     const statusBadgePage = document.getElementById('tab-autopilot-status-badge');
     if (statusBadgePage) {
@@ -4911,6 +5577,7 @@ async function stopAutopilotPipeline() {
 
 window.initAutoPilotHub = initAutoPilotHub;
 window.loadAutopilotQueue = loadAutopilotQueue;
+window.renderAutopilotUI = renderAutopilotUI;
 window.startAutopilotPipeline = startAutopilotPipeline;
 window.stopAutopilotPipeline = stopAutopilotPipeline;
 
@@ -5035,7 +5702,7 @@ function initDownloadVideoPipeline() {
 
             // If auto-download is enabled and user checked "Select All"
             if (checked && autoDownload && currentList.length > 0) {
-                const unDownloaded = currentList.filter(it => !it.is_downloaded && it.status !== 'downloading' && it.status !== 'queued');
+                const unDownloaded = currentList.filter(it => !it.is_downloaded && it.status !== 'previously_downloaded' && it.status !== 'downloading' && it.status !== 'queued');
                 if (unDownloaded.length > 0) {
                     triggerBatchDownload(unDownloaded);
                 }
@@ -5334,12 +6001,16 @@ function renderDownloadMediaCards() {
 
     list.forEach(item => {
         const isSelected = dlSelectedItems.has(item.id);
+        const isCurrentDl = item.is_downloaded || item.status === 'downloaded';
+        const isPrevDl = item.status === 'previously_downloaded' || item.is_previously_downloaded;
+
         const card = document.createElement('div');
-        card.className = `dl-video-card ${isSelected ? 'is-selected' : ''} ${item.is_downloaded ? 'is-downloaded' : ''}`;
+        card.className = `dl-video-card ${isSelected ? 'is-selected' : ''} ${isCurrentDl ? 'is-downloaded' : ''} ${isPrevDl ? 'is-previously-downloaded' : ''}`;
         card.dataset.id = item.id;
         card.dataset.url = item.url;
 
-        const isShort = item.is_short;
+        const isShort = Boolean(item.is_short || (item.duration > 0 && item.duration < 120));
+        const isLong = Boolean(item.is_long || (item.duration && item.duration > 900));
         const thumbAspectClass = isShort ? 'short-aspect' : '';
 
         let statusBadgeHtml = '';
@@ -5347,10 +6018,36 @@ function renderDownloadMediaCards() {
             statusBadgeHtml = `<span class="dl-card-status-badge downloading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải...</span>`;
         } else if (item.status === 'queued') {
             statusBadgeHtml = `<span class="dl-card-status-badge" style="background: rgba(148, 163, 184, 0.15); color: var(--text-secondary);"><i class="fa-solid fa-clock"></i> Chờ tải...</span>`;
-        } else if (item.is_downloaded || item.status === 'downloaded') {
+        } else if (isCurrentDl) {
             statusBadgeHtml = `<span class="dl-card-status-badge downloaded"><i class="fa-solid fa-circle-check"></i> Đã có trong kho</span>`;
+        } else if (isPrevDl) {
+            statusBadgeHtml = `<span class="dl-card-status-badge previously-downloaded"><i class="fa-solid fa-clock-rotate-left"></i> Đã từng tải</span>`;
         } else {
             statusBadgeHtml = `<span class="dl-card-status-badge ready"><i class="fa-solid fa-cloud-arrow-down"></i> Sẵn sàng tải</span>`;
+        }
+
+        let btnActionHtml = '';
+        if (isCurrentDl) {
+            btnActionHtml = `
+                <button type="button" class="btn btn-xs btn-secondary btn-dl-single" style="font-weight: 700;">
+                    <i class="fa-solid fa-arrows-rotate"></i> 
+                    <span>Tải Lại</span>
+                </button>
+            `;
+        } else if (isPrevDl) {
+            btnActionHtml = `
+                <button type="button" class="btn btn-xs btn-prev-dl btn-dl-single" style="font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35);">
+                    <i class="fa-solid fa-clock-rotate-left"></i> 
+                    <span>Tải Lại</span>
+                </button>
+            `;
+        } else {
+            btnActionHtml = `
+                <button type="button" class="btn btn-xs btn-primary btn-dl-single" style="font-weight: 700;">
+                    <i class="fa-solid fa-cloud-arrow-down"></i> 
+                    <span>Tải Xuống</span>
+                </button>
+            `;
         }
 
         card.innerHTML = `
@@ -5361,8 +6058,20 @@ function renderDownloadMediaCards() {
                     <input type="checkbox" class="dl-card-checkbox" ${isSelected ? 'checked' : ''}>
                 </label>
 
-                <div class="dl-card-duration-badge">
-                    <i class="fa-solid ${isShort ? 'fa-bolt' : 'fa-clock'}"></i>
+                ${isShort ? `
+                    <div class="dl-card-short-tag" title="Video ngắn dưới 2 phút (<120s)">
+                        <i class="fa-solid fa-bolt"></i>
+                        <span>SHORT</span>
+                    </div>
+                ` : (isLong ? `
+                    <div class="dl-card-long-tag" title="Video dài trên 15 phút (>15p)">
+                        <i class="fa-solid fa-film"></i>
+                        <span>LONG</span>
+                    </div>
+                ` : '')}
+
+                <div class="dl-card-duration-badge ${isShort ? 'is-short-duration' : (isLong ? 'is-long-duration' : '')}">
+                    <i class="fa-solid ${isShort ? 'fa-bolt text-warning' : (isLong ? 'fa-film text-info' : 'fa-clock')}"></i>
                     <span>${item.formatted_duration || '0:00'}</span>
                 </div>
             </div>
@@ -5371,9 +6080,13 @@ function renderDownloadMediaCards() {
                 <h4 class="dl-card-title" title="${item.title}">${item.title}</h4>
 
                 <div class="dl-card-meta">
-                    <div class="dl-views-pill" title="${item.views.toLocaleString()} views">
-                        <i class="fa-solid fa-fire"></i>
-                        <span>${item.formatted_views || '0 views'}</span>
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <div class="dl-views-pill" title="${item.views.toLocaleString()} views">
+                            <i class="fa-solid fa-fire"></i>
+                            <span>${item.formatted_views || '0 views'}</span>
+                        </div>
+                        ${isShort ? `<span class="dl-meta-short-badge" title="Video ngắn dưới 2 phút"><i class="fa-solid fa-bolt"></i> Short</span>` : ''}
+                        ${isLong ? `<span class="dl-meta-long-badge" title="Video dài trên 15 phút"><i class="fa-solid fa-film"></i> Long</span>` : ''}
                     </div>
                     ${statusBadgeHtml}
                 </div>
@@ -5384,10 +6097,7 @@ function renderDownloadMediaCards() {
             </div>
 
             <div class="dl-card-footer">
-                <button type="button" class="btn btn-xs ${item.is_downloaded ? 'btn-secondary' : 'btn-primary'} btn-dl-single" style="font-weight: 700;">
-                    <i class="fa-solid ${item.is_downloaded ? 'fa-arrows-rotate' : 'fa-cloud-arrow-down'}"></i> 
-                    <span>${item.is_downloaded ? 'Tải Lại' : 'Tải Xuống'}</span>
-                </button>
+                ${btnActionHtml}
                 <a href="${item.url}" target="_blank" class="btn btn-xs btn-outline" title="Mở video trên YouTube" style="display: inline-flex; align-items: center; gap: 4px;">
                     <i class="fa-brands fa-youtube text-danger"></i> YouTube
                 </a>
@@ -5404,7 +6114,7 @@ function renderDownloadMediaCards() {
 
                 // Check if auto-download toggle is active
                 const autoDownload = document.getElementById('dl-toggle-auto-download')?.checked ?? true;
-                if (autoDownload && !item.is_downloaded && item.status !== 'downloading' && item.status !== 'queued') {
+                if (autoDownload && !isCurrentDl && !isPrevDl && item.status !== 'downloading' && item.status !== 'queued') {
                     triggerSingleVideoDownload(item, card);
                 }
             } else {
@@ -5456,11 +6166,12 @@ async function triggerSingleVideoDownload(item, cardEl) {
         }
     }
 
+    const isShortFlag = Boolean(item.is_short || (item.duration > 0 && item.duration < 120));
     const payload = {
         url: item.url,
         title: item.title,
         channel: item.channel || dlScannedData.channel_name || 'Downloads',
-        is_short: item.is_short,
+        is_short: isShortFlag,
         thumbnail: item.thumbnail || '',
         source_dir: accountsData.source_path || ''
     };
@@ -5485,7 +6196,7 @@ async function triggerBatchDownload(items) {
             url: item.url,
             title: item.title,
             channel: item.channel || dlScannedData.channel_name || 'Downloads',
-            is_short: item.is_short,
+            is_short: Boolean(item.is_short || (item.duration > 0 && item.duration < 120)),
             thumbnail: item.thumbnail || ''
         })),
         source_dir: accountsData.source_path || ''
@@ -5590,7 +6301,7 @@ function startDownloadQueuePolling() {
                             <div class="dl-widget-item ${itemClass}">
                                 <div class="dl-widget-item-top">
                                     <span class="dl-widget-item-title" title="${t.title}">
-                                        ${t.is_short ? '<i class="fa-solid fa-bolt" style="color: #f59e0b;"></i> ' : '<i class="fa-solid fa-video" style="color: #3b82f6;"></i> '}${t.title}
+                                        ${t.is_short ? '<i class="fa-solid fa-bolt" style="color: #f59e0b;" title="Short (<2p)"></i> ' : (t.is_long ? '<i class="fa-solid fa-film" style="color: #6366f1;" title="Long (>15p)"></i> ' : '<i class="fa-solid fa-video" style="color: #3b82f6;"></i> ')}${t.title}
                                     </span>
                                     <span class="dl-widget-item-channel">${t.channel || 'Video'}</span>
                                 </div>
@@ -5903,3 +6614,56 @@ window.initTikTokAnalyticsEngine = initTikTokAnalyticsEngine;
 
 // Heartbeat System to keep background server alive
 setInterval(() => { fetch('/api/heartbeat').catch(e => {}); }, 10000);
+
+/* ==========================================================================
+   Logs Console Manager & Interactive Tools (Copy, Clear, Auto-Scroll)
+   ========================================================================== */
+let terminalAutoScroll = true;
+
+function initLogsControls() {
+    const btnCopy = document.getElementById('btn-copy-terminal-logs');
+    const btnClear = document.getElementById('btn-clear-terminal-logs');
+    const btnAutoScroll = document.getElementById('btn-toggle-autoscroll-logs');
+    const term = document.getElementById('terminal-logs-window');
+
+    if (btnCopy && term) {
+        btnCopy.addEventListener('click', async () => {
+            const text = term.innerText || term.textContent;
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('📋 Đã sao chép toàn bộ logs vào clipboard!', 'success');
+            } catch (err) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('📋 Đã sao chép logs!', 'success');
+            }
+        });
+    }
+
+    if (btnClear && term) {
+        btnClear.addEventListener('click', () => {
+            term.innerHTML = '<div class="log-line text-muted">[Console Cleared] Sẵn sàng nhận logs mới...</div>';
+            const logsCountEl = document.getElementById('terminal-logs-count');
+            if (logsCountEl) logsCountEl.textContent = '1 dòng';
+            showToast('🧹 Đã xóa sạch màn hình console!', 'info');
+        });
+    }
+
+    if (btnAutoScroll) {
+        btnAutoScroll.addEventListener('click', () => {
+            terminalAutoScroll = !terminalAutoScroll;
+            btnAutoScroll.innerHTML = terminalAutoScroll
+                ? '<i class="fa-solid fa-arrow-down-short-wide"></i> Auto-Scroll: ON'
+                : '<i class="fa-solid fa-pause"></i> Auto-Scroll: OFF';
+            if (terminalAutoScroll && term) {
+                term.scrollTop = term.scrollHeight;
+            }
+            showToast(terminalAutoScroll ? 'Đã bật tự động cuộn logs' : 'Đã tạm dừng tự động cuộn logs', 'info');
+        });
+    }
+}
+window.initLogsControls = initLogsControls;

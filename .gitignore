@@ -32,6 +32,7 @@ cookies.txt
 !/data/accounts.example.json
 
 # Runtime Storage, Videos & Logs
+/storage/*.json
 /storage/inputs/*
 !/storage/inputs/.gitkeep
 /storage/outputs/*
