@@ -62,8 +62,8 @@ def load_settings():
             "model": "gemini-3.7-flash"
         },
         "telegram": {
-            "bot_token": "8862905925:AAE7b5oOqce_3jPA-9F8lq_HqEI0v4ncvxY",
-            "chat_id": "6661216386",
+            "bot_token": "",
+            "chat_id": "",
             "enabled": True
         }
     }
